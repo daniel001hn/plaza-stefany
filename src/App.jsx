@@ -9,80 +9,72 @@ function LoginScreen({ onLogin }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [shake, setShake] = useState(false)
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (!password) return
     setLoading(true)
     setTimeout(() => {
       if (password === CORRECT_PASSWORD) {
         sessionStorage.setItem(SESSION_KEY, '1')
         onLogin()
       } else {
-        setError('Contraseña incorrecta')
+        setError('Contrase\u00f1a incorrecta')
         setLoading(false)
+        setShake(true)
+        setTimeout(() => setShake(false), 500)
       }
-    }, 400)
+    }, 600)
   }
+
+  const css = `
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+    .lc{animation:fadeIn 0.45s ease}
+    .li:focus{outline:none;border-color:rgba(255,255,255,0.22)!important;background:rgba(255,255,255,0.1)!important}
+    .li{transition:all 0.2s ease}
+    .lb{transition:all 0.15s ease}
+    .lb:hover:not(:disabled){background:rgba(255,255,255,0.96)!important;transform:scale(1.01)}
+    .lb:active:not(:disabled){transform:scale(0.99)}
+  `
 
   return (
     <div style={{
-      minHeight: '100vh',
-      background: '#0a0a0a',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: 'monospace'
+      minHeight:'100vh',
+      background:'linear-gradient(145deg,#1c1c1e 0%,#2c2c2e 50%,#1c1c1e 100%)',
+      display:'flex',alignItems:'center',justifyContent:'center',
+      fontFamily:'-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif',
+      WebkitFontSmoothing:'antialiased'
     }}>
-      <div style={{
-        background: '#111',
-        border: '1px solid #1a3a1a',
-        borderRadius: '12px',
-        padding: '40px',
-        width: '320px',
-        textAlign: 'center'
+      <style>{css}</style>
+      <div className={shake ? '' : 'lc'} style={{
+        width:'340px',
+        background:'rgba(44,44,46,0.88)',
+        backdropFilter:'blur(40px)',
+        WebkitBackdropFilter:'blur(40px)',
+        borderRadius:'20px',
+        border:'1px solid rgba(255,255,255,0.1)',
+        padding:'44px 36px 40px',
+        boxShadow:'0 32px 80px rgba(0,0,0,0.6),0 0 0 0.5px rgba(255,255,255,0.05)',
+        animation: shake ? 'shake 0.4s ease' : undefined
       }}>
-        <div style={{ fontSize: '48px', marginBottom: '8px' }}>🏢</div>
-        <h1 style={{ color: '#4ade80', fontSize: '22px', margin: '0 0 4px 0' }}>Plaza Stefany</h1>
-        <p style={{ color: '#555', fontSize: '12px', marginBottom: '28px' }}>Control · V3</p>
-
+        <div style={{width:'68px',height:'68px',background:'linear-gradient(145deg,#3a3a3c,#2c2c2e)',borderRadius:'16px',margin:'0 auto 24px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'32px',boxShadow:'0 4px 16px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.1)',border:'1px solid rgba(255,255,255,0.08)'}}>
+          \uD83C\uDFE2
+        </div>
+        <h1 style={{color:'#fff',fontSize:'22px',fontWeight:'700',textAlign:'center',margin:'0 0 4px',letterSpacing:'-0.4px'}}>Plaza Stefany</h1>
+        <p style={{color:'rgba(255,255,255,0.35)',fontSize:'13px',textAlign:'center',margin:'0 0 32px',letterSpacing:'0.2px'}}>Control \u00b7 V3</p>
         <form onSubmit={handleSubmit}>
-          <input
-            type="password"
-            placeholder="Contraseña"
-            value={password}
-            onChange={e => { setPassword(e.target.value); setError('') }}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: '#1a1a1a',
-              border: error ? '1px solid #ef4444' : '1px solid #222',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '16px',
-              marginBottom: '12px',
-              boxSizing: 'border-box',
-              outline: 'none'
-            }}
-            autoFocus
-          />
-          {error && <p style={{ color: '#ef4444', fontSize: '13px', margin: '0 0 12px 0' }}>{error}</p>}
-          <button
-            type="submit"
-            disabled={loading || !password}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: loading ? '#1a3a1a' : '#4ade80',
-              color: loading ? '#4ade80' : '#000',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '15px',
-              fontWeight: 'bold',
-              cursor: loading ? 'wait' : 'pointer',
-              transition: 'all 0.2s'
-            }}
-          >
-            {loading ? 'Verificando...' : 'Entrar'}
+          <div style={{marginBottom: error ? '10px' : '16px'}}>
+            <input className='li' type='password' placeholder='Contrase\u00f1a' value={password}
+              onChange={e => { setPassword(e.target.value); setError('') }}
+              style={{width:'100%',padding:'14px 16px',background:error?'rgba(255,59,48,0.08)':'rgba(255,255,255,0.07)',border:error?'1px solid rgba(255,59,48,0.5)':'1px solid rgba(255,255,255,0.1)',borderRadius:'12px',color:'#fff',fontSize:'15px',fontFamily:'inherit',fontWeight:'400',letterSpacing:'0.1px',boxSizing:'border-box',caretColor:'#fff'}}
+              autoFocus />
+          </div>
+          {error && <p style={{color:'rgb(255,69,58)',fontSize:'12px',margin:'0 0 14px 4px'}}>{error}</p>}
+          <button className='lb' type='submit' disabled={loading || !password}
+            style={{width:'100%',padding:'14px',background:password&&!loading?'rgba(255,255,255,0.92)':'rgba(255,255,255,0.12)',color:password&&!loading?'#1c1c1e':'rgba(255,255,255,0.25)',border:'none',borderRadius:'12px',fontSize:'15px',fontFamily:'inherit',fontWeight:'600',cursor:loading?'default':password?'pointer':'default',letterSpacing:'-0.1px'}}>
+            {loading ? 'Verificando\u2026' : 'Continuar'}
           </button>
         </form>
       </div>
@@ -92,13 +84,9 @@ function LoginScreen({ onLogin }) {
 
 function App() {
   const [authed, setAuthed] = useState(false)
-
   useEffect(() => {
-    if (sessionStorage.getItem(SESSION_KEY) === '1') {
-      setAuthed(true)
-    }
+    if (sessionStorage.getItem(SESSION_KEY) === '1') setAuthed(true)
   }, [])
-
   if (!authed) return <LoginScreen onLogin={() => setAuthed(true)} />
   return <PlazaStefany supabase={supabase} />
 }
