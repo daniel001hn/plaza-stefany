@@ -31,3 +31,17 @@ input, button, select, textarea {
   border: 1px solid rgba(255,255,255,0.90);
   box-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
 }
+/* Force readable text - override inherited near-white */
+* { color: inherit; }
+body, #root {
+  color: #1C1C1E;
+}
+/* Override any element inheriting near-white text from parent */
+div, span, p, h1, h2, h3, h4, h5, h6, button, a, label, td, th {
+  color: inherit;
+}
+/* Nuclear option: if body color is near-white, force dark */
+@media screen {
+  html { color-scheme: light; }
+  body { color: #1C1C1E !important; }
+}
