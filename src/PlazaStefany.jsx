@@ -372,7 +372,7 @@ export default function App({ supabase }) {
       {toast && (
         <div style={{
           position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
-          background: '#1D4ED8', color: '#F2F2F7', padding: '.6rem 1.2rem', borderRadius: 999,
+          background: '#1D4ED8', color: '#6E6E78', padding: '.6rem 1.2rem', borderRadius: 999,
           fontSize: '.82rem', fontWeight: 600, zIndex: 100, animation: 'psSlide .2s ease',
           display: 'flex', alignItems: 'center', gap: '.45rem',
           boxShadow: '0 8px 32px rgba(29,78,216,0.25)',
@@ -718,7 +718,7 @@ function HistorialPlaza({ monthsData, year }) {
               <Tooltip
                 cursor={{ fill: 'rgba(132, 248, 65, 0.05)' }}
                 contentStyle={{ background: '#E8E8ED', border: '1px solid #2E2E38', borderRadius: 8, fontSize: '.78rem', fontFamily: 'JetBrains Mono, monospace' }}
-                labelStyle={{ color: '#F5F5F7', fontWeight: 600 }}
+                labelStyle={{ color: '#1C1C1E', fontWeight: 600 }}
                 formatter={(value, name) => [`L ${fmt(value)}`, name === 'cobradoRenta' ? 'Renta' : 'Luz']}
               />
               <Bar dataKey="cobradoRenta" stackId="a" fill="#1D4ED8" />
@@ -863,7 +863,7 @@ function HistorialLocales({ monthsData, locales, year }) {
                         return (
                           <tr key={m.idx} className="ps-table-row" style={{ opacity: m.hasData ? 1 : 0.35 }}>
                             <td style={{ fontWeight: 600 }}>{m.mes}</td>
-                            <td className="num" style={{ color: '#B0B0BA' }}>
+                            <td className="num" style={{ color: '#8E8E96' }}>
                               {ld.lecturaActual != null ? ld.lecturaActual : '—'}
                             </td>
                             <td className="num" style={{ color: '#5AC8FA' }}>
@@ -978,7 +978,7 @@ function HistorialENEE({ monthsData, year }) {
                 <YAxis tick={{ fill: '#6E6E78', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} domain={['auto', 'auto']} />
                 <Tooltip
                   contentStyle={{ background: '#E8E8ED', border: '1px solid #2E2E38', borderRadius: 8, fontSize: '.78rem', fontFamily: 'JetBrains Mono, monospace' }}
-                  labelStyle={{ color: '#F5F5F7', fontWeight: 600 }}
+                  labelStyle={{ color: '#1C1C1E', fontWeight: 600 }}
                   formatter={(v) => [`L ${fmt2(v)}/kWh`, 'Tarifa']}
                 />
                 <Line type="monotone" dataKey="tarifa" stroke="#1D4ED8" strokeWidth={2.5} dot={{ fill: '#1D4ED8', r: 4 }} activeDot={{ r: 6 }} />
@@ -1009,7 +1009,7 @@ function HistorialENEE({ monthsData, year }) {
             {monthsData.map((m) => (
               <tr key={m.idx} className="ps-table-row" style={{ opacity: m.factura.montoTotal ? 1 : 0.35 }}>
                 <td style={{ fontWeight: 600 }}>{m.mes}</td>
-                <td className="num" style={{ color: '#B0B0BA' }}>
+                <td className="num" style={{ color: '#8E8E96' }}>
                   {m.factura.lecturaPrincipal != null ? m.factura.lecturaPrincipal : '—'}
                 </td>
                 <td className="num">{m.consumoPrincipal != null ? `${fmt(m.consumoPrincipal)}` : '—'}</td>
@@ -1069,7 +1069,7 @@ function FacturaCard({ factura, consumoPrincipal, consumoSubmedidores, areasComu
             <div className="ps-eyebrow" style={{ color: '#7C3AED', marginBottom: '.2rem' }}>
               <AlertCircle size={11} /> FACTURA ENEE PENDIENTE
             </div>
-            <div style={{ fontSize: '.95rem', fontWeight: 500, color: '#F5F5F7' }}>
+            <div style={{ fontSize: '.95rem', fontWeight: 500, color: '#1C1C1E' }}>
               Registrá la factura ENEE del mes
             </div>
             <div style={{ fontSize: '.78rem', color: '#8E8E96', marginTop: '.2rem' }}>
@@ -1214,7 +1214,7 @@ function YearlyChart({ data, year, total }) {
             <Tooltip
               cursor={{ fill: 'rgba(132, 248, 65, 0.05)' }}
               contentStyle={{ background: '#E8E8ED', border: '1px solid #2E2E38', borderRadius: 8, fontSize: '.78rem', fontFamily: 'JetBrains Mono, monospace' }}
-              labelStyle={{ color: '#F5F5F7', fontWeight: 600 }}
+              labelStyle={{ color: '#1C1C1E', fontWeight: 600 }}
               formatter={(value, name) => [`L ${fmt(value)}`, name === 'renta' ? 'Renta' : 'Luz']}
             />
             <Bar dataKey="renta" stackId="a" fill="#1D4ED8">
@@ -1394,11 +1394,11 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
         <div style={{
           background: 'rgba(90, 200, 250, 0.06)', border: '1px solid rgba(90, 200, 250, 0.2)',
           padding: '.7rem .9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '.78rem',
-          color: '#B0B0BA', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
+          color: '#8E8E96', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
         }}>
           <Info size={14} color="#5AC8FA" style={{ flexShrink: 0, marginTop: '.1rem' }} />
           <div>
-            Metés el <strong style={{ color: '#F5F5F7' }}>monto total</strong> que ENEE te cobró y la <strong style={{ color: '#F5F5F7' }}>lectura del medidor principal</strong>. Con eso la app calcula sola la tarifa efectiva del mes y reparte entre los locales.
+            Metés el <strong style={{ color: '#1C1C1E' }}>monto total</strong> que ENEE te cobró y la <strong style={{ color: '#1C1C1E' }}>lectura del medidor principal</strong>. Con eso la app calcula sola la tarifa efectiva del mes y reparte entre los locales.
           </div>
         </div>
 
@@ -1414,7 +1414,7 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
           display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.4rem',
         }}>
           <span>Lectura anterior del medidor principal:</span>
-          <span className="ps-mono" style={{ color: '#F5F5F7', fontWeight: 600 }}>
+          <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>
             {lecturaAnt != null ? lecturaAnt : '— sin registro previo'}
           </span>
         </div>
@@ -1604,7 +1604,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                   display: 'flex', justifyContent: 'space-between',
                 }}>
                   <span>Lectura anterior:</span>
-                  <span className="ps-mono" style={{ color: '#F5F5F7', fontWeight: 600 }}>{lecturaAnterior ?? '—'}</span>
+                  <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>{lecturaAnterior ?? '—'}</span>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginBottom: '.85rem' }}>
@@ -1629,7 +1629,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                 display: 'flex', justifyContent: 'space-between',
               }}>
                 <span>Monto fijo configurado:</span>
-                <span className="ps-mono" style={{ color: '#F5F5F7', fontWeight: 600 }}>L {fmt2(local.luzFija || 0)}</span>
+                <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>L {fmt2(local.luzFija || 0)}</span>
               </div>
             )}
 
@@ -1704,11 +1704,11 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
         <div style={{
           background: 'rgba(90, 200, 250, 0.06)', border: '1px solid rgba(90, 200, 250, 0.2)',
           padding: '.75rem .9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '.78rem',
-          color: '#B0B0BA', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
+          color: '#8E8E96', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
         }}>
           <Info size={14} color="#5AC8FA" style={{ flexShrink: 0, marginTop: '.1rem' }} />
           <div>
-            <strong style={{ color: '#F5F5F7' }}>La tarifa de luz no se configura aquí.</strong> Cada mes se calcula sola dividiendo el monto total de la factura ENEE entre los kWh consumidos por los submedidores. Así siempre cuadra exacto y se ajusta automático a los cambios trimestrales de ENEE.
+            <strong style={{ color: '#1C1C1E' }}>La tarifa de luz no se configura aquí.</strong> Cada mes se calcula sola dividiendo el monto total de la factura ENEE entre los kWh consumidos por los submedidores. Así siempre cuadra exacto y se ajusta automático a los cambios trimestrales de ENEE.
           </div>
         </div>
 
