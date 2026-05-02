@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import PlazaStefany from './PlazaStefany'
+import './storageAdapter'
 
 const CORRECT_PASSWORD = import.meta.env.VITE_APP_PASSWORD || 'STEFANYPLAZA100280'
 const SESSION_KEY = 'plaza_auth'
