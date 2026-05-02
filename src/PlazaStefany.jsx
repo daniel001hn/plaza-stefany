@@ -100,7 +100,7 @@ const STYLES = `
     radial-gradient(circle at 100% 100%, rgba(255, 184, 84, 0.04) 0%, transparent 40%),
     radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 24px 24px;
-  color: #F5F5F7;
+  color: #1C1C1E;
   min-height: 100vh;
   padding: 1.5rem 1.5rem 4rem;
   -webkit-font-smoothing: antialiased;
@@ -115,17 +115,17 @@ const STYLES = `
 .ps-label { font-size: 0.68rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: #6E6E78; }
 .ps-eyebrow { display: inline-flex; align-items: center; gap: .35rem; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: #1D4ED8; }
 .ps-tab { padding: .55rem 1rem; font-size: 0.85rem; font-weight: 500; color: #8E8E96; background: transparent; border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .4rem; }
-.ps-tab:hover { color: #F5F5F7; background: rgba(255,255,255,0.72); }
+.ps-tab:hover { color: #1C1C1E; background: rgba(255,255,255,0.72); }
 .ps-tab-active { color: #F2F2F7; background: #1D4ED8; }
 .ps-tab-active:hover { background: #2563EB; color: #F2F2F7; }
 .ps-btn { background: #1D4ED8; color: #F2F2F7; padding: .6rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .4rem; font-family: 'Geist', sans-serif; }
 .ps-btn:hover { background: #2563EB; transform: translateY(-1px); }
 .ps-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-.ps-btn-ghost { background: rgba(255,255,255,0.65); border: 1px solid #2E2E38; color: #F5F5F7; padding: .55rem .9rem; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .4rem; font-family: 'Geist', sans-serif; }
+.ps-btn-ghost { background: rgba(255,255,255,0.65); border: 1px solid #2E2E38; color: #1C1C1E; padding: .55rem .9rem; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .4rem; font-family: 'Geist', sans-serif; }
 .ps-btn-ghost:hover { background: rgba(255,255,255,0.50); border-color: #44444E; }
 .ps-btn-icon { background: rgba(255,255,255,0.65); border: 1px solid #2E2E38; color: #B0B0BA; padding: .5rem; border-radius: 8px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; justify-content: center; }
-.ps-btn-icon:hover { background: rgba(255,255,255,0.50); color: #F5F5F7; border-color: #44444E; }
-.ps-input { width: 100%; background: #E8E8ED; border: 1px solid #2E2E38; border-radius: 8px; padding: .65rem .85rem; font-family: 'Geist', sans-serif; font-size: 0.9rem; color: #F5F5F7; transition: all .15s; }
+.ps-btn-icon:hover { background: rgba(255,255,255,0.50); color: #1C1C1E; border-color: #44444E; }
+.ps-input { width: 100%; background: #E8E8ED; border: 1px solid #2E2E38; border-radius: 8px; padding: .65rem .85rem; font-family: 'Geist', sans-serif; font-size: 0.9rem; color: #1C1C1E; transition: all .15s; }
 .ps-input:focus { outline: none; border-color: #1D4ED8; box-shadow: 0 0 0 3px rgba(132, 248, 65, 0.12); }
 .ps-input::placeholder { color: #5A5A64; }
 .ps-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .22rem .55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.01em; font-family: 'JetBrains Mono', monospace; }
@@ -153,7 +153,7 @@ const STYLES = `
 
 .ps-table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: 'JetBrains Mono', monospace; font-size: .8rem; }
 .ps-table th { text-align: left; padding: .65rem .8rem; background: #E8E8ED; color: #6E6E78; font-weight: 500; font-size: .68rem; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid #2E2E38; position: sticky; top: 0; }
-.ps-table td { padding: .7rem .8rem; border-bottom: 1px solid rgba(255,255,255,0.75); color: #F5F5F7; }
+.ps-table td { padding: .7rem .8rem; border-bottom: 1px solid rgba(255,255,255,0.75); color: #1C1C1E; }
 .ps-table tr:last-child td { border-bottom: none; }
 .ps-table tr.ps-table-row { transition: background .15s; }
 .ps-table tr.ps-table-row:hover { background: rgba(255,255,255,0.72); }
@@ -1134,7 +1134,7 @@ function FacturaStat({ label, value, sub, accent, highlight }) {
       <div className="ps-label" style={{ marginBottom: '.3rem' }}>{label}</div>
       <div className="ps-mono" style={{
         fontSize: '1.1rem', fontWeight: 600, lineHeight: 1.1,
-        color: accent || '#F5F5F7', letterSpacing: '-0.02em',
+        color: accent || '#1C1C1E', letterSpacing: '-0.02em',
       }}>{value}</div>
       {sub && <div style={{ fontSize: '.7rem', color: '#6E6E78', marginTop: '.2rem' }}>{sub}</div>}
     </div>
@@ -1256,7 +1256,7 @@ function LocalBreakdown({ perLocal }) {
                 <span style={{ fontWeight: 500 }}>
                   {l.numero} <span style={{ color: '#6E6E78' }}>· {l.inquilino || 'Sin asignar'}</span>
                 </span>
-                <span className="ps-mono" style={{ color: l.cobrado >= l.total && l.total > 0 ? '#1D4ED8' : '#F5F5F7' }}>
+                <span className="ps-mono" style={{ color: l.cobrado >= l.total && l.total > 0 ? '#1D4ED8' : '#1C1C1E' }}>
                   L {fmt(l.cobrado)}<span style={{ color: '#6E6E78' }}> / {fmt(l.total)}</span>
                 </span>
               </div>
@@ -2064,7 +2064,7 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
                       <td colSpan="2" style={{ ...tdCell, textAlign: 'right', fontStyle: 'italic' }}>
                         <b><i>{fmt(consumo)} kWh × L {fmt2(tarifaEfectiva || 0)} =</i></b>
                       </td>
-                      <td style={{ ...tdCell, textAlign: 'right', background: '#FAFAFA' }}>
+                      <td style={{ ...tdCell, textAlign: 'right', background: '#3C3C43' }}>
                         <b>L {fmt2(monto)}</b>
                       </td>
                     </tr>
@@ -2099,7 +2099,7 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
               {/* FOOTER */}
               <div style={{ marginTop: 'auto' }}>
                 <div style={{
-                  background: '#F5F5F0', padding: '.85rem 2.5rem',
+                  background: '#2C2C2E', padding: '.85rem 2.5rem',
                   display: 'flex', justifyContent: 'space-around', alignItems: 'center',
                   flexWrap: 'wrap', gap: '.65rem', fontSize: '.78rem', borderTop: '1px solid #E5E5DD',
                 }}>
