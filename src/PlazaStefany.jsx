@@ -162,26 +162,33 @@ const STYLES = `
 
 
 const APPLE_GLOBAL_CSS = `
-  * { -webkit-font-smoothing: antialiased; }
+  * { -webkit-font-smoothing: antialiased; box-sizing: border-box; }
   body { 
     background: linear-gradient(135deg, #EEF2FF 0%, #F3E8FF 25%, #ECFDF5 55%, #FFF1F2 85%, #EEF2FF 100%) !important;
     background-attachment: fixed !important;
     min-height: 100vh;
   }
-  /* Override any remaining dark divs */
-  div[style*="background: rgb(10, 10, 11)"],
-  div[style*="background: rgb(15, 15, 20)"],
-  div[style*="background: rgb(18, 18, 29)"],
-  div[style*="background: rgb(26, 26, 34)"],
-  div[style*="background: rgb(34, 34, 44)"] {
-    background: rgba(255,255,255,0.72) !important;
+  h1, h2, h3 { color: #1C1C1E !important; }
+  [style*='color: rgb(255, 255, 255)'],
+  [style*='color: rgba(255, 255, 255'] {
+    color: #1C1C1E !important;
+  }
+  div[style*='background: rgb(10,'],
+  div[style*='background: rgb(15,'],
+  div[style*='background: rgb(18,'],
+  div[style*='background: rgb(26,'],
+  div[style*='background: rgb(34,'],
+  div[style*='background: rgb(28,'],
+  div[style*='background: rgb(22,'],
+  div[style*='background: rgb(46,'],
+  div[style*='background: rgb(38,'] {
+    background: rgba(255,255,255,0.78) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
   }
-  /* Glass card style */
-  [style*="borderRadius"][style*="background"] {
-    border: 1px solid rgba(255,255,255,0.80) !important;
-  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 99px; }
 `;
 
 export default function App({ supabase }) {
