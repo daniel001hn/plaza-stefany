@@ -159,6 +159,47 @@ const STYLES = `
 .ps-table tr.ps-table-row { transition: background .15s; }
 .ps-table tr.ps-table-row:hover { background: rgba(255,255,255,0.72); }
 .ps-table .num { text-align: right; }
+
+/* Grid gráfico */
+.ps-chart-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1rem; }
+
+/* LocalRow grid */
+.ps-local-row {
+  background: rgba(255,255,255,0.72);
+  border: 1px solid rgba(255,255,255,0.50);
+  border-radius: 10px;
+  padding: .9rem 1.1rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto;
+  gap: 1rem;
+  align-items: center;
+  cursor: pointer;
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.ps-local-row:hover { transform: translateY(-2px); border-color: #1D4ED833; box-shadow: 0 12px 32px -16px rgba(29,78,216,0.15), 0 0 0 1px #1D4ED822; }
+
+/* ─── MÓVIL ─── */
+@media (max-width: 640px) {
+  .ps-app { padding: .85rem .85rem 5rem; }
+
+  /* Tabs de navegación más compactos */
+  .ps-tab { padding: .45rem .65rem; font-size: .8rem; }
+
+  /* Gráfico: una columna en móvil */
+  .ps-chart-grid { grid-template-columns: 1fr; }
+
+  /* LocalRow: 2 filas en móvil */
+  .ps-local-row {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: .5rem .75rem;
+    padding: .85rem 1rem;
+  }
+  .ps-local-info  { grid-column: 1; grid-row: 1; }
+  .ps-local-arrow { grid-column: 2; grid-row: 1; align-self: start; margin-top: .2rem; }
+  .ps-local-renta { grid-column: 1; grid-row: 2; }
+  .ps-local-luz   { grid-column: 2; grid-row: 2; }
+}
 `;
 
 
@@ -556,7 +597,7 @@ function DashboardView({
         <KPIPending rentaPend={kpis.pendientesRenta} luzPend={kpis.pendientesLuz} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: '1rem' }}>
+      <div className="ps-chart-grid">
         <YearlyChart data={yearChart} year={year} total={yearTotal} />
         <LocalBreakdown perLocal={perLocal} />
       </div>
@@ -1299,14 +1340,8 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
   const btnNA = { ...btnBase, background: '#F3F4F6', color: '#9CA3AF', cursor: 'default' };
 
   return (
-    <div className="ps-card-hover" onClick={onClick} style={{
-      background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(255,255,255,0.50)', borderRadius: 10,
-      padding: '.9rem 1.1rem',
-      display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto',
-      gap: '1rem', alignItems: 'center', animationDelay: `${i * 60}ms`,
-    }}>
-      <div style={{ minWidth: 0 }}>
+    <div className="ps-local-row" onClick={onClick} style={{ animationDelay: `${i * 60}ms` }}>
+      <div className="ps-local-info" style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.2rem' }}>
           <span className="ps-mono" style={{
             fontSize: '.7rem', padding: '.15rem .4rem', background: 'rgba(255,255,255,0.50)',
@@ -1320,7 +1355,7 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
         {l.nombre && <div style={{ fontSize: '.75rem', color: '#6E6E78', marginTop: '.1rem' }}>{l.nombre}</div>}
       </div>
 
-      <div>
+      <div className="ps-local-renta">
         <div className="ps-label" style={{ marginBottom: '.25rem' }}>RENTA</div>
         <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 500 }}>L {fmt(l.renta)}</div>
         <div style={{ marginTop: '.4rem' }}>
@@ -1331,7 +1366,7 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
         </div>
       </div>
 
-      <div>
+      <div className="ps-local-luz">
         <div className="ps-label" style={{ marginBottom: '.25rem' }}>LUZ</div>
         {luzAplica ? (
           luzCalculable ? (
@@ -1359,7 +1394,7 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
         )}
       </div>
 
-      <ArrowRight size={16} style={{ color: '#5A5A64' }} />
+      <div className="ps-local-arrow"><ArrowRight size={16} style={{ color: '#5A5A64' }} /></div>
     </div>
   );
 }
