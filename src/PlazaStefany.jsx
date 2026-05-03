@@ -1982,9 +1982,6 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta }) {
 }
 
 // =================================================================
-// RECIBO LUZ MODAL — printable receipt for tenant
-// =================================================================
-
 // =================================================================
 // RECIBO LUZ MODAL — based on D&L Soluciones template
 // =================================================================
@@ -1992,48 +1989,68 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
   const lecturaAnterior = prevData.lecturaActual ?? local.lecturaInicial ?? 0;
   const lecturaActual = data.lecturaActual ?? 0;
   const consumo = lecturaActual - lecturaAnterior;
-  const monto = consumo * (tarifaEfectiva || 0);
-  const reciboNum = `${year}${String(monthIdx + 1).padStart(2, '0')}-${(local.numero || '').toString().padStart(3, '0')}`;
-  const fechaEmision = new Date().toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
+  const tarifa = tarifaEfectiva || 0;
+  const montoEnergia = consumo * tarifa;
+  const totalPagar = montoEnergia;
+  const reciboNum = `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(local.numero || '').padStart(3, '0')}`;
+  const fechaEmision = new Date().toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' });
+  const kWhPlaza = tarifa > 0 ? Math.round((factura.montoTotal || 0) / tarifa) : 0;
+  const numLocales = config?.numLocales || 5;
 
   const handlePrint = () => {
     const printContents = document.getElementById('recibo-print-area').innerHTML;
     const w = window.open('', '_blank');
-    w.document.write(`
-      <!DOCTYPE html>
-      <html><head><title>Recibo Luz - Local ${local.numero} - ${MESES_LARGO[monthIdx]} ${year}</title>
+    w.document.write(`<!DOCTYPE html><html><head>
+      <title>Recibo Luz - Local ${local.numero} - ${MESES_LARGO[monthIdx]} ${year}</title>
       <style>
         @page { size: Letter; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Times New Roman', 'Liberation Serif', serif; color: rgba(255,255,255,0.75); -webkit-font-smoothing: antialiased; background: white; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #333; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-      </style>
-      </head><body>${printContents}</body></html>
-    `);
+      </style></head><body>${printContents}</body></html>`);
     w.document.close();
     w.focus();
     setTimeout(() => { w.print(); }, 300);
   };
 
-  // SVG logo recreating the D&L bird mark
-  const Logo = () => (
-    <svg viewBox="0 0 100 100" width="64" height="64" style={{ flexShrink: 0 }}>
-      <g fill="#D87264" stroke="none">
-        <path d="M 20,75 L 50,30 L 80,75 L 65,75 L 50,50 L 35,75 Z" opacity="0.9" />
-        <path d="M 30,55 L 50,15 L 70,55 L 58,55 L 50,35 L 42,55 Z" opacity="1" />
-        <circle cx="50" cy="22" r="3" fill="rgba(255,255,255,0.75)" />
-      </g>
+  // D&L bird SVG logo (faithful recreation)
+  const DLLogo = () => (
+    <svg viewBox="0 0 120 110" width="80" height="73" xmlns="http://www.w3.org/2000/svg">
+      {/* Bird body - layered triangles */}
+      <path d="M60 10 L90 65 L75 65 L60 40 L45 65 L30 65 Z" fill="#C8706A" />
+      <path d="M60 25 L82 70 L70 70 L60 52 L50 70 L38 70 Z" fill="#C8706A" opacity="0.85"/>
+      <path d="M60 42 L72 72 L64 72 L60 63 L56 72 L48 72 Z" fill="#C8706A" opacity="0.7"/>
+      {/* Wing left */}
+      <path d="M45 45 L20 75 L38 62 Z" fill="#C8706A" opacity="0.6"/>
+      {/* Wing right */}
+      <path d="M75 45 L100 75 L82 62 Z" fill="#C8706A" opacity="0.6"/>
+      {/* Tail */}
+      <path d="M52 68 L45 90 L60 78 L75 90 L68 68 Z" fill="#C8706A" opacity="0.5"/>
     </svg>
   );
 
+  const C = { // color palette
+    coral: '#C8706A',
+    teal: '#3B8A8F',
+    tealDark: '#2A6268',
+    rowHead: '#F5C9C2',
+    border: '#ccc',
+    text: '#333',
+    textLight: '#555',
+    labelBg: '#f0f0f0',
+  };
+
+  const tH = { border: `1px solid ${C.border}`, padding: '7px 10px', fontSize: '12px', fontWeight: 700, textAlign: 'center', color: C.text };
+  const tC = { border: `1px solid ${C.border}`, padding: '8px 10px', fontSize: '13px', color: C.text, verticalAlign: 'middle' };
+
   return (
     <div className="ps-modal-backdrop" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 720, animation: 'psSlide .25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-        {/* Toolbar (dark theme) */}
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 740, animation: 'psSlide .25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        {/* Toolbar */}
         <div className="ps-card-elevated" style={{ padding: '.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '14px 14px 0 0', borderBottom: 'none' }}>
           <div>
             <div className="ps-eyebrow" style={{ color: '#5AC8FA' }}><Printer size={11} /> RECIBO DE LUZ</div>
-            <div style={{ fontSize: '.88rem', fontWeight: 600, marginTop: '.15rem' }}>Vista previa — Local {local.numero}</div>
+            <div style={{ fontSize: '.88rem', fontWeight: 600, marginTop: '.15rem' }}>Vista previa — Local {local.numero} · {MESES_LARGO[monthIdx]} {year}</div>
           </div>
           <div style={{ display: 'flex', gap: '.5rem' }}>
             <button onClick={handlePrint} className="ps-btn"><Printer size={14} strokeWidth={2.5} /> Imprimir / PDF</button>
@@ -2041,169 +2058,137 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
           </div>
         </div>
 
-        {/* Recibo - white background, scrollable */}
-        <div style={{
-          background: '#e8e8e3', borderRadius: '0 0 14px 14px',
-          border: '1px solid #2E2E38', borderTop: 'none',
-          padding: '1.5rem', maxHeight: '75vh', overflowY: 'auto',
-        }}>
+        {/* Scrollable preview area */}
+        <div style={{ background: '#d8d8d4', borderRadius: '0 0 14px 14px', border: '1px solid #2E2E38', borderTop: 'none', padding: '1.25rem', maxHeight: '78vh', overflowY: 'auto' }}>
           <div id="recibo-print-area">
-            <div style={{
-              background: 'white', maxWidth: 720, margin: '0 auto',
-              fontFamily: "'Times New Roman', serif", color: 'rgba(255,255,255,0.75)',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-              minHeight: 900, position: 'relative',
-              display: 'flex', flexDirection: 'column',
-            }}>
-              {/* HEADER with logo */}
-              <div style={{ padding: '2rem 2.5rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1.25rem' }}>
-                <Logo />
-                <div style={{ textAlign: 'left' }}>
-                  <div style={{ fontSize: '2rem', fontWeight: 700, color: '#3F8B92', letterSpacing: '0.02em', lineHeight: 1 }}>
-                    D & L
-                  </div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#3F8B92', letterSpacing: '0.06em', lineHeight: 1, marginTop: '.15rem' }}>
-                    SOLUCIONES
-                  </div>
+            <div style={{ background: 'white', maxWidth: 700, margin: '0 auto', fontFamily: 'Arial, Helvetica, sans-serif', color: C.text, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', minHeight: 900 }}>
+
+              {/* ── HEADER ── */}
+              <div style={{ padding: '28px 40px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                <DLLogo />
+                <div>
+                  <div style={{ fontSize: '30px', fontWeight: 900, color: C.teal, letterSpacing: '3px', lineHeight: 1 }}>D &amp; L</div>
+                  <div style={{ fontSize: '19px', fontWeight: 700, color: C.teal, letterSpacing: '5px', lineHeight: 1.2 }}>SOLUCIONES</div>
                 </div>
               </div>
 
-              {/* Decorative bar */}
-              <div style={{ height: 12, background: 'linear-gradient(to right, #D87264 0%, #D87264 35%, #3F8B92 35%, #3F8B92 100%)' }} />
+              {/* ── DECORATIVE BAR ── */}
+              <div style={{ display: 'flex', height: 10 }}>
+                <div style={{ width: '30%', background: C.coral }} />
+                <div style={{ flex: 1, background: C.teal }} />
+              </div>
 
-              {/* Body */}
-              <div style={{ padding: '1.75rem 2.5rem', flex: 1 }}>
-                {/* Plaza name */}
-                <div style={{ fontSize: '.95rem', fontWeight: 700, marginBottom: '1rem', letterSpacing: '0.02em' }}>
-                  PLAZA STEFANY
-                </div>
+              {/* ── TITLE SECTION ── */}
+              <div style={{ textAlign: 'center', padding: '20px 40px 10px' }}>
+                <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '6px', color: C.text }}>P L A Z A &nbsp; S T E F A N Y</div>
+                <div style={{ fontSize: '12px', letterSpacing: '3px', color: C.textLight, marginTop: '4px' }}>R E C I B O &nbsp; D E &nbsp; E N E R G Í A &nbsp; E L É C T R I C A</div>
+              </div>
 
-                {/* Meta info rows */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.4rem 0', borderBottom: '1px solid transparent' }}>
-                  <span style={{ fontSize: '.88rem', letterSpacing: '0.02em' }}>RECIBO N°</span>
-                  <span style={{ fontSize: '.88rem', fontWeight: 700 }}>{reciboNum}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.4rem 0' }}>
-                  <span style={{ fontSize: '.88rem', letterSpacing: '0.02em' }}>INQUILINO</span>
-                  <span style={{ fontSize: '.88rem', fontWeight: 700 }}>{(local.inquilino || 'N/A').toUpperCase()}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.4rem 0' }}>
-                  <span style={{ fontSize: '.88rem', letterSpacing: '0.02em' }}>LOCAL</span>
-                  <span style={{ fontSize: '.88rem', fontWeight: 700 }}>N° {local.numero}{local.nombre ? ` — ${local.nombre.toUpperCase()}` : ''}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.4rem 0' }}>
-                  <span style={{ fontSize: '.88rem', letterSpacing: '0.02em' }}>PERIODO</span>
-                  <span style={{ fontSize: '.88rem', fontWeight: 700 }}>{MESES_LARGO[monthIdx].toUpperCase()} {year}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '.4rem 0', marginBottom: '1rem' }}>
-                  <span style={{ fontSize: '.88rem', letterSpacing: '0.02em' }}>FECHA</span>
-                  <span style={{ fontSize: '.88rem', fontWeight: 700 }}>{fechaEmision}</span>
-                </div>
-
-                {/* Lecturas table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '.5rem' }}>
-                  <thead>
-                    <tr style={{ background: '#F5C9C2' }}>
-                      <th style={tdHead}>CONCEPTO</th>
-                      <th style={tdHead}>LECTURA ANTERIOR</th>
-                      <th style={tdHead}>LECTURA ACTUAL</th>
-                      <th style={tdHead}>CONSUMO</th>
-                    </tr>
-                  </thead>
+              {/* ── INFO TABLE ── */}
+              <div style={{ padding: '10px 40px 16px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', border: `1px solid ${C.border}` }}>
                   <tbody>
-                    <tr>
-                      <td style={tdCell}><b>SUBMEDIDOR LOCAL {local.numero}</b></td>
-                      <td style={{ ...tdCell, textAlign: 'center' }}><b>{fmt(lecturaAnterior)} kWh</b></td>
-                      <td style={{ ...tdCell, textAlign: 'center' }}><b>{fmt(lecturaActual)} kWh</b></td>
-                      <td style={{ ...tdCell, textAlign: 'center' }}><b>{fmt(consumo)} kWh</b></td>
-                    </tr>
+                    {[
+                      ['Recibo N°', reciboNum],
+                      ['Inquilino', local.inquilino || local.nombre || 'N/A'],
+                      ['Local', `Local ${local.numero}`],
+                      ['Período', `${MESES_LARGO[monthIdx]} ${year}`],
+                      ['Fecha de emisión', fechaEmision],
+                    ].map(([label, value]) => (
+                      <tr key={label}>
+                        <td style={{ ...tC, background: C.labelBg, width: '35%', color: C.textLight, fontSize: '12px' }}>{label}</td>
+                        <td style={{ ...tC }}>{value}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
+              </div>
 
-                {/* Cálculo table */}
-                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
-                  <thead>
-                    <tr style={{ background: '#F5C9C2' }}>
-                      <th style={{ ...tdHead, width: '60%' }}>DETALLE DEL CÁLCULO</th>
-                      <th style={tdHead}>VALOR</th>
-                      <th style={tdHead}>MONTO</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={tdCell}><b>Factura ENEE total del mes</b></td>
-                      <td style={{ ...tdCell, textAlign: 'center' }}><b>—</b></td>
-                      <td style={{ ...tdCell, textAlign: 'right' }}><b>L {fmt2(factura.montoTotal || 0)}</b></td>
-                    </tr>
-                    <tr>
-                      <td style={tdCell}><b>Tarifa efectiva del mes (prorrateo)</b></td>
-                      <td style={{ ...tdCell, textAlign: 'center' }}><b>L {fmt2(tarifaEfectiva || 0)}/kWh</b></td>
-                      <td style={{ ...tdCell, textAlign: 'right' }}><b>—</b></td>
-                    </tr>
-                    <tr>
-                      <td style={tdCell}><b>Consumo del local</b></td>
-                      <td style={{ ...tdCell, textAlign: 'center' }}><b>{fmt(consumo)} kWh</b></td>
-                      <td style={{ ...tdCell, textAlign: 'right' }}><b>—</b></td>
-                    </tr>
-                    <tr>
-                      <td colSpan="2" style={{ ...tdCell, textAlign: 'right', fontStyle: 'italic' }}>
-                        <b><i>{fmt(consumo)} kWh × L {fmt2(tarifaEfectiva || 0)} =</i></b>
-                      </td>
-                      <td style={{ ...tdCell, textAlign: 'right', background: '#3C3C43' }}>
-                        <b>L {fmt2(monto)}</b>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td colSpan="2" style={{ ...tdCell, textAlign: 'right', background: '#3F8B92', color: '#1C1C1E', fontSize: '.95rem' }}>
-                        <b>TOTAL A PAGAR</b>
-                      </td>
-                      <td style={{ ...tdCell, textAlign: 'right', background: '#3F8B92', color: '#1C1C1E', fontSize: '1.05rem' }}>
-                        <b>L {fmt2(monto)}</b>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              {/* ── BODY ── */}
+              <div style={{ padding: '0 40px 24px', flex: 1 }}>
 
-                {/* Nota */}
-                <div style={{ marginTop: '1.5rem', fontSize: '.82rem', lineHeight: 1.6 }}>
-                  <div style={{ fontWeight: 700, marginBottom: '.3rem' }}>NOTA:</div>
-                  <div style={{ fontWeight: 700 }}>EL MONTO SE CALCULA PRORRATEANDO LA FACTURA TOTAL DE ENEE ENTRE LOS KWH CONSUMIDOS POR CADA SUBMEDIDOR DEL MES.</div>
-                  <div style={{ marginTop: '.3rem' }}>ESTE RECIBO NO GENERA ISV — EL IMPUESTO YA FUE PAGADO EN LA FACTURA ORIGINAL DE ENEE.</div>
-                  <div style={{ marginTop: '.3rem' }}>FECHA LÍMITE DE PAGO: {factura.fechaPago ? new Date(factura.fechaPago + 'T12:00:00').toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase() : '___________________'}</div>
-                </div>
-
-                {/* Firma */}
-                <div style={{ marginTop: '3rem', textAlign: 'center' }}>
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.75)', width: 280, margin: '0 auto', paddingTop: '.4rem' }}>
-                    <div style={{ fontSize: '.92rem', fontWeight: 700, letterSpacing: '0.02em' }}>WILLIAM RAMOS</div>
-                    <div style={{ fontSize: '.85rem' }}>DIRECTOR COMERCIAL</div>
+                {/* LECTURAS */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: C.teal, letterSpacing: '2px', borderBottom: `2px solid ${C.teal}`, paddingBottom: '4px', marginBottom: '8px' }}>
+                    L E C T U R A S &nbsp; D E L &nbsp; S U B M E D I D O R
                   </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: C.rowHead }}>
+                        <th style={{ ...tH, color: C.coral }}>LECTURA ANTERIOR (kWh)</th>
+                        <th style={{ ...tH, color: C.coral }}>LECTURA ACTUAL (kWh)</th>
+                        <th style={{ ...tH, color: C.coral }}>CONSUMO (kWh)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ ...tC, textAlign: 'center' }}>{fmt(lecturaAnterior)}</td>
+                        <td style={{ ...tC, textAlign: 'center' }}>{fmt(lecturaActual)}</td>
+                        <td style={{ ...tC, textAlign: 'center', fontWeight: 700 }}>{fmt(consumo)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* CÁLCULO */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: C.teal, letterSpacing: '2px', borderBottom: `2px solid ${C.teal}`, paddingBottom: '4px', marginBottom: '8px' }}>
+                    C Á L C U L O &nbsp; D E L &nbsp; M O N T O
+                  </div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: C.rowHead }}>
+                        <th style={{ ...tH, color: C.coral, width: '55%', textAlign: 'left' }}>DETALLE</th>
+                        <th style={{ ...tH, color: C.coral }}>VALOR</th>
+                        <th style={{ ...tH, color: C.coral }}>MONTO (L)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={tC}>Factura ENEE estimada (plaza)</td>
+                        <td style={{ ...tC, textAlign: 'center', color: C.textLight }}>{kWhPlaza > 0 ? `${fmt(kWhPlaza)} kWh` : '—'}</td>
+                        <td style={{ ...tC, textAlign: 'right' }}>{fmt2(factura.montoTotal || 0)}</td>
+                      </tr>
+                      <tr>
+                        <td style={tC}>Tarifa efectiva de energía</td>
+                        <td style={{ ...tC, textAlign: 'center', color: C.textLight }}>L/kWh</td>
+                        <td style={{ ...tC, textAlign: 'right' }}>{fmt2(tarifa)}</td>
+                      </tr>
+                      <tr>
+                        <td style={tC}>Energía consumida</td>
+                        <td style={{ ...tC, textAlign: 'center', color: C.textLight }}>{fmt(consumo)} × {fmt2(tarifa)}</td>
+                        <td style={{ ...tC, textAlign: 'right' }}>{fmt2(montoEnergia)}</td>
+                      </tr>
+                      <tr style={{ background: C.tealDark }}>
+                        <td colSpan={2} style={{ ...tC, color: 'white', fontWeight: 700, fontSize: '14px', border: `1px solid ${C.tealDark}` }}>TOTAL A PAGAR</td>
+                        <td style={{ ...tC, color: 'white', fontWeight: 700, fontSize: '15px', textAlign: 'right', border: `1px solid ${C.tealDark}` }}>L &nbsp;{fmt2(totalPagar)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* NOTA */}
+                <div style={{ background: '#FFFBEA', borderLeft: `4px solid #D4A800`, padding: '10px 14px', fontSize: '12px', lineHeight: 1.6, color: '#555' }}>
+                  <span style={{ fontWeight: 700, color: C.text }}>Método de cálculo: </span>
+                  El monto se obtiene prorrateando la factura ENEE de la plaza según el consumo real registrado en el submedidor de cada local.
+                  Este recibo no genera ISV.
                 </div>
               </div>
 
-              {/* FOOTER */}
+              {/* ── FOOTER ── */}
               <div style={{ marginTop: 'auto' }}>
-                <div style={{
-                  background: '#2C2C2E', padding: '.85rem 2.5rem',
-                  display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-                  flexWrap: 'wrap', gap: '.65rem', fontSize: '.78rem', borderTop: '1px solid #E5E5DD',
-                }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                    <span style={{ color: '#D87264' }}>📞</span> +504 9462-8618
-                  </span>
-                  <span style={{ color: '#3F8B92' }}>|</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                    <span style={{ color: '#D87264' }}>✉</span> soluciones_dyl@yahoo.com
-                  </span>
-                  <span style={{ color: '#3F8B92' }}>|</span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                    <span style={{ color: '#D87264' }}>📍</span> Plaza Stefany, Col. América, frente a Torre Xcala
-                  </span>
-                  <span style={{ color: '#3F8B92' }}>|</span>
-                  <span>RTN: 0801-9014-639584</span>
+                <div style={{ background: '#2A2A2A', padding: '12px 40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', flexWrap: 'wrap', fontSize: '11px', color: '#ccc' }}>
+                  <span>📞 +504 9462-8518</span>
+                  <span style={{ color: C.teal }}>|</span>
+                  <span>✉ soluciones_dyl@yahoo.com</span>
+                  <span style={{ color: C.teal }}>|</span>
+                  <span>📍 Res. Altos de venecia 1</span>
+                  <span style={{ color: C.teal }}>|</span>
+                  <span>RTN: 0801-9022-372253</span>
                 </div>
-                <div style={{ height: 14, background: '#3F8B92' }} />
+                <div style={{ height: 10, background: C.teal }} />
               </div>
+
             </div>
           </div>
         </div>
@@ -2212,12 +2197,5 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
   );
 }
 
-const tdHead = {
-  border: '1px solid rgba(255,255,255,0.75)', padding: '.5rem .65rem',
-  fontSize: '.78rem', fontWeight: 700, letterSpacing: '0.02em',
-  textAlign: 'center', verticalAlign: 'middle',
-};
-const tdCell = {
-  border: '1px solid rgba(255,255,255,0.75)', padding: '.55rem .7rem',
-  fontSize: '.85rem', verticalAlign: 'middle',
-};
+const tdHead = { border: '1px solid #ccc', padding: '7px 10px', fontSize: '12px', fontWeight: 700, textAlign: 'center', color: '#333' };
+const tdCell = { border: '1px solid #ccc', padding: '8px 10px', fontSize: '13px', color: '#333', verticalAlign: 'middle' };
