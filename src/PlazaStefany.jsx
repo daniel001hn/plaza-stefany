@@ -1679,6 +1679,27 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
   const [draft, setDraft] = useState(config);
   useEffect(() => setDraft(config), [config]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(config);
+  const [fetchingTasa, setFetchingTasa] = useState(false);
+  const [tasaMsg, setTasaMsg] = useState('');
+
+  const fetchTasaBac = async () => {
+    setFetchingTasa(true);
+    setTasaMsg('');
+    try {
+      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      const data = await res.json();
+      if (data && data.rates && data.rates.HNL) {
+        const tasa = Math.round(data.rates.HNL * 100) / 100;
+        setDraft(d => ({ ...d, tasaCambio: tasa }));
+        setTasaMsg(`✓ Tasa BCH: L ${tasa}/$`);
+      } else {
+        setTasaMsg('No se pudo obtener la tasa.');
+      }
+    } catch (e) {
+      setTasaMsg('Error de conexión.');
+    }
+    setFetchingTasa(false);
+  };
 
   return (
     <div className="ps-fade-in" style={{ display: 'grid', gap: '1rem' }}>
@@ -1698,7 +1719,13 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
             <input type="number" step="0.01" className="ps-input ps-mono" value={draft.rentPerM2USD ?? draft.rentPerM2 ?? 29} onChange={(e) => setDraft({ ...draft, rentPerM2USD: Number(e.target.value) })} />
           </Field>
           <Field label="Tipo de cambio (HNL/$)">
-            <input type="number" step="0.01" className="ps-input ps-mono" value={draft.tasaCambio ?? 25} onChange={(e) => setDraft({ ...draft, tasaCambio: Number(e.target.value) })} />
+            <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+              <input type="number" step="0.01" className="ps-input ps-mono" style={{ flex: 1 }} value={draft.tasaCambio ?? 25} onChange={(e) => setDraft({ ...draft, tasaCambio: Number(e.target.value) })} />
+              <button onClick={fetchTasaBac} disabled={fetchingTasa} title="Obtener tasa de referencia BCH" style={{ padding: '0 .65rem', height: '38px', background: fetchingTasa ? '#e5e5ea' : '#1D4ED8', color: '#fff', border: 'none', borderRadius: 8, fontSize: '.75rem', fontWeight: 600, cursor: fetchingTasa ? 'default' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                {fetchingTasa ? '...' : '🔄 BCH'}
+              </button>
+            </div>
+            {tasaMsg && <div style={{ fontSize: '.72rem', marginTop: '.3rem', color: tasaMsg.startsWith('✓') ? '#34C759' : '#FF3B30' }}>{tasaMsg} — ajustá al precio venta BAC si difiere</div>}
           </Field>
           <Field label="ISV (%)">
             <input type="number" step="0.01" className="ps-input ps-mono" value={(draft.isv * 100).toFixed(2)} onChange={(e) => setDraft({ ...draft, isv: Number(e.target.value) / 100 })} />
