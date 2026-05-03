@@ -186,19 +186,27 @@ const STYLES = `
   .ps-tab { padding: .45rem .65rem; font-size: .8rem; }
 
   /* Gráfico: una columna en móvil */
-  .ps-chart-grid { grid-template-columns: 1fr; }
+  .ps-chart-grid { grid-template-columns: 1fr !important; }
 
-  /* LocalRow: 2 filas en móvil */
+  /* LocalRow: layout vertical completo */
   .ps-local-row {
-    grid-template-columns: 1fr auto;
-    grid-template-rows: auto auto;
-    gap: .5rem .75rem;
-    padding: .85rem 1rem;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+    gap: .6rem !important;
+    padding: .85rem 1rem !important;
   }
-  .ps-local-info  { grid-column: 1; grid-row: 1; }
-  .ps-local-arrow { grid-column: 2; grid-row: 1; align-self: start; margin-top: .2rem; }
-  .ps-local-renta { grid-column: 1; grid-row: 2; }
-  .ps-local-luz   { grid-column: 2; grid-row: 2; }
+  .ps-local-info  { grid-column: 1 !important; grid-row: 1 !important; }
+  .ps-local-renta { grid-column: 1 !important; grid-row: 2 !important; display: flex !important; align-items: center !important; gap: 1rem !important; }
+  .ps-local-luz   { grid-column: 1 !important; grid-row: 3 !important; display: flex !important; align-items: center !important; gap: 1rem !important; }
+  .ps-local-arrow { display: none !important; }
+
+  /* Fuente más pequeña para montos en móvil */
+  .ps-local-renta .ps-mono,
+  .ps-local-luz .ps-mono { font-size: .85rem !important; }
+
+  /* Labels inline en móvil */
+  .ps-local-renta .ps-label,
+  .ps-local-luz .ps-label { margin-bottom: 0 !important; min-width: 40px; }
 }
 `;
 
@@ -1357,8 +1365,8 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
 
       <div className="ps-local-renta">
         <div className="ps-label" style={{ marginBottom: '.25rem' }}>RENTA</div>
-        <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 500 }}>L {fmt(l.renta)}</div>
-        <div style={{ marginTop: '.4rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
+          <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 600 }}>L {fmt(l.renta)}</div>
           <button style={data.rentaPagada ? btnPaid : btnPending}
             onClick={(e) => { e.stopPropagation(); onToggleRenta && onToggleRenta(); }}>
             {data.rentaPagada ? '✓ Pagada' : '○ Pendiente'}
@@ -1370,27 +1378,23 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
         <div className="ps-label" style={{ marginBottom: '.25rem' }}>LUZ</div>
         {luzAplica ? (
           luzCalculable ? (
-            <>
-              <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 500 }}>L {fmt(l.luz)}</div>
-              <div style={{ marginTop: '.4rem', display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
-                {l.luz > 0
-                  ? <button style={data.luzPagada ? btnPaid : btnPending}
-                      onClick={(e) => { e.stopPropagation(); onToggleLuz && onToggleLuz(); }}>
-                      {data.luzPagada ? '✓ Pagada' : '○ Pendiente'}
-                    </button>
-                  : <span style={btnNA}>—</span>}
-                {l.consumo != null && (
-                  <span className="ps-mono" style={{ fontSize: '.7rem', color: '#5AC8FA' }}>{l.consumo} kWh</span>
-                )}
-              </div>
-            </>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
+              <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 600 }}>L {fmt(l.luz)}</div>
+              {l.luz > 0
+                ? <button style={data.luzPagada ? btnPaid : btnPending}
+                    onClick={(e) => { e.stopPropagation(); onToggleLuz && onToggleLuz(); }}>
+                    {data.luzPagada ? '✓ Pagada' : '○ Pendiente'}
+                  </button>
+                : <span style={btnNA}>—</span>}
+              {l.consumo != null && (
+                <span className="ps-mono" style={{ fontSize: '.7rem', color: '#5AC8FA' }}>{l.consumo} kWh</span>
+              )}
+            </div>
           ) : (
-            <span className="ps-pill ps-pill-na" style={{ marginTop: '.25rem' }}>
-              <span className="ps-pill-dot" />Falta datos
-            </span>
+            <span className="ps-pill ps-pill-na"><span className="ps-pill-dot" />Falta datos</span>
           )
         ) : (
-          <span className="ps-pill ps-pill-na" style={{ marginTop: '.25rem' }}><span className="ps-pill-dot" />Incluida</span>
+          <span className="ps-pill ps-pill-na"><span className="ps-pill-dot" />Incluida</span>
         )}
       </div>
 
