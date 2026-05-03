@@ -36,7 +36,7 @@ function getFactura(md) { return (md && md.factura) || {}; }
 async function loadCfg() {
   try {
     const r = await window.storage.get('config-and-locales');
-    if (r && r.value) return JSON.parse(r.value);
+    if (r) return typeof r === 'string' ? JSON.parse(r) : r;
   } catch (e) {}
   return { config: DEFAULT_CONFIG, locales: [] };
 }
@@ -47,7 +47,7 @@ async function saveCfg(d) {
 async function loadMonth(year, monthIdx) {
   try {
     const r = await window.storage.get(monthKey(year, monthIdx));
-    if (r && r.value) return JSON.parse(r.value);
+    if (r) return typeof r === 'string' ? JSON.parse(r) : r;
   } catch (e) {}
   return {};
 }
