@@ -93,102 +93,278 @@ function calcConsumoPrincipal(factura, prevFactura) {
 const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
+/* ── LIQUID GLASS BASE ── */
 .ps-app {
-  font-family: 'Geist', system-ui, sans-serif;
-  background: #F2F2F7;
-  background-image:
-    radial-gradient(circle at 0% 0%, rgba(132, 248, 65, 0.06) 0%, transparent 35%),
-    radial-gradient(circle at 100% 100%, rgba(255, 184, 84, 0.04) 0%, transparent 40%),
-    radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 24px 24px;
-  color: #1C1C1E;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   min-height: 100vh;
   padding: 1.5rem 1.5rem 4rem;
   -webkit-font-smoothing: antialiased;
+  color: #1C1C1E;
+  position: relative;
+  /* Vibrant mesh gradient background */
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%,   rgba(99, 102, 241, 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 50% at 90% 5%,   rgba(236, 72, 153, 0.25) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 60% at 70% 85%,  rgba(20, 184, 166, 0.20) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 5%  85%,  rgba(251, 146, 60, 0.18) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 50% 50%,  rgba(168, 85, 247, 0.12) 0%, transparent 60%),
+    #EEF0F8;
+  background-attachment: fixed;
 }
 .ps-app * { box-sizing: border-box; }
 .ps-mono { font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums; }
-.ps-card { background: linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.72) 100%); border: 1px solid rgba(255,255,255,0.75); border-radius: 14px; position: relative; overflow: hidden; }
-.ps-card-elevated { background: linear-gradient(180deg, rgba(255,255,255,0.65) 0%, rgba(255,255,255,0.72) 100%); border: 1px solid #2E2E38; border-radius: 14px; position: relative; overflow: hidden; }
-.ps-card::before, .ps-card-elevated::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.10), transparent); }
-.ps-card-hover { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; cursor: pointer; }
-.ps-card-hover:hover { transform: translateY(-2px); border-color: #1D4ED833; box-shadow: 0 12px 32px -16px rgba(29,78,216,0.15), 0 0 0 1px #1D4ED822; }
-.ps-label { font-size: 0.68rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: #6E6E78; }
-.ps-eyebrow { display: inline-flex; align-items: center; gap: .35rem; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: #1D4ED8; }
-.ps-tab { padding: .55rem 1rem; font-size: 0.85rem; font-weight: 500; color: #8E8E96; background: transparent; border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .4rem; }
-.ps-tab:hover { color: #1C1C1E; background: rgba(255,255,255,0.72); }
-.ps-tab-active { color: #F2F2F7; background: #1D4ED8; }
-.ps-tab-active:hover { background: #2563EB; color: #F2F2F7; }
-.ps-btn { background: #1D4ED8; color: #F2F2F7; padding: .6rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; border: none; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .4rem; font-family: 'Geist', sans-serif; }
-.ps-btn:hover { background: #2563EB; transform: translateY(-1px); }
-.ps-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-.ps-btn-ghost { background: rgba(255,255,255,0.65); border: 1px solid #2E2E38; color: #1C1C1E; padding: .55rem .9rem; border-radius: 8px; font-weight: 500; font-size: 0.82rem; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: .4rem; font-family: 'Geist', sans-serif; }
-.ps-btn-ghost:hover { background: rgba(255,255,255,0.50); border-color: #44444E; }
-.ps-btn-icon { background: rgba(255,255,255,0.65); border: 1px solid #2E2E38; color: #B0B0BA; padding: .5rem; border-radius: 8px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; justify-content: center; }
-.ps-btn-icon:hover { background: rgba(255,255,255,0.50); color: #1C1C1E; border-color: #44444E; }
-.ps-input { width: 100%; background: #E8E8ED; border: 1px solid #2E2E38; border-radius: 8px; padding: .65rem .85rem; font-family: 'Geist', sans-serif; font-size: 0.9rem; color: #1C1C1E; transition: all .15s; }
-.ps-input:focus { outline: none; border-color: #1D4ED8; box-shadow: 0 0 0 3px rgba(132, 248, 65, 0.12); }
-.ps-input::placeholder { color: #5A5A64; }
-.ps-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .22rem .55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.01em; font-family: 'JetBrains Mono', monospace; }
-.ps-pill-paid { background: rgba(29,78,216,0.1); color: #1D4ED8; border: 1px solid rgba(132, 248, 65, 0.25); }
-.ps-pill-pending { background: rgba(124,58,237,0.1); color: #7C3AED; border: 1px solid rgba(255, 184, 84, 0.25); }
-.ps-pill-na { background: rgba(0,0,0,0.03); color: #6E6E78; border: 1px solid rgba(0,0,0,0.10); }
-.ps-pill-dot { width: 6px; height: 6px; border-radius: 50%; }
-.ps-pill-paid .ps-pill-dot { background: #1D4ED8; box-shadow: 0 0 8px #1D4ED8; }
-.ps-pill-pending .ps-pill-dot { background: #7C3AED; box-shadow: 0 0 8px #7C3AED; }
-.ps-pill-na .ps-pill-dot { background: #6E6E78; }
-.ps-modal-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); backdrop-filter: blur(8px); z-index: 50; display: flex; align-items: flex-start; justify-content: center; padding: 4vh 1rem; overflow-y: auto; animation: psFade .2s ease; }
-.ps-modal { width: 100%; max-width: 540px; animation: psSlide .25s cubic-bezier(0.16, 1, 0.3, 1); }
-@keyframes psFade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes psSlide { from { opacity: 0; transform: translateY(-12px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.ps-fade-in { animation: psFadeIn .4s ease both; }
-@keyframes psFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.ps-bar-bg { position: relative; height: 4px; background: rgba(255,255,255,0.75); border-radius: 2px; overflow: hidden; }
-.ps-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; border-radius: 2px; transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
-.ps-checkbox { width: 18px; height: 18px; appearance: none; background: #E8E8ED; border: 1.5px solid #44444E; border-radius: 5px; cursor: pointer; position: relative; transition: all .15s; }
-.ps-checkbox:checked { background: #1D4ED8; border-color: #1D4ED8; }
-.ps-checkbox:checked::after { content: ''; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px; border: solid #F2F2F7; border-width: 0 2px 2px 0; transform: rotate(45deg); }
-.ps-divider-soft { height: 1px; background: linear-gradient(90deg, transparent, #2E2E38 20%, #2E2E38 80%, transparent); }
-.ps-glow-pulse { animation: psGlowPulse 2.5s ease-in-out infinite; }
-@keyframes psGlowPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 184, 84, 0.3); } 50% { box-shadow: 0 0 0 6px rgba(255, 184, 84, 0); } }
 
+/* ── GLASS CARD (light) ── */
+.ps-card {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.ps-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 40%, rgba(255,255,255,0.9) 60%, transparent 100%);
+}
+
+/* ── GLASS CARD ELEVATED (dark, for modals/toolbars) ── */
+.ps-card-elevated {
+  background: rgba(28, 28, 32, 0.72);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08);
+  color: #F2F2F7;
+}
+.ps-card-elevated::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+}
+
+/* ── HOVER CARDS ── */
+.ps-card-hover {
+  transition: transform .22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .22s ease, border-color .22s ease;
+  cursor: pointer;
+}
+.ps-card-hover:hover {
+  transform: translateY(-3px) scale(1.005);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 16px 40px rgba(99, 102, 241, 0.15), 0 4px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.9);
+}
+
+/* ── LABELS & EYEBROWS ── */
+.ps-label { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(60,60,70,0.55); }
+.ps-eyebrow { display: inline-flex; align-items: center; gap: .35rem; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #6366F1; }
+
+/* ── TABS ── */
+.ps-tab {
+  padding: .55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(60,60,70,0.6);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all .18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+}
+.ps-tab:hover {
+  color: #1C1C1E;
+  background: rgba(255,255,255,0.5);
+  border-color: rgba(255,255,255,0.7);
+  backdrop-filter: blur(12px);
+}
+.ps-tab-active {
+  color: white;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  border-color: rgba(255,255,255,0.25);
+  box-shadow: 0 4px 14px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.ps-tab-active:hover { background: linear-gradient(135deg, #4F52E0 0%, #7C3AED 100%); color: white; }
+
+/* ── BUTTONS ── */
+.ps-btn {
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  color: white;
+  padding: .6rem 1.1rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  border: none;
+  cursor: pointer;
+  transition: all .18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-family: 'Geist', sans-serif;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+  letter-spacing: -0.01em;
+}
+.ps-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.ps-btn:active { transform: translateY(0); }
+.ps-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.ps-btn-ghost {
+  background: rgba(255,255,255,0.45);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.65);
+  color: #1C1C1E;
+  padding: .55rem .9rem;
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all .18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  font-family: 'Geist', sans-serif;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.ps-btn-ghost:hover {
+  background: rgba(255,255,255,0.7);
+  border-color: rgba(99,102,241,0.35);
+  box-shadow: 0 4px 12px rgba(99,102,241,0.12);
+}
+
+.ps-btn-icon {
+  background: rgba(255,255,255,0.45);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.65);
+  color: rgba(60,60,70,0.6);
+  padding: .5rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all .18s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.ps-btn-icon:hover { background: rgba(255,255,255,0.7); color: #1C1C1E; border-color: rgba(99,102,241,0.3); }
+
+/* ── INPUTS ── */
+.ps-input {
+  width: 100%;
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 10px;
+  padding: .65rem .85rem;
+  font-family: 'Geist', sans-serif;
+  font-size: 0.9rem;
+  color: #1C1C1E;
+  transition: all .18s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8);
+}
+.ps-input:focus {
+  outline: none;
+  border-color: rgba(99,102,241,0.5);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15), 0 2px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.75);
+}
+.ps-input::placeholder { color: rgba(60,60,70,0.35); }
+
+/* ── PILLS ── */
+.ps-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .22rem .55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.01em; font-family: 'JetBrains Mono', monospace; }
+.ps-pill-paid { background: rgba(52,199,89,0.15); color: #1A7F35; border: 1px solid rgba(52,199,89,0.3); backdrop-filter: blur(8px); }
+.ps-pill-pending { background: rgba(255,159,10,0.15); color: #B25800; border: 1px solid rgba(255,159,10,0.3); backdrop-filter: blur(8px); }
+.ps-pill-na { background: rgba(120,120,130,0.1); color: rgba(60,60,70,0.5); border: 1px solid rgba(120,120,130,0.2); }
+.ps-pill-dot { width: 6px; height: 6px; border-radius: 50%; }
+.ps-pill-paid .ps-pill-dot { background: #34C759; box-shadow: 0 0 6px #34C759; }
+.ps-pill-pending .ps-pill-dot { background: #FF9F0A; box-shadow: 0 0 6px #FF9F0A; }
+.ps-pill-na .ps-pill-dot { background: rgba(120,120,130,0.5); }
+
+/* ── MODAL ── */
+.ps-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 20, 0.45);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 1rem;
+  overflow-y: auto;
+  animation: psFade .2s ease;
+}
+.ps-modal { width: 100%; max-width: 540px; animation: psSlide .3s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes psFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes psSlide { from { opacity: 0; transform: translateY(-16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.ps-fade-in { animation: psFadeIn .4s ease both; }
+@keyframes psFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── MISC ── */
+.ps-bar-bg { position: relative; height: 4px; background: rgba(255,255,255,0.4); border-radius: 2px; overflow: hidden; }
+.ps-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; border-radius: 2px; transition: width .6s cubic-bezier(0.16, 1, 0.3, 1); }
+
+.ps-checkbox { width: 18px; height: 18px; appearance: none; background: rgba(255,255,255,0.5); border: 1.5px solid rgba(120,120,130,0.4); border-radius: 6px; cursor: pointer; position: relative; transition: all .15s; backdrop-filter: blur(8px); }
+.ps-checkbox:checked { background: linear-gradient(135deg, #6366F1, #8B5CF6); border-color: transparent; box-shadow: 0 2px 8px rgba(99,102,241,0.4); }
+.ps-checkbox:checked::after { content: ''; position: absolute; left: 5px; top: 2px; width: 4px; height: 8px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+
+.ps-divider-soft { height: 1px; background: linear-gradient(90deg, transparent, rgba(99,102,241,0.15) 20%, rgba(99,102,241,0.15) 80%, transparent); }
+.ps-glow-pulse { animation: psGlowPulse 2.5s ease-in-out infinite; }
+@keyframes psGlowPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.3); } 50% { box-shadow: 0 0 0 8px rgba(99,102,241,0); } }
+
+/* ── TABLE ── */
 .ps-table { width: 100%; border-collapse: separate; border-spacing: 0; font-family: 'JetBrains Mono', monospace; font-size: .8rem; }
-.ps-table th { text-align: left; padding: .65rem .8rem; background: #E8E8ED; color: #6E6E78; font-weight: 500; font-size: .68rem; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid #2E2E38; position: sticky; top: 0; }
-.ps-table td { padding: .7rem .8rem; border-bottom: 1px solid rgba(255,255,255,0.75); color: #1C1C1E; }
+.ps-table th { text-align: left; padding: .65rem .8rem; background: rgba(255,255,255,0.4); backdrop-filter: blur(8px); color: rgba(60,60,70,0.6); font-weight: 600; font-size: .68rem; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.5); position: sticky; top: 0; }
+.ps-table td { padding: .7rem .8rem; border-bottom: 1px solid rgba(255,255,255,0.35); color: #1C1C1E; }
 .ps-table tr:last-child td { border-bottom: none; }
 .ps-table tr.ps-table-row { transition: background .15s; }
-.ps-table tr.ps-table-row:hover { background: rgba(255,255,255,0.72); }
+.ps-table tr.ps-table-row:hover { background: rgba(255,255,255,0.4); }
 .ps-table .num { text-align: right; }
 
-/* Grid gráfico */
+/* ── GRID GRÁFICO ── */
 .ps-chart-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1rem; }
 
-/* LocalRow grid */
+/* ── LOCAL ROW ── */
 .ps-local-row {
-  background: rgba(255,255,255,0.72);
-  border: 1px solid rgba(255,255,255,0.50);
-  border-radius: 10px;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.7);
+  border-radius: 14px;
   padding: .9rem 1.1rem;
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) minmax(0, 1.2fr) auto;
   gap: 1rem;
   align-items: center;
   cursor: pointer;
-  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  transition: all .22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.9);
 }
-.ps-local-row:hover { transform: translateY(-2px); border-color: #1D4ED833; box-shadow: 0 12px 32px -16px rgba(29,78,216,0.15), 0 0 0 1px #1D4ED822; }
+.ps-local-row:hover {
+  transform: translateY(-3px) scale(1.005);
+  background: rgba(255,255,255,0.72);
+  border-color: rgba(99,102,241,0.35);
+  box-shadow: 0 12px 32px rgba(99,102,241,0.14), 0 4px 12px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,1);
+}
 
 /* ─── MÓVIL ─── */
 @media (max-width: 640px) {
   .ps-app { padding: .85rem .85rem 5rem; }
-
-  /* Tabs de navegación más compactos */
   .ps-tab { padding: .45rem .65rem; font-size: .8rem; }
-
-  /* Gráfico: una columna en móvil */
   .ps-chart-grid { grid-template-columns: 1fr !important; }
-
-  /* LocalRow: layout vertical completo */
   .ps-local-row {
     grid-template-columns: 1fr !important;
     grid-template-rows: auto !important;
@@ -199,10 +375,12 @@ const STYLES = `
   .ps-local-renta { grid-column: 1 !important; grid-row: 2 !important; display: flex !important; align-items: center !important; gap: 1rem !important; }
   .ps-local-luz   { grid-column: 1 !important; grid-row: 3 !important; display: flex !important; align-items: center !important; gap: 1rem !important; }
   .ps-local-arrow { display: none !important; }
-
-  /* Fuente más pequeña para montos en móvil */
   .ps-local-renta .ps-mono,
   .ps-local-luz .ps-mono { font-size: .85rem !important; }
+  .ps-local-renta .ps-label,
+  .ps-local-luz .ps-label { margin-bottom: 0 !important; min-width: 40px; }
+}
+`;
 
   /* Labels inline en móvil */
   .ps-local-renta .ps-label,
@@ -213,32 +391,22 @@ const STYLES = `
 
 const APPLE_GLOBAL_CSS = `
   * { -webkit-font-smoothing: antialiased; box-sizing: border-box; }
-  body { 
-    background: linear-gradient(135deg, #EEF2FF 0%, #F3E8FF 25%, #ECFDF5 55%, #FFF1F2 85%, #EEF2FF 100%) !important;
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 10% 0%,   rgba(99, 102, 241, 0.35) 0%, transparent 55%),
+      radial-gradient(ellipse 60% 50% at 90% 5%,   rgba(236, 72, 153, 0.25) 0%, transparent 50%),
+      radial-gradient(ellipse 50% 60% at 70% 85%,  rgba(20, 184, 166, 0.20) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 5%  85%,  rgba(251, 146, 60, 0.18) 0%, transparent 50%),
+      radial-gradient(ellipse 60% 40% at 50% 50%,  rgba(168, 85, 247, 0.12) 0%, transparent 60%),
+      #EEF0F8 !important;
     background-attachment: fixed !important;
     min-height: 100vh;
   }
-  h1, h2, h3 { color: #1C1C1E !important; }
-  [style*='color: rgb(255, 255, 255)'],
-  [style*='color: rgba(255, 255, 255'] {
-    color: #1C1C1E !important;
-  }
-  div[style*='background: rgb(10,'],
-  div[style*='background: rgb(15,'],
-  div[style*='background: rgb(18,'],
-  div[style*='background: rgb(26,'],
-  div[style*='background: rgb(34,'],
-  div[style*='background: rgb(28,'],
-  div[style*='background: rgb(22,'],
-  div[style*='background: rgb(46,'],
-  div[style*='background: rgb(38,'] {
-    background: rgba(255,255,255,0.78) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-  }
-  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.25); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.4); }
 `;
 
 export default function App({ supabase }) {
@@ -347,7 +515,7 @@ export default function App({ supabase }) {
   if (loading) {
     return (
       <div className="ps-app" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ color: '#1D4ED8', fontFamily: 'JetBrains Mono, monospace', fontSize: '.85rem', letterSpacing: '0.15em' }}>
+        <div style={{ color: '#6366F1', fontFamily: 'JetBrains Mono, monospace', fontSize: '.85rem', letterSpacing: '0.15em' }}>
           ◯ CARGANDO DATOS
         </div>
       </div>
@@ -423,10 +591,10 @@ export default function App({ supabase }) {
       {toast && (
         <div style={{
           position: 'fixed', bottom: '2rem', left: '50%', transform: 'translateX(-50%)',
-          background: '#1D4ED8', color: '#6E6E78', padding: '.6rem 1.2rem', borderRadius: 999,
+          background: '#6366F1', color: '#6E6E78', padding: '.6rem 1.2rem', borderRadius: 999,
           fontSize: '.82rem', fontWeight: 600, zIndex: 100, animation: 'psSlide .2s ease',
           display: 'flex', alignItems: 'center', gap: '.45rem',
-          boxShadow: '0 8px 32px rgba(29,78,216,0.25)',
+          boxShadow: '0 8px 32px rgba(99,102,241,0.25)',
         }}>
           <Check size={14} strokeWidth={3} /> {toast}
         </div>
@@ -480,8 +648,8 @@ function Header({ config, view, setView, monthIdx, year, navigateMonth, today })
               </span>
               {isCurrentMonth && (
                 <span style={{
-                  fontSize: '.62rem', padding: '.15rem .45rem', background: 'rgba(29,78,216,0.15)',
-                  color: '#1D4ED8', borderRadius: 4, fontWeight: 600, letterSpacing: '.05em',
+                  fontSize: '.62rem', padding: '.15rem .45rem', background: 'rgba(99,102,241,0.15)',
+                  color: '#6366F1', borderRadius: 4, fontWeight: 600, letterSpacing: '.05em',
                 }}>AHORA</span>
               )}
             </div>
@@ -576,7 +744,7 @@ function DashboardView({
       <div className="ps-card ps-fade-in" style={{ padding: '4rem 2rem', textAlign: 'center', marginTop: '2rem' }}>
         <div style={{
           width: 56, height: 56, borderRadius: 14, margin: '0 auto 1.25rem',
-          background: 'rgba(29,78,216,0.1)', border: '1px solid rgba(132, 248, 65, 0.25)',
+          background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(132, 248, 65, 0.25)',
           display: 'grid', placeItems: 'center',
         }}>
           <Building2 size={24} color="#1D4ED8" />
@@ -737,7 +905,7 @@ function HistorialPlaza({ monthsData, year }) {
       <div className="ps-card-elevated" style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.5rem' }}>
         <div>
           <div className="ps-label" style={{ marginBottom: '.4rem' }}>Total cobrado {year}</div>
-          <div className="ps-mono" style={{ fontSize: '1.8rem', fontWeight: 600, color: '#1D4ED8', letterSpacing: '-0.02em', lineHeight: 1 }}>
+          <div className="ps-mono" style={{ fontSize: '1.8rem', fontWeight: 600, color: '#6366F1', letterSpacing: '-0.02em', lineHeight: 1 }}>
             <span style={{ fontSize: '.55em', color: '#6E6E78', marginRight: '.25rem' }}>L</span>
             {fmt(totals.cobrado)}
           </div>
@@ -746,13 +914,13 @@ function HistorialPlaza({ monthsData, year }) {
           </div>
         </div>
         <div>
-          <div className="ps-label" style={{ marginBottom: '.4rem', color: '#1D4ED8' }}><Receipt size={11} style={{ display: 'inline', marginRight: '.3rem', verticalAlign: '-2px' }} />Renta cobrada</div>
+          <div className="ps-label" style={{ marginBottom: '.4rem', color: '#6366F1' }}><Receipt size={11} style={{ display: 'inline', marginRight: '.3rem', verticalAlign: '-2px' }} />Renta cobrada</div>
           <div className="ps-mono" style={{ fontSize: '1.4rem', fontWeight: 600, letterSpacing: '-0.02em' }}>
             L {fmt(totals.renta)}
           </div>
         </div>
         <div>
-          <div className="ps-label" style={{ marginBottom: '.4rem', color: '#5AC8FA' }}><Zap size={11} style={{ display: 'inline', marginRight: '.3rem', verticalAlign: '-2px' }} />Luz cobrada</div>
+          <div className="ps-label" style={{ marginBottom: '.4rem', color: '#6366F1' }}><Zap size={11} style={{ display: 'inline', marginRight: '.3rem', verticalAlign: '-2px' }} />Luz cobrada</div>
           <div className="ps-mono" style={{ fontSize: '1.4rem', fontWeight: 600, letterSpacing: '-0.02em' }}>
             L {fmt(totals.luz)}
           </div>
@@ -805,10 +973,10 @@ function HistorialPlaza({ monthsData, year }) {
                 <tr key={m.idx} className="ps-table-row" style={{ opacity: m.hasData ? 1 : 0.4 }}>
                   <td style={{ fontWeight: 600 }}>{m.mesLargo}</td>
                   <td className="num">L {fmt(m.cobradoRenta)}</td>
-                  <td className="num" style={{ color: '#5AC8FA' }}>L {fmt(m.cobradoLuz)}</td>
-                  <td className="num" style={{ color: '#1D4ED8', fontWeight: 600 }}>L {fmt(m.total)}</td>
+                  <td className="num" style={{ color: '#6366F1' }}>L {fmt(m.cobradoLuz)}</td>
+                  <td className="num" style={{ color: '#6366F1', fontWeight: 600 }}>L {fmt(m.total)}</td>
                   <td className="num" style={{ color: '#6E6E78' }}>L {fmt(m.esperado)}</td>
-                  <td className="num" style={{ color: pct >= 100 ? '#1D4ED8' : pct > 50 ? '#7C3AED' : '#6E6E78' }}>
+                  <td className="num" style={{ color: pct >= 100 ? '#6366F1' : pct > 50 ? '#8B5CF6' : '#6E6E78' }}>
                     {m.esperado > 0 ? `${pct.toFixed(0)}%` : '—'}
                   </td>
                 </tr>
@@ -817,8 +985,8 @@ function HistorialPlaza({ monthsData, year }) {
             <tr style={{ background: '#E8E8ED' }}>
               <td style={{ fontWeight: 700, fontSize: '.85rem' }}>TOTAL {year}</td>
               <td className="num" style={{ fontWeight: 700 }}>L {fmt(monthsData.reduce((s, m) => s + m.cobradoRenta, 0))}</td>
-              <td className="num" style={{ fontWeight: 700, color: '#5AC8FA' }}>L {fmt(monthsData.reduce((s, m) => s + m.cobradoLuz, 0))}</td>
-              <td className="num" style={{ fontWeight: 700, color: '#1D4ED8' }}>L {fmt(totals.cobrado)}</td>
+              <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>L {fmt(monthsData.reduce((s, m) => s + m.cobradoLuz, 0))}</td>
+              <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>L {fmt(totals.cobrado)}</td>
               <td className="num" style={{ fontWeight: 700, color: '#6E6E78' }}>L {fmt(totals.esperado)}</td>
               <td className="num" style={{ fontWeight: 700 }}>
                 {totals.esperado > 0 ? `${((totals.cobrado / totals.esperado) * 100).toFixed(0)}%` : '—'}
@@ -869,7 +1037,7 @@ function HistorialLocales({ monthsData, locales, year }) {
             >
               <span className="ps-mono" style={{
                 fontSize: '.7rem', padding: '.25rem .55rem', background: 'rgba(255,255,255,0.50)',
-                borderRadius: 4, color: '#1D4ED8', fontWeight: 600, minWidth: 32, textAlign: 'center',
+                borderRadius: 4, color: '#6366F1', fontWeight: 600, minWidth: 32, textAlign: 'center',
               }}>{l.numero || '?'}</span>
               <div>
                 <div style={{ fontSize: '.95rem', fontWeight: 500 }}>
@@ -881,7 +1049,7 @@ function HistorialLocales({ monthsData, locales, year }) {
               </div>
               <div>
                 <div className="ps-label" style={{ marginBottom: '.2rem' }}>Total cobrado</div>
-                <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 600, color: '#1D4ED8' }}>
+                <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 600, color: '#6366F1' }}>
                   L {fmt(totalRenta + totalLuz)}
                 </div>
               </div>
@@ -920,7 +1088,7 @@ function HistorialLocales({ monthsData, locales, year }) {
                             <td className="num" style={{ color: '#8E8E96' }}>
                               {ld.lecturaActual != null ? ld.lecturaActual : '—'}
                             </td>
-                            <td className="num" style={{ color: '#5AC8FA' }}>
+                            <td className="num" style={{ color: '#6366F1' }}>
                               {ld.consumo != null ? `${ld.consumo} kWh` : '—'}
                             </td>
                             <td className="num">{ld.renta ? `L ${fmt(ld.renta)}` : '—'}</td>
@@ -945,9 +1113,9 @@ function HistorialLocales({ monthsData, locales, year }) {
                       <tr style={{ background: 'rgba(255,255,255,0.72)' }}>
                         <td style={{ fontWeight: 700 }}>TOTAL</td>
                         <td className="num"></td>
-                        <td className="num" style={{ color: '#5AC8FA', fontWeight: 700 }}>{totalConsumo} kWh</td>
+                        <td className="num" style={{ color: '#6366F1', fontWeight: 700 }}>{totalConsumo} kWh</td>
                         <td className="num" style={{ fontWeight: 700 }}>L {fmt(totalRenta)}</td>
-                        <td className="num" style={{ fontWeight: 700, color: '#5AC8FA' }}>L {fmt(totalLuz)}</td>
+                        <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>L {fmt(totalLuz)}</td>
                         <td colSpan="2"></td>
                       </tr>
                     </tbody>
@@ -988,10 +1156,10 @@ function HistorialENEE({ monthsData, year }) {
       {/* ENEE summary */}
       <div className="ps-card-elevated" style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1.5rem' }}>
         <div>
-          <div className="ps-label" style={{ marginBottom: '.4rem', color: '#5AC8FA' }}>
+          <div className="ps-label" style={{ marginBottom: '.4rem', color: '#6366F1' }}>
             <Zap size={11} style={{ display: 'inline', marginRight: '.3rem', verticalAlign: '-2px' }} />Total ENEE {year}
           </div>
-          <div className="ps-mono" style={{ fontSize: '1.6rem', fontWeight: 600, color: '#5AC8FA', letterSpacing: '-0.02em', lineHeight: 1 }}>
+          <div className="ps-mono" style={{ fontSize: '1.6rem', fontWeight: 600, color: '#6366F1', letterSpacing: '-0.02em', lineHeight: 1 }}>
             <span style={{ fontSize: '.55em', color: '#6E6E78', marginRight: '.25rem' }}>L</span>
             {fmt(yearTotals.monto)}
           </div>
@@ -1013,7 +1181,7 @@ function HistorialENEE({ monthsData, year }) {
         </div>
         <div>
           <div className="ps-label" style={{ marginBottom: '.4rem' }}>kWh áreas comunes</div>
-          <div className="ps-mono" style={{ fontSize: '1.4rem', fontWeight: 600, color: '#7C3AED' }}>
+          <div className="ps-mono" style={{ fontSize: '1.4rem', fontWeight: 600, color: '#8B5CF6' }}>
             {fmt(yearTotals.areasComunes)}
           </div>
         </div>
@@ -1035,7 +1203,7 @@ function HistorialENEE({ monthsData, year }) {
                   labelStyle={{ color: '#1C1C1E', fontWeight: 600 }}
                   formatter={(v) => [`L ${fmt2(v)}/kWh`, 'Tarifa']}
                 />
-                <Line type="monotone" dataKey="tarifa" stroke="#1D4ED8" strokeWidth={2.5} dot={{ fill: '#1D4ED8', r: 4 }} activeDot={{ r: 6 }} />
+                <Line type="monotone" dataKey="tarifa" stroke="#1D4ED8" strokeWidth={2.5} dot={{ fill: '#6366F1', r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -1067,16 +1235,16 @@ function HistorialENEE({ monthsData, year }) {
                   {m.factura.lecturaPrincipal != null ? m.factura.lecturaPrincipal : '—'}
                 </td>
                 <td className="num">{m.consumoPrincipal != null ? `${fmt(m.consumoPrincipal)}` : '—'}</td>
-                <td className="num" style={{ color: '#5AC8FA' }}>
+                <td className="num" style={{ color: '#6366F1' }}>
                   {m.consumoSubmedidores > 0 ? fmt(m.consumoSubmedidores) : '—'}
                 </td>
-                <td className="num" style={{ color: m.areasComunes < 0 ? '#FF5C5C' : '#7C3AED' }}>
+                <td className="num" style={{ color: m.areasComunes < 0 ? '#FF5C5C' : '#8B5CF6' }}>
                   {m.areasComunes != null ? `${m.areasComunes}` : '—'}
                 </td>
-                <td className="num" style={{ color: '#5AC8FA', fontWeight: 600 }}>
+                <td className="num" style={{ color: '#6366F1', fontWeight: 600 }}>
                   {m.factura.montoTotal ? `L ${fmt2(m.factura.montoTotal)}` : '—'}
                 </td>
-                <td className="num" style={{ color: '#1D4ED8', fontWeight: 600 }}>
+                <td className="num" style={{ color: '#6366F1', fontWeight: 600 }}>
                   {m.tarifa ? `L ${fmt2(m.tarifa)}` : '—'}
                 </td>
               </tr>
@@ -1085,10 +1253,10 @@ function HistorialENEE({ monthsData, year }) {
               <td style={{ fontWeight: 700 }}>TOTAL {year}</td>
               <td className="num"></td>
               <td className="num" style={{ fontWeight: 700 }}>{fmt(yearTotals.kwhPrincipal)}</td>
-              <td className="num" style={{ fontWeight: 700, color: '#5AC8FA' }}>{fmt(yearTotals.kwhSubmedidores)}</td>
-              <td className="num" style={{ fontWeight: 700, color: '#7C3AED' }}>{fmt(yearTotals.areasComunes)}</td>
-              <td className="num" style={{ fontWeight: 700, color: '#5AC8FA' }}>L {fmt2(yearTotals.monto)}</td>
-              <td className="num" style={{ fontWeight: 700, color: '#1D4ED8' }}>
+              <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>{fmt(yearTotals.kwhSubmedidores)}</td>
+              <td className="num" style={{ fontWeight: 700, color: '#8B5CF6' }}>{fmt(yearTotals.areasComunes)}</td>
+              <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>L {fmt2(yearTotals.monto)}</td>
+              <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>
                 {yearTotals.kwhPrincipal > 0 ? `L ${fmt2(yearTotals.monto / yearTotals.kwhPrincipal)} prom.` : '—'}
               </td>
             </tr>
@@ -1114,13 +1282,13 @@ function FacturaCard({ factura, consumoPrincipal, consumoSubmedidores, areasComu
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div className="ps-glow-pulse" style={{
             width: 42, height: 42, borderRadius: 10,
-            background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(255, 184, 84, 0.3)',
+            background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(255, 184, 84, 0.3)',
             display: 'grid', placeItems: 'center',
           }}>
             <FileText size={18} color="#7C3AED" />
           </div>
           <div>
-            <div className="ps-eyebrow" style={{ color: '#7C3AED', marginBottom: '.2rem' }}>
+            <div className="ps-eyebrow" style={{ color: '#8B5CF6', marginBottom: '.2rem' }}>
               <AlertCircle size={11} /> FACTURA ENEE PENDIENTE
             </div>
             <div style={{ fontSize: '.95rem', fontWeight: 500, color: '#1C1C1E' }}>
@@ -1142,13 +1310,13 @@ function FacturaCard({ factura, consumoPrincipal, consumoSubmedidores, areasComu
         <div style={{ display: 'flex', alignItems: 'center', gap: '.85rem' }}>
           <div style={{
             width: 38, height: 38, borderRadius: 10,
-            background: 'rgba(90, 200, 250, 0.1)', border: '1px solid rgba(90, 200, 250, 0.25)',
+            background: 'rgba(99,102,241, 0.1)', border: '1px solid rgba(99,102,241, 0.25)',
             display: 'grid', placeItems: 'center',
           }}>
             <Zap size={18} color="#5AC8FA" />
           </div>
           <div>
-            <div className="ps-eyebrow" style={{ color: '#5AC8FA', marginBottom: '.15rem' }}>
+            <div className="ps-eyebrow" style={{ color: '#6366F1', marginBottom: '.15rem' }}>
               <FileText size={10} /> FACTURA ENEE
             </div>
             <div style={{ fontSize: '1rem', fontWeight: 600 }}>Energía del mes</div>
@@ -1182,7 +1350,7 @@ function FacturaStat({ label, value, sub, accent, highlight }) {
     <div style={{
       padding: highlight ? '.5rem .75rem' : 0,
       background: highlight ? 'rgba(132, 248, 65, 0.06)' : 'transparent',
-      border: highlight ? '1px solid rgba(29,78,216,0.2)' : 'none',
+      border: highlight ? '1px solid rgba(99,102,241,0.2)' : 'none',
       borderRadius: highlight ? 8 : 0,
     }}>
       <div className="ps-label" style={{ marginBottom: '.3rem' }}>{label}</div>
@@ -1228,7 +1396,7 @@ function KPIPending({ rentaPend, luzPend }) {
   const total = rentaPend + luzPend;
   return (
     <div className="ps-card" style={{ padding: '1.1rem 1.25rem' }}>
-      <div className="ps-label" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: '#7C3AED', marginBottom: '.6rem' }}>
+      <div className="ps-label" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: '#8B5CF6', marginBottom: '.6rem' }}>
         <AlertCircle size={14} /> Pendientes
       </div>
       <div className="ps-mono" style={{ fontSize: '1.7rem', fontWeight: 600, lineHeight: 1, marginBottom: '.7rem', letterSpacing: '-0.02em' }}>
@@ -1253,7 +1421,7 @@ function YearlyChart({ data, year, total }) {
         </div>
         <div style={{ textAlign: 'right' }}>
           <div className="ps-label">Total año</div>
-          <div className="ps-mono" style={{ fontSize: '1.4rem', fontWeight: 600, color: '#1D4ED8', letterSpacing: '-0.02em' }}>
+          <div className="ps-mono" style={{ fontSize: '1.4rem', fontWeight: 600, color: '#6366F1', letterSpacing: '-0.02em' }}>
             L {fmt(total)}
           </div>
         </div>
@@ -1272,10 +1440,10 @@ function YearlyChart({ data, year, total }) {
               formatter={(value, name) => [`L ${fmt(value)}`, name === 'renta' ? 'Renta' : 'Luz']}
             />
             <Bar dataKey="renta" stackId="a" fill="#1D4ED8">
-              {data.map((entry, idx) => <Cell key={idx} fill={entry.active ? '#1D4ED8' : 'rgba(132, 248, 65, 0.55)'} />)}
+              {data.map((entry, idx) => <Cell key={idx} fill={entry.active ? '#6366F1' : 'rgba(132, 248, 65, 0.55)'} />)}
             </Bar>
             <Bar dataKey="luz" stackId="a" fill="#5AC8FA" radius={[6, 6, 0, 0]}>
-              {data.map((entry, idx) => <Cell key={idx} fill={entry.active ? '#5AC8FA' : 'rgba(90, 200, 250, 0.55)'} />)}
+              {data.map((entry, idx) => <Cell key={idx} fill={entry.active ? '#6366F1' : 'rgba(99,102,241, 0.55)'} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -1283,10 +1451,10 @@ function YearlyChart({ data, year, total }) {
 
       <div style={{ display: 'flex', gap: '1.25rem', marginTop: '.5rem', fontSize: '.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: '#8E8E96' }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: '#1D4ED8' }} /> Renta
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: '#6366F1' }} /> Renta
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: '#8E8E96' }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: '#5AC8FA' }} /> Luz
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: '#6366F1' }} /> Luz
         </div>
       </div>
     </div>
@@ -1310,7 +1478,7 @@ function LocalBreakdown({ perLocal }) {
                 <span style={{ fontWeight: 500 }}>
                   {l.numero} <span style={{ color: '#6E6E78' }}>· {l.inquilino || 'Sin asignar'}</span>
                 </span>
-                <span className="ps-mono" style={{ color: l.cobrado >= l.total && l.total > 0 ? '#1D4ED8' : '#1C1C1E' }}>
+                <span className="ps-mono" style={{ color: l.cobrado >= l.total && l.total > 0 ? '#6366F1' : '#1C1C1E' }}>
                   L {fmt(l.cobrado)}<span style={{ color: '#6E6E78' }}> / {fmt(l.total)}</span>
                 </span>
               </div>
@@ -1320,7 +1488,7 @@ function LocalBreakdown({ perLocal }) {
               }}>
                 <div style={{
                   position: 'absolute', inset: 0, width: `${pctCobrado}%`,
-                  background: pctCobrado >= 100 ? '#1D4ED8' : 'linear-gradient(90deg, #1D4ED8, #7C3AED)',
+                  background: pctCobrado >= 100 ? '#6366F1' : 'linear-gradient(90deg, #1D4ED8, #7C3AED)',
                   transition: 'width .6s cubic-bezier(0.16, 1, 0.3, 1)',
                   boxShadow: pctCobrado >= 100 ? '0 0 8px rgba(132, 248, 65, 0.5)' : 'none',
                 }} />
@@ -1353,7 +1521,7 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.2rem' }}>
           <span className="ps-mono" style={{
             fontSize: '.7rem', padding: '.15rem .4rem', background: 'rgba(255,255,255,0.50)',
-            borderRadius: 4, color: '#1D4ED8', fontWeight: 600,
+            borderRadius: 4, color: '#6366F1', fontWeight: 600,
           }}>{l.numero || '?'}</span>
           <span className="ps-mono" style={{ fontSize: '.7rem', color: '#6E6E78' }}>{l.m2} m²</span>
         </div>
@@ -1387,7 +1555,7 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
                   </button>
                 : <span style={btnNA}>—</span>}
               {l.consumo != null && (
-                <span className="ps-mono" style={{ fontSize: '.7rem', color: '#5AC8FA' }}>{l.consumo} kWh</span>
+                <span className="ps-mono" style={{ fontSize: '.7rem', color: '#6366F1' }}>{l.consumo} kWh</span>
               )}
             </div>
           ) : (
@@ -1436,7 +1604,7 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
       <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
           <div>
-            <div className="ps-eyebrow" style={{ color: '#5AC8FA', marginBottom: '.25rem' }}>
+            <div className="ps-eyebrow" style={{ color: '#6366F1', marginBottom: '.25rem' }}>
               <Zap size={11} /> FACTURA ENEE · {MESES_LARGO[monthIdx]} {year}
             </div>
             <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>Energía del mes</div>
@@ -1447,7 +1615,7 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
         <div className="ps-divider-soft" style={{ marginBottom: '1.25rem' }} />
 
         <div style={{
-          background: 'rgba(90, 200, 250, 0.06)', border: '1px solid rgba(90, 200, 250, 0.2)',
+          background: 'rgba(99,102,241, 0.06)', border: '1px solid rgba(99,102,241, 0.2)',
           padding: '.7rem .9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '.78rem',
           color: '#8E8E96', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
         }}>
@@ -1482,7 +1650,7 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
           </div>
           <div>
             <div className="ps-label" style={{ marginBottom: '.3rem' }}>Consumo</div>
-            <div className="ps-input ps-mono" style={{ background: 'rgba(255,255,255,0.75)', color: consumo < 0 ? '#FF5C5C' : '#5AC8FA', fontWeight: 600 }}>
+            <div className="ps-input ps-mono" style={{ background: 'rgba(255,255,255,0.75)', color: consumo < 0 ? '#FF5C5C' : '#6366F1', fontWeight: 600 }}>
               {consumo != null ? `${consumo} kWh` : '—'}
             </div>
           </div>
@@ -1578,7 +1746,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
 
         <div style={{ marginBottom: '1.25rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.6rem' }}>
-            <div className="ps-eyebrow" style={{ color: '#1D4ED8' }}><Receipt size={11} /> RENTA</div>
+            <div className="ps-eyebrow" style={{ color: '#6366F1' }}><Receipt size={11} /> RENTA</div>
             <div className="ps-mono" style={{ fontSize: '1rem', fontWeight: 600 }}>L {fmt2(renta)}</div>
           </div>
           <div style={{ background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.65rem .85rem', borderRadius: 8, fontSize: '.78rem', color: '#8E8E96', marginBottom: '.85rem' }}>
@@ -1608,7 +1776,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
             <input type="url" className="ps-input" placeholder="https://drive.google.com/..." value={form.linkFactura} onChange={(e) => set('linkFactura', e.target.value)} />
             {form.linkFactura && (
               <a href={form.linkFactura} target="_blank" rel="noreferrer" style={{
-                fontSize: '.75rem', color: '#1D4ED8', textDecoration: 'none', marginTop: '.4rem',
+                fontSize: '.75rem', color: '#6366F1', textDecoration: 'none', marginTop: '.4rem',
                 display: 'inline-flex', alignItems: 'center', gap: '.3rem',
               }}>
                 <ExternalLink size={11} /> Abrir factura
@@ -1621,8 +1789,8 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
           <div style={{ marginBottom: '1.25rem' }}>
             <div className="ps-divider-soft" style={{ marginBottom: '1rem' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.6rem' }}>
-              <div className="ps-eyebrow" style={{ color: '#5AC8FA' }}><Zap size={11} /> ENERGÍA ELÉCTRICA</div>
-              <div className="ps-mono" style={{ fontSize: '1rem', fontWeight: 600, color: tarifaEfectiva || tipoLuz === 'fijo' ? '#5AC8FA' : '#6E6E78' }}>
+              <div className="ps-eyebrow" style={{ color: '#6366F1' }}><Zap size={11} /> ENERGÍA ELÉCTRICA</div>
+              <div className="ps-mono" style={{ fontSize: '1rem', fontWeight: 600, color: tarifaEfectiva || tipoLuz === 'fijo' ? '#6366F1' : '#6E6E78' }}>
                 L {fmt2(montoLuzCalc)}
               </div>
             </div>
@@ -1633,7 +1801,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                   <div style={{
                     background: 'rgba(255, 184, 84, 0.06)', border: '1px solid rgba(255, 184, 84, 0.25)',
                     padding: '.65rem .85rem', borderRadius: 8, marginBottom: '.85rem', fontSize: '.78rem',
-                    color: '#7C3AED', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
+                    color: '#8B5CF6', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
                   }}>
                     <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '.1rem' }} />
                     <div>Aún no hay factura ENEE registrada del mes. Metela primero para calcular el monto.</div>
@@ -1642,14 +1810,14 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
 
                 {tarifaEfectiva && (
                   <div style={{
-                    background: 'rgba(90, 200, 250, 0.06)', border: '1px solid rgba(90, 200, 250, 0.2)',
+                    background: 'rgba(99,102,241, 0.06)', border: '1px solid rgba(99,102,241, 0.2)',
                     padding: '.65rem .85rem', borderRadius: 8, marginBottom: '.85rem',
                     display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', fontSize: '.78rem',
                   }}>
                     <div style={{ color: '#8E8E96', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
                       <Calculator size={12} /> Tarifa efectiva del mes:
                     </div>
-                    <div className="ps-mono" style={{ color: '#5AC8FA', fontWeight: 600 }}>L {fmt2(tarifaEfectiva)}/kWh</div>
+                    <div className="ps-mono" style={{ color: '#6366F1', fontWeight: 600 }}>L {fmt2(tarifaEfectiva)}/kWh</div>
                   </div>
                 )}
 
@@ -1669,7 +1837,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                   </div>
                   <div>
                     <div className="ps-label" style={{ marginBottom: '.3rem' }}>Consumo</div>
-                    <div className="ps-input ps-mono" style={{ background: 'rgba(255,255,255,0.75)', color: consumo < 0 ? '#FF5C5C' : '#5AC8FA', fontWeight: 600 }}>
+                    <div className="ps-input ps-mono" style={{ background: 'rgba(255,255,255,0.75)', color: consumo < 0 ? '#FF5C5C' : '#6366F1', fontWeight: 600 }}>
                       {consumo != null ? `${consumo} kWh` : '—'}
                     </div>
                   </div>
@@ -1714,7 +1882,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
           <div>
             {tipoLuz !== 'incluido' && montoLuzCalc > 0 && (
-              <button onClick={onGenerateRecibo} className="ps-btn-ghost" style={{ background: 'rgba(90, 200, 250, 0.08)', borderColor: 'rgba(90, 200, 250, 0.3)', color: '#5AC8FA' }}>
+              <button onClick={onGenerateRecibo} className="ps-btn-ghost" style={{ background: 'rgba(99,102,241, 0.08)', borderColor: 'rgba(99,102,241, 0.3)', color: '#6366F1' }}>
                 <Printer size={14} /> Generar recibo de luz
               </button>
             )}
@@ -1775,7 +1943,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
           <Field label="Tipo de cambio (HNL/$)">
             <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
               <input type="number" step="0.01" className="ps-input ps-mono" style={{ flex: 1 }} value={draft.tasaCambio ?? 25} onChange={(e) => setDraft({ ...draft, tasaCambio: Number(e.target.value) })} />
-              <button onClick={fetchTasaBac} disabled={fetchingTasa} title="Obtener tasa de referencia BCH" style={{ padding: '0 .65rem', height: '38px', background: fetchingTasa ? '#e5e5ea' : '#1D4ED8', color: '#fff', border: 'none', borderRadius: 8, fontSize: '.75rem', fontWeight: 600, cursor: fetchingTasa ? 'default' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+              <button onClick={fetchTasaBac} disabled={fetchingTasa} title="Obtener tasa de referencia BCH" style={{ padding: '0 .65rem', height: '38px', background: fetchingTasa ? '#e5e5ea' : '#6366F1', color: '#fff', border: 'none', borderRadius: 8, fontSize: '.75rem', fontWeight: 600, cursor: fetchingTasa ? 'default' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
                 {fetchingTasa ? '...' : '🔄 BCH'}
               </button>
             </div>
@@ -1787,7 +1955,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
         </div>
 
         <div style={{
-          background: 'rgba(90, 200, 250, 0.06)', border: '1px solid rgba(90, 200, 250, 0.2)',
+          background: 'rgba(99,102,241, 0.06)', border: '1px solid rgba(99,102,241, 0.2)',
           padding: '.75rem .9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '.78rem',
           color: '#8E8E96', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
         }}>
@@ -1826,7 +1994,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
                 }}>
                   <span className="ps-mono" style={{
                     fontSize: '.7rem', padding: '.2rem .5rem', background: 'rgba(255,255,255,0.50)',
-                    borderRadius: 4, color: '#1D4ED8', fontWeight: 600, minWidth: 32, textAlign: 'center',
+                    borderRadius: 4, color: '#6366F1', fontWeight: 600, minWidth: 32, textAlign: 'center',
                   }}>{l.numero || '?'}</span>
                   <div>
                     <div style={{ fontSize: '.92rem', fontWeight: 500 }}>{l.inquilino || 'Sin asignar'}</div>
@@ -1834,7 +2002,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
                       {l.m2} m² · L {fmt(calcRenta(l.m2))}/mes · Luz: {tipoLabel}
                     </div>
                   </div>
-                  <span className="ps-mono" style={{ fontSize: '.78rem', color: '#1D4ED8' }}>L {fmt(calcRenta(l.m2))}</span>
+                  <span className="ps-mono" style={{ fontSize: '.78rem', color: '#6366F1' }}>L {fmt(calcRenta(l.m2))}</span>
                   <button onClick={() => onEditLocal(l)} className="ps-btn-icon"><Edit3 size={13} /></button>
                   <button onClick={() => onDeleteLocal(l.id)} className="ps-btn-icon" style={{ color: '#FF5C5C' }}><Trash2 size={13} /></button>
                 </div>
@@ -1930,9 +2098,9 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta }) {
                   padding: '.6rem .5rem', borderRadius: 8, cursor: 'pointer',
                   fontSize: '.8rem', fontWeight: 500,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.35rem',
-                  background: f.tipoLuz === opt.v ? 'rgba(29,78,216,0.1)' : '#E8E8ED',
-                  border: '1px solid', borderColor: f.tipoLuz === opt.v ? '#1D4ED8' : '#2E2E38',
-                  color: f.tipoLuz === opt.v ? '#1D4ED8' : '#B0B0BA',
+                  background: f.tipoLuz === opt.v ? 'rgba(99,102,241,0.1)' : '#E8E8ED',
+                  border: '1px solid', borderColor: f.tipoLuz === opt.v ? '#6366F1' : '#2E2E38',
+                  color: f.tipoLuz === opt.v ? '#6366F1' : '#B0B0BA',
                   transition: 'all .15s', fontFamily: 'Geist, sans-serif',
                 }}
               >{opt.icon} {opt.label}</button>
@@ -1961,12 +2129,12 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta }) {
 
         {f.m2 > 0 && (
           <div style={{
-            background: 'rgba(132, 248, 65, 0.06)', border: '1px solid rgba(29,78,216,0.2)',
+            background: 'rgba(132, 248, 65, 0.06)', border: '1px solid rgba(99,102,241,0.2)',
             padding: '.75rem 1rem', borderRadius: 8, marginBottom: '1.25rem',
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.85rem',
           }}>
             <span style={{ color: '#8E8E96' }}>Renta calculada (con ISV)</span>
-            <span className="ps-mono" style={{ fontWeight: 600, color: '#1D4ED8', fontSize: '1.05rem' }}>
+            <span className="ps-mono" style={{ fontWeight: 600, color: '#6366F1', fontSize: '1.05rem' }}>
               L {fmt2(calcRenta(Number(f.m2)))}
             </span>
           </div>
@@ -2049,7 +2217,7 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
         {/* Toolbar */}
         <div className="ps-card-elevated" style={{ padding: '.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '14px 14px 0 0', borderBottom: 'none' }}>
           <div>
-            <div className="ps-eyebrow" style={{ color: '#5AC8FA' }}><Printer size={11} /> RECIBO DE LUZ</div>
+            <div className="ps-eyebrow" style={{ color: '#6366F1' }}><Printer size={11} /> RECIBO DE LUZ</div>
             <div style={{ fontSize: '.88rem', fontWeight: 600, marginTop: '.15rem' }}>Vista previa — Local {local.numero} · {MESES_LARGO[monthIdx]} {year}</div>
           </div>
           <div style={{ display: 'flex', gap: '.5rem' }}>
