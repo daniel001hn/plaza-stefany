@@ -318,6 +318,7 @@ export default function App({ supabase }) {
             pagos={pagos} prevPagos={prevPagos} tarifaEfectiva={tarifaEfectiva}
             onOpenPayment={setPaymentLocal} onEditFactura={() => setEditingFactura(true)}
             onGoConfig={() => setView('config')}
+            onTogglePago={updatePayment}
           />
         )}
 
@@ -452,7 +453,7 @@ function Header({ config, view, setView, monthIdx, year, navigateMonth, today })
 function DashboardView({
   locales, yearData, monthIdx, year, config, calcRenta,
   factura, prevFactura, pagos, prevPagos, tarifaEfectiva,
-  onOpenPayment, onEditFactura, onGoConfig,
+  onOpenPayment, onEditFactura, onGoConfig, onTogglePago,
 }) {
   const consumoPrincipal = calcConsumoPrincipal(factura, prevFactura);
   const consumoSubmedidores = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
@@ -574,7 +575,10 @@ function DashboardView({
         <div style={{ display: 'grid', gap: '.5rem' }}>
           {perLocal.map((l, i) => (
             <LocalRow key={l.id} l={l} data={pagos[l.id] || {}} tarifaEfectiva={tarifaEfectiva}
-              onClick={() => onOpenPayment(l)} i={i} />
+              onClick={() => onOpenPayment(l)} i={i}
+              onToggleRenta={() => onTogglePago(l.id, { rentaPagada: !((pagos[l.id] || {}).rentaPagada), fechaRenta: new Date().toISOString().slice(0,10) })}
+              onToggleLuz={() => onTogglePago(l.id, { luzPagada: !((pagos[l.id] || {}).luzPagada) })}
+            />
           ))}
         </div>
       </div>
@@ -1280,10 +1284,19 @@ function LocalBreakdown({ perLocal }) {
   );
 }
 
-function LocalRow({ l, data, tarifaEfectiva, onClick, i }) {
+function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggleLuz }) {
   const tipoLuz = l.tipoLuz || 'incluido';
   const luzAplica = tipoLuz !== 'incluido';
   const luzCalculable = tipoLuz === 'medidor' ? (l.consumo != null && tarifaEfectiva != null) : true;
+
+  const btnBase = {
+    border: 'none', borderRadius: 6, fontSize: '.72rem', fontWeight: 600,
+    cursor: 'pointer', padding: '.28rem .6rem', display: 'inline-flex',
+    alignItems: 'center', gap: '.25rem', transition: 'all .15s',
+  };
+  const btnPaid = { ...btnBase, background: '#D1FAE5', color: '#065F46' };
+  const btnPending = { ...btnBase, background: '#FEE2E2', color: '#991B1B' };
+  const btnNA = { ...btnBase, background: '#F3F4F6', color: '#9CA3AF', cursor: 'default' };
 
   return (
     <div className="ps-card-hover" onClick={onClick} style={{
@@ -1310,10 +1323,11 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i }) {
       <div>
         <div className="ps-label" style={{ marginBottom: '.25rem' }}>RENTA</div>
         <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 500 }}>L {fmt(l.renta)}</div>
-        <div style={{ marginTop: '.3rem' }}>
-          {data.rentaPagada
-            ? <span className="ps-pill ps-pill-paid"><span className="ps-pill-dot" />Pagada</span>
-            : <span className="ps-pill ps-pill-pending"><span className="ps-pill-dot" />Pendiente</span>}
+        <div style={{ marginTop: '.4rem' }}>
+          <button style={data.rentaPagada ? btnPaid : btnPending}
+            onClick={(e) => { e.stopPropagation(); onToggleRenta && onToggleRenta(); }}>
+            {data.rentaPagada ? '✓ Pagada' : '○ Pendiente'}
+          </button>
         </div>
       </div>
 
@@ -1323,12 +1337,13 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i }) {
           luzCalculable ? (
             <>
               <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 500 }}>L {fmt(l.luz)}</div>
-              <div style={{ marginTop: '.3rem', display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
+              <div style={{ marginTop: '.4rem', display: 'flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
                 {l.luz > 0
-                  ? (data.luzPagada
-                      ? <span className="ps-pill ps-pill-paid"><span className="ps-pill-dot" />Pagada</span>
-                      : <span className="ps-pill ps-pill-pending"><span className="ps-pill-dot" />Pendiente</span>)
-                  : <span className="ps-pill ps-pill-na"><span className="ps-pill-dot" />—</span>}
+                  ? <button style={data.luzPagada ? btnPaid : btnPending}
+                      onClick={(e) => { e.stopPropagation(); onToggleLuz && onToggleLuz(); }}>
+                      {data.luzPagada ? '✓ Pagada' : '○ Pendiente'}
+                    </button>
+                  : <span style={btnNA}>—</span>}
                 {l.consumo != null && (
                   <span className="ps-mono" style={{ fontSize: '.7rem', color: '#5AC8FA' }}>{l.consumo} kWh</span>
                 )}
