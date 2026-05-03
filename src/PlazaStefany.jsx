@@ -14,7 +14,8 @@ import {
 } from 'recharts';
 
 const DEFAULT_CONFIG = {
-  rentPerM2: 29,
+  rentPerM2USD: 29,
+  tasaCambio: 25,
   isv: 0.15,
   plazaNombre: 'Plaza Stefany',
 };
@@ -232,7 +233,7 @@ export default function App({ supabase }) {
   }, [year]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
-  const calcRenta = (m2) => (m2 || 0) * config.rentPerM2 * (1 + config.isv);
+  const calcRenta = (m2) => (m2 || 0) * (config.rentPerM2USD || 29) * (config.tasaCambio || 25) * (1 + config.isv);
 
   const navigateMonth = (delta) => {
     let m = monthIdx + delta, y = year;
@@ -1527,7 +1528,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
             <div className="ps-mono" style={{ fontSize: '1rem', fontWeight: 600 }}>L {fmt2(renta)}</div>
           </div>
           <div style={{ background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.65rem .85rem', borderRadius: 8, fontSize: '.78rem', color: '#8E8E96', marginBottom: '.85rem' }}>
-            {local.m2} m² × L {config.rentPerM2} + ISV {(config.isv * 100).toFixed(0)}%
+            {local.m2} m² × ${config.rentPerM2USD ?? 29} × {config.tasaCambio ?? 25} + ISV {(config.isv * 100).toFixed(0)}%
           </div>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.4rem 0' }}>
@@ -1693,8 +1694,11 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
           <Field label="Nombre de la plaza">
             <input className="ps-input" value={draft.plazaNombre} onChange={(e) => setDraft({ ...draft, plazaNombre: e.target.value })} />
           </Field>
-          <Field label="Renta por m² (L)">
-            <input type="number" step="0.01" className="ps-input ps-mono" value={draft.rentPerM2} onChange={(e) => setDraft({ ...draft, rentPerM2: Number(e.target.value) })} />
+          <Field label="Precio por m² (USD $)">
+            <input type="number" step="0.01" className="ps-input ps-mono" value={draft.rentPerM2USD ?? draft.rentPerM2 ?? 29} onChange={(e) => setDraft({ ...draft, rentPerM2USD: Number(e.target.value) })} />
+          </Field>
+          <Field label="Tipo de cambio (HNL/$)">
+            <input type="number" step="0.01" className="ps-input ps-mono" value={draft.tasaCambio ?? 25} onChange={(e) => setDraft({ ...draft, tasaCambio: Number(e.target.value) })} />
           </Field>
           <Field label="ISV (%)">
             <input type="number" step="0.01" className="ps-input ps-mono" value={(draft.isv * 100).toFixed(2)} onChange={(e) => setDraft({ ...draft, isv: Number(e.target.value) / 100 })} />
