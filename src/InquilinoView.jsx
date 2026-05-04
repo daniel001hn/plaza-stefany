@@ -281,7 +281,7 @@ export default function InquilinoView({ session, onLogout }) {
                 <div style={{textAlign:'right',flexShrink:0,marginLeft:'1rem'}}>
                   <div style={{fontSize:'.67rem',color:'#888'}}>Renta</div>
                   <div style={{fontWeight:600,fontSize:'.88rem',fontVariantNumeric:'tabular-nums'}}>L {fmt(renta)}</div>
-                  {tieneLuz && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz</div><div style={{fontWeight:600,fontSize:'.88rem',color:'#0EA5E9',fontVariantNumeric:'tabular-nums'}}>L {fmt(montoLuz)}</div></>}
+                  {luzAplica && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#aaa',fontVariantNumeric:'tabular-nums'}}>L {fmt(montoLuz)}</div></>}
                 </div>
               </div>
 
@@ -297,7 +297,11 @@ export default function InquilinoView({ session, onLogout }) {
 
               <div style={{borderTop:'1px solid rgba(255,255,255,.5)',paddingTop:'.65rem',display:'flex',gap:'.5rem',flexWrap:'wrap'}}>
                 <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
-                {tieneLuz && <button className="btn-l" onClick={() => generarLuz(mes)}>⚡ Recibo de luz</button>}
+                {luzAplica && (
+                  tieneLuz
+                    ? <button className="btn-l" onClick={() => generarLuz(mes)}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
+                    : <button className="btn-l" disabled style={{opacity:.45,cursor:'default'}}>⚡ Luz disponible — L 0.00</button>
+                )}
               </div>
             </div>
           )
