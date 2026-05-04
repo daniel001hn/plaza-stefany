@@ -415,6 +415,8 @@ export default function App({ supabase }) {
   const [editingLocal, setEditingLocal] = useState(null);
   const [editingFactura, setEditingFactura] = useState(false);
   const [reciboLuz, setReciboLuz] = useState(null);
+  const [reciboRenta, setReciboRenta] = useState(null);
+  const [reporteMensual, setReporteMensual] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -474,6 +476,14 @@ export default function App({ supabase }) {
           ? Math.round(data.rates.HNL * 10000) / 10000
           : config.tasaCambio;
         updates.tasaCambioCongelado = tasa;
+        // Guardar en historial de tasas
+        try {
+          const histKey = 'historial-tasas';
+          const hRaw = await window.storage.get(histKey);
+          const hist = hRaw ? JSON.parse(hRaw) : [];
+          hist.unshift({ fecha: new Date().toISOString(), tasa, mes: `${MESES_LARGO[monthIdx]} ${year}`, localId });
+          await window.storage.set(histKey, JSON.stringify(hist.slice(0, 100)));
+        } catch {}
         showToast(`Tasa BCH del día: L ${tasa}/$`);
       } catch {
         updates.tasaCambioCongelado = config.tasaCambio; // fallback
@@ -544,6 +554,7 @@ export default function App({ supabase }) {
             onOpenPayment={setPaymentLocal} onEditFactura={() => setEditingFactura(true)}
             onGoConfig={() => setView('config')}
             onTogglePago={updatePayment}
+            onReporte={() => setReporteMensual(true)}
           />
         )}
 
@@ -574,6 +585,11 @@ export default function App({ supabase }) {
             prevData: prevPagos[paymentLocal.id] || {},
             factura, tarifaEfectiva, monthIdx, year,
           })}
+          onGenerateReciboRenta={() => setReciboRenta({
+            local: paymentLocal,
+            data: pagos[paymentLocal.id] || {},
+            monthIdx, year,
+          })}
         />
       )}
 
@@ -583,6 +599,23 @@ export default function App({ supabase }) {
           factura={reciboLuz.factura} tarifaEfectiva={reciboLuz.tarifaEfectiva}
           monthIdx={reciboLuz.monthIdx} year={reciboLuz.year} config={config}
           onClose={() => setReciboLuz(null)}
+        />
+      )}
+
+      {reciboRenta && (
+        <ReciboRentaModal
+          local={reciboRenta.local} data={reciboRenta.data}
+          monthIdx={reciboRenta.monthIdx} year={reciboRenta.year} config={config}
+          onClose={() => setReciboRenta(null)}
+        />
+      )}
+
+      {reporteMensual && (
+        <ReporteMensualModal
+          locales={locales} pagos={pagos} factura={factura}
+          monthIdx={monthIdx} year={year} config={config}
+          tarifaEfectiva={tarifaEfectiva} calcRenta={calcRenta}
+          onClose={() => setReporteMensual(false)}
         />
       )}
 
@@ -678,7 +711,7 @@ function Header({ config, view, setView, monthIdx, year, navigateMonth, today })
 function DashboardView({
   locales, yearData, monthIdx, year, config, calcRenta,
   factura, prevFactura, pagos, prevPagos, tarifaEfectiva,
-  onOpenPayment, onEditFactura, onGoConfig, onTogglePago,
+  onOpenPayment, onEditFactura, onGoConfig, onTogglePago, onReporte,
 }) {
   const consumoPrincipal = calcConsumoPrincipal(factura, prevFactura);
   const consumoSubmedidores = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
@@ -761,7 +794,10 @@ function DashboardView({
         <div style={{ color: '#8E8E96', marginBottom: '1.5rem', fontSize: '.92rem', maxWidth: 420, margin: '0 auto 1.5rem' }}>
           Agregá los locales con sus m², tipo de cobro de luz e inquilinos para empezar.
         </div>
-        <button onClick={onGoConfig} className="ps-btn"><Plus size={14} strokeWidth={2.5} /> Configurar locales</button>
+        <button onClick={onReporte} className="ps-btn-ghost" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
+              <FileText size={14} /> Reporte mensual
+            </button>
+            <button onClick={onGoConfig} className="ps-btn"><Plus size={14} strokeWidth={2.5} /> Configurar locales</button>
       </div>
     );
   }
@@ -1775,7 +1811,7 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
   );
 }
 
-function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEfectiva, config, calcRenta, onClose, onSave, onGenerateRecibo }) {
+function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEfectiva, config, calcRenta, onClose, onSave, onGenerateRecibo, onGenerateReciboRenta }) {
   const [form, setForm] = useState({
     rentaPagada: !!data.rentaPagada,
     fechaRenta: data.fechaRenta || '',
@@ -1997,10 +2033,13 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
-          <div>
+          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+            <button onClick={onGenerateReciboRenta} className="ps-btn-ghost" style={{ background: 'rgba(99,102,241, 0.08)', borderColor: 'rgba(99,102,241, 0.3)', color: '#6366F1' }}>
+              <Printer size={14} /> Recibo de renta
+            </button>
             {tipoLuz !== 'incluido' && montoLuzCalc > 0 && (
-              <button onClick={onGenerateRecibo} className="ps-btn-ghost" style={{ background: 'rgba(99,102,241, 0.08)', borderColor: 'rgba(99,102,241, 0.3)', color: '#6366F1' }}>
-                <Printer size={14} /> Generar recibo de luz
+              <button onClick={onGenerateRecibo} className="ps-btn-ghost" style={{ background: 'rgba(14,165,233, 0.08)', borderColor: 'rgba(14,165,233, 0.3)', color: '#0EA5E9' }}>
+                <Printer size={14} /> Recibo de luz
               </button>
             )}
           </div>
@@ -2130,16 +2169,37 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
       </div>
 
       {/* ── USUARIOS INQUILINOS ── */}
-      <UsuariosSection config={config} locales={locales} onSaveConfig={onSaveConfig} />
+      <UsuariosSection config={config} locales={locales} onSaveConfig={onSaveConfig}
+        onSendReminders={async (usuarios) => {
+          const mes = MESES_LARGO[new Date().getMonth()];
+          for (const u of usuarios) {
+            try {
+              await fetch('https://gmailmcp.googleapis.com/mcp/v1', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  tool: 'create_draft',
+                  input: {
+                    to: u.email,
+                    subject: `Plaza Stefany — Su recibo de ${mes} está disponible`,
+                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Plaza Stefany.\n\nPuede acceder en: https://plaza-stefany.vercel.app\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nPlaza Stefany\n+504 9462-8618`
+                  }
+                })
+              });
+            } catch(e) {}
+          }
+          alert(`Borradores de email creados para ${usuarios.length} inquilino(s). Revisá tu Gmail para enviarlos.`);
+        }}
+      />
     </div>
   );
 }
 
-function UsuariosSection({ config, locales, onSaveConfig }) {
+function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
   const usuarios = config.usuarios || [];
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ localId: '', nombre: '', usuario: '', password: '' });
+  const [form, setForm] = useState({ localId: '', nombre: '', usuario: '', password: '', email: '' });
   const [editIdx, setEditIdx] = useState(null);
+  const [sending, setSending] = useState(false);
 
   const handleSave = () => {
     if (!form.localId || !form.usuario || !form.password) { alert('Completá todos los campos.'); return; }
@@ -2148,11 +2208,11 @@ function UsuariosSection({ config, locales, onSaveConfig }) {
     else list.push(form);
     onSaveConfig({ ...config, usuarios: list });
     setShowForm(false); setEditIdx(null);
-    setForm({ localId: '', nombre: '', usuario: '', password: '' });
+    setForm({ localId: '', nombre: '', usuario: '', password: '', email: '' });
   };
 
   const handleEdit = (u, i) => {
-    setForm({ ...u });
+    setForm({ email: '', ...u });
     setEditIdx(i);
     setShowForm(true);
   };
@@ -2163,16 +2223,31 @@ function UsuariosSection({ config, locales, onSaveConfig }) {
     onSaveConfig({ ...config, usuarios: list });
   };
 
+  const handleSendReminders = async () => {
+    const conEmail = usuarios.filter(u => u.email);
+    if (conEmail.length === 0) { alert('Ningún inquilino tiene email configurado.'); return; }
+    setSending(true);
+    await onSendReminders(conEmail);
+    setSending(false);
+  };
+
   return (
     <div className="ps-card" style={{ padding: '1.4rem 1.5rem', marginTop: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
         <div>
           <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}><Users size={10} /> ACCESO INQUILINOS</div>
           <div style={{ fontSize: '1rem', fontWeight: 600 }}>Usuarios del portal</div>
         </div>
-        <button onClick={() => { setShowForm(true); setEditIdx(null); setForm({ localId: '', nombre: '', usuario: '', password: '' }); }} className="ps-btn">
-          <Plus size={14} strokeWidth={2.5} /> Agregar usuario
-        </button>
+        <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+          {usuarios.some(u=>u.email) && (
+            <button onClick={handleSendReminders} disabled={sending} className="ps-btn-ghost" style={{ fontSize: '.8rem' }}>
+              {sending ? '⏳ Enviando…' : '✉ Enviar recordatorios'}
+            </button>
+          )}
+          <button onClick={() => { setShowForm(true); setEditIdx(null); setForm({ localId: '', nombre: '', usuario: '', password: '', email: '' }); }} className="ps-btn">
+            <Plus size={14} strokeWidth={2.5} /> Agregar usuario
+          </button>
+        </div>
       </div>
 
       {usuarios.length === 0 && !showForm && (
@@ -2220,6 +2295,10 @@ function UsuariosSection({ config, locales, onSaveConfig }) {
             <div>
               <div className="ps-label" style={{ marginBottom: '.3rem' }}>Contraseña</div>
               <input className="ps-input" placeholder="Contraseña del inquilino" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} autoComplete="off" />
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Email del inquilino (para recordatorios)</div>
+              <input className="ps-input" placeholder="ej: contacto@empresa.com" type="email" value={form.email||''} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} autoComplete="off" />
             </div>
           </div>
           <div style={{ display: 'flex', gap: '.5rem' }}>
@@ -2577,6 +2656,283 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
                 <div style={{ height: 8, background: '#1E7A8A' }} />
               </div>
 
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =================================================================
+// RECIBO RENTA MODAL — mismo membrete D&L que el de luz
+// =================================================================
+function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
+  const tasaUsada  = data.tasaCambioCongelado || config.tasaCambio || 25;
+  const base       = (local.m2 || 0) * (config.rentPerM2USD || 29) * tasaUsada;
+  const isvMonto   = base * (config.isv || 0.15);
+  const total      = base + isvMonto;
+  const reciboNum  = `PS-${year}-${String(monthIdx + 1).padStart(2,'0')}-R${String(local.numero || '').padStart(2,'0')}`;
+  const fechaEmision = data.fechaRentaPagada
+    ? new Date(data.fechaRentaPagada).toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric' })
+    : new Date().toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric' });
+
+  const DLBird = () => (
+    <svg viewBox="0 0 220 160" width="90" height="65" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
+      <polygon points="65,55 105,80 85,50" fill="#E66555"/>
+      <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
+      <polygon points="65,55 85,50 110,65 105,80" fill="#F37A72"/>
+      <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
+      <polygon points="130,60 150,75 145,55" fill="#E66555"/>
+      <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
+      <polygon points="170,58 190,62 185,72 175,72" fill="#E66555"/>
+      <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
+      <circle cx="180" cy="65" r="3" fill="#C84040"/>
+      <polygon points="55,130 40,155 70,148 80,125" fill="#F37A72"/>
+      <polygon points="40,155 70,148 55,160" fill="#E66555"/>
+    </svg>
+  );
+
+  const fmt2 = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const C = { coral:'#F37A72', teal:'#1E7A8A', tealDark:'#155F6E', rowHead:'#F5C9C2', border:'#ccc', text:'#333', light:'#555', lbl:'#f0f0f0' };
+  const tH = { border:`1px solid ${C.border}`, padding:'7px 10px', fontSize:'12px', fontWeight:700, textAlign:'center', color:C.text };
+  const tC = { border:`1px solid ${C.border}`, padding:'8px 10px', fontSize:'13px', color:C.text, verticalAlign:'middle' };
+
+  const handlePrint = () => {
+    const w = window.open('','_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>Recibo Renta ${MESES_LARGO[monthIdx]} ${year}</title>
+    <style>@page{size:Letter;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>
+    </head><body>${document.getElementById('recibo-renta-print').innerHTML}</body></html>`);
+    w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
+  };
+
+  return (
+    <div className="ps-modal-backdrop" onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:740,animation:'psSlide .25s cubic-bezier(0.16,1,0.3,1)'}}>
+        <div className="ps-card-elevated" style={{padding:'.85rem 1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',borderRadius:'14px 14px 0 0',borderBottom:'none'}}>
+          <div>
+            <div className="ps-eyebrow" style={{color:'#6366F1'}}><Printer size={11}/> RECIBO DE RENTA</div>
+            <div style={{fontSize:'.88rem',fontWeight:600,marginTop:'.15rem'}}>Vista previa — Local {local.numero} · {MESES_LARGO[monthIdx]} {year}</div>
+          </div>
+          <div style={{display:'flex',gap:'.5rem'}}>
+            <button onClick={handlePrint} className="ps-btn"><Printer size={14} strokeWidth={2.5}/> Imprimir / PDF</button>
+            <button onClick={onClose} className="ps-btn-icon"><X size={16}/></button>
+          </div>
+        </div>
+        <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'78vh',overflowY:'auto'}}>
+          <div id="recibo-renta-print">
+            <div style={{background:'white',maxWidth:700,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)',display:'flex',flexDirection:'column',minHeight:900}}>
+              {/* HEADER */}
+              <div style={{padding:'26px 40px 14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'22px'}}>
+                <DLBird/>
+                <div>
+                  <div style={{fontSize:'36px',fontWeight:900,color:C.teal,letterSpacing:'6px',lineHeight:1}}>D &amp; L</div>
+                  <div style={{fontSize:'20px',fontWeight:700,color:C.teal,letterSpacing:'5px',lineHeight:1.3}}>SOLUCIONES</div>
+                  <div style={{fontSize:'9px',color:'#888',letterSpacing:'1px',marginTop:'3px'}}>S DE R.L.</div>
+                </div>
+              </div>
+              <div style={{display:'flex',height:8}}>
+                <div style={{width:'15%',background:C.teal}}/>
+                <div style={{flex:1,background:C.coral}}/>
+              </div>
+              <div style={{textAlign:'center',padding:'18px 40px 10px'}}>
+                <div style={{fontSize:'20px',fontWeight:900,letterSpacing:'6px',color:C.text}}>P L A Z A &nbsp; S T E F A N Y</div>
+                <div style={{fontSize:'11px',letterSpacing:'3px',color:C.light,marginTop:'4px'}}>R E C I B O &nbsp; D E &nbsp; R E N T A</div>
+              </div>
+              {/* INFO */}
+              <div style={{padding:'8px 40px 14px'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',border:`1px solid ${C.border}`}}>
+                  {[['Recibo N°',reciboNum],['Inquilino',local.inquilino||local.nombre||'—'],['Local',`Local ${local.numero}`],['Período',`${MESES_LARGO[monthIdx]} ${year}`],['Fecha de emisión',fechaEmision]].map(([l,v])=>(
+                    <tr key={l}><td style={{...tC,background:C.lbl,width:'36%',color:C.light,fontSize:'11px'}}>{l}</td><td style={tC}>{v}</td></tr>
+                  ))}
+                </table>
+              </div>
+              {/* DETALLE */}
+              <div style={{padding:'0 40px 20px',flex:1}}>
+                <div style={{fontSize:'12px',fontWeight:700,color:C.teal,letterSpacing:'2px',borderBottom:`1.5px solid ${C.teal}`,paddingBottom:'4px',marginBottom:'8px'}}>D E T A L L E &nbsp; D E &nbsp; R E N T A</div>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{background:C.rowHead}}>
+                    <th style={{...tH,color:C.coral,textAlign:'left',width:'55%'}}>DETALLE</th>
+                    <th style={{...tH,color:C.coral}}>VALOR</th>
+                    <th style={{...tH,color:C.coral}}>MONTO (L)</th>
+                  </tr></thead>
+                  <tbody>
+                    <tr><td style={tC}>Área arrendada</td><td style={{...tC,textAlign:'center',color:C.light}}>{local.m2} m²</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
+                    <tr style={{background:C.lbl}}><td style={tC}>Precio por m²</td><td style={{...tC,textAlign:'center',color:C.light}}>$ {(config.rentPerM2USD||29).toFixed(2)} / m²</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
+                    <tr><td style={tC}>Tipo de cambio BCH (venta)</td><td style={{...tC,textAlign:'center',color:C.light}}>L {tasaUsada} / US$</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
+                    <tr style={{background:C.lbl}}><td style={tC}>Base ({local.m2} × ${config.rentPerM2USD||29} × {tasaUsada})</td><td style={{...tC,textAlign:'center'}}></td><td style={{...tC,textAlign:'right'}}>{fmt2(base)}</td></tr>
+                    <tr><td style={tC}>ISV ({((config.isv||0.15)*100).toFixed(0)}%)</td><td style={{...tC,textAlign:'center',color:C.light}}>L {fmt2(base)} × {((config.isv||0.15)*100).toFixed(0)}%</td><td style={{...tC,textAlign:'right'}}>{fmt2(isvMonto)}</td></tr>
+                    <tr style={{background:C.tealDark}}>
+                      <td colSpan={2} style={{...tC,color:'white',fontWeight:700,fontSize:'13px',border:`1px solid ${C.tealDark}`}}>TOTAL A PAGAR</td>
+                      <td style={{...tC,color:'white',fontWeight:700,fontSize:'14px',textAlign:'right',border:`1px solid ${C.tealDark}`}}>L &nbsp;{fmt2(total)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div style={{background:'#FFFBEA',borderLeft:'4px solid #D4A800',padding:'10px 14px',fontSize:'11px',lineHeight:1.6,marginTop:'14px',color:'#555'}}>
+                  <b style={{color:C.text}}>Nota:</b> Renta mensual calculada sobre {local.m2} m² al precio pactado de US${config.rentPerM2USD||29}/m², convertido al tipo de cambio BCH (venta) de L {tasaUsada}/US$ al momento del pago. ISV ({((config.isv||0.15)*100).toFixed(0)}%) incluido en el total.
+                </div>
+              </div>
+              {/* FOOTER */}
+              <div style={{marginTop:'auto'}}>
+                <div style={{background:'#2A2A2A',padding:'12px 40px',display:'flex',justifyContent:'center',alignItems:'center',gap:'20px',flexWrap:'wrap',fontSize:'11px',color:'#ccc'}}>
+                  <span>📞 +504 9462-8618</span><span style={{color:C.teal}}>|</span>
+                  <span>✉ soluciones_dyl@yahoo.com</span><span style={{color:C.teal}}>|</span>
+                  <span>📍 Res. Altos de Venecia 1</span><span style={{color:C.teal}}>|</span>
+                  <span>RTN: 0801-9022-372253</span>
+                </div>
+                <div style={{height:8,background:C.teal}}/>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =================================================================
+// REPORTE MENSUAL — resumen de todos los locales del mes
+// =================================================================
+function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, tarifaEfectiva, calcRenta, onClose }) {
+  const fmt2 = (n) => Number(n||0).toLocaleString('es-HN',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const C = { coral:'#F37A72', teal:'#1E7A8A', tealDark:'#155F6E', rowHead:'#F5C9C2', border:'#ddd', text:'#333', light:'#555', lbl:'#f5f5f5' };
+
+  const rows = locales.map(l => {
+    const d = pagos[l.id] || {};
+    const tasaMes = d.tasaCambioCongelado || config.tasaCambio || 25;
+    const base    = l.m2 * (config.rentPerM2USD||29) * tasaMes;
+    const renta   = base * (1 + (config.isv||0.15));
+    const luzM    = d.luzMonto || 0;
+    return { l, d, renta, luzM, tasaMes };
+  });
+
+  const totRenta    = rows.reduce((s,r)=>s+(r.d.rentaPagada?r.renta:0),0);
+  const totLuz      = rows.reduce((s,r)=>s+(r.d.luzPagada?r.luzM:0),0);
+  const totPend     = rows.reduce((s,r)=>s+(!r.d.rentaPagada?r.renta:0),0);
+  const totalFact   = factura?.montoTotal||0;
+  const totalEsp    = rows.reduce((s,r)=>s+r.renta,0);
+
+  const DLBird = () => (
+    <svg viewBox="0 0 220 160" width="70" height="51" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
+      <polygon points="65,55 105,80 85,50" fill="#E66555"/>
+      <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
+      <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
+      <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
+      <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
+    </svg>
+  );
+
+  const handlePrint = () => {
+    const w = window.open('','_blank');
+    w.document.write(`<!DOCTYPE html><html><head><title>Reporte ${MESES_LARGO[monthIdx]} ${year}</title>
+    <style>@page{size:Letter;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>
+    </head><body>${document.getElementById('reporte-print').innerHTML}</body></html>`);
+    w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
+  };
+
+  return (
+    <div className="ps-modal-backdrop" onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:800,animation:'psSlide .25s cubic-bezier(0.16,1,0.3,1)'}}>
+        <div className="ps-card-elevated" style={{padding:'.85rem 1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',borderRadius:'14px 14px 0 0',borderBottom:'none'}}>
+          <div>
+            <div className="ps-eyebrow" style={{color:'#6366F1'}}><FileText size={11}/> REPORTE MENSUAL</div>
+            <div style={{fontSize:'.88rem',fontWeight:600,marginTop:'.15rem'}}>{MESES_LARGO[monthIdx]} {year} — Todos los locales</div>
+          </div>
+          <div style={{display:'flex',gap:'.5rem'}}>
+            <button onClick={handlePrint} className="ps-btn"><Printer size={14}/> Imprimir / PDF</button>
+            <button onClick={onClose} className="ps-btn-icon"><X size={16}/></button>
+          </div>
+        </div>
+        <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'80vh',overflowY:'auto'}}>
+          <div id="reporte-print">
+            <div style={{background:'white',maxWidth:750,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)'}}>
+              {/* HEADER */}
+              <div style={{padding:'22px 36px 12px',display:'flex',alignItems:'center',justifyContent:'center',gap:'18px'}}>
+                <DLBird/>
+                <div>
+                  <div style={{fontSize:'28px',fontWeight:900,color:C.teal,letterSpacing:'5px',lineHeight:1}}>D &amp; L</div>
+                  <div style={{fontSize:'16px',fontWeight:700,color:C.teal,letterSpacing:'4px'}}>SOLUCIONES</div>
+                </div>
+              </div>
+              <div style={{display:'flex',height:7}}><div style={{width:'15%',background:C.teal}}/><div style={{flex:1,background:C.coral}}/></div>
+              <div style={{textAlign:'center',padding:'14px 36px 8px'}}>
+                <div style={{fontSize:'18px',fontWeight:900,letterSpacing:'5px'}}>P L A Z A &nbsp; S T E F A N Y</div>
+                <div style={{fontSize:'11px',letterSpacing:'3px',color:C.light,marginTop:'3px'}}>R E P O R T E &nbsp; M E N S U A L &nbsp; D E &nbsp; C O B R A N Z A</div>
+                <div style={{fontSize:'13px',fontWeight:700,color:C.teal,marginTop:'6px'}}>{MESES_LARGO[monthIdx].toUpperCase()} {year}</div>
+              </div>
+
+              {/* KPIs */}
+              <div style={{padding:'10px 36px',display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'10px'}}>
+                {[
+                  ['Total cobrado renta',`L ${fmt2(totRenta)}`,C.teal],
+                  ['Total cobrado luz',`L ${fmt2(totLuz)}`,C.coral],
+                  ['Pendiente de cobro',`L ${fmt2(totPend)}`,'#E67E22'],
+                ].map(([lbl,val,col])=>(
+                  <div key={lbl} style={{background:C.lbl,border:`1px solid ${C.border}`,borderRadius:6,padding:'10px 14px',textAlign:'center'}}>
+                    <div style={{fontSize:'10px',color:C.light,marginBottom:'4px'}}>{lbl}</div>
+                    <div style={{fontSize:'16px',fontWeight:700,color:col}}>{val}</div>
+                  </div>
+                ))}
+              </div>
+              {totalFact>0 && (
+                <div style={{padding:'0 36px 8px',textAlign:'center',fontSize:'11px',color:C.light}}>
+                  Factura ENEE del mes: <b style={{color:C.text}}>L {fmt2(totalFact)}</b> · Tarifa efectiva: <b style={{color:C.text}}>L {(tarifaEfectiva||0).toFixed(4)}/kWh</b>
+                </div>
+              )}
+
+              {/* TABLA LOCALES */}
+              <div style={{padding:'8px 36px 20px'}}>
+                <div style={{fontSize:'11px',fontWeight:700,color:C.teal,letterSpacing:'2px',borderBottom:`1.5px solid ${C.teal}`,paddingBottom:'4px',marginBottom:'8px'}}>D E T A L L E &nbsp; P O R &nbsp; L O C A L</div>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{background:C.rowHead}}>
+                    {['#','Inquilino','m²','Renta','Renta','Luz','Luz'].map((h,i)=>(
+                      <th key={i} style={{border:`1px solid ${C.border}`,padding:'6px 8px',fontSize:'10px',fontWeight:700,color:C.coral,textAlign:i>2?'center':'left'}}>{h}</th>
+                    ))}
+                  </tr>
+                  <tr style={{background:'#EEE'}}>
+                    {['','','','(Monto)','Estado','(Monto)','Estado'].map((h,i)=>(
+                      <th key={i} style={{border:`1px solid ${C.border}`,padding:'4px 8px',fontSize:'9px',color:C.light,textAlign:i>2?'center':'left'}}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {rows.map(({l,d,renta,luzM,tasaMes},i)=>(
+                      <tr key={l.id} style={{background:i%2===0?'white':C.lbl}}>
+                        <td style={{border:`1px solid ${C.border}`,padding:'7px 8px',fontSize:'11px',fontWeight:700,color:C.teal}}>{l.numero}</td>
+                        <td style={{border:`1px solid ${C.border}`,padding:'7px 8px',fontSize:'11px'}}>{l.inquilino||'Sin asignar'}</td>
+                        <td style={{border:`1px solid ${C.border}`,padding:'7px 8px',fontSize:'11px',textAlign:'center'}}>{l.m2}</td>
+                        <td style={{border:`1px solid ${C.border}`,padding:'7px 8px',fontSize:'11px',textAlign:'right'}}>L {fmt2(renta)}</td>
+                        <td style={{border:`1px solid ${C.border}`,padding:'7px 8px',fontSize:'11px',textAlign:'center'}}>
+                          <span style={{background:d.rentaPagada?'rgba(52,199,89,.15)':'rgba(255,159,10,.15)',color:d.rentaPagada?'#1A7F35':'#B25800',padding:'2px 8px',borderRadius:12,fontSize:'10px',fontWeight:600}}>{d.rentaPagada?'✓ Pagada':'Pendiente'}</span>
+                        </td>
+                        <td style={{border:`1px solid ${C.border}`,padding:'7px 8px',fontSize:'11px',textAlign:'right'}}>{luzM>0?`L ${fmt2(luzM)}`:'—'}</td>
+                        <td style={{border:`1px solid ${C.border}`,padding:'7px 8px',fontSize:'11px',textAlign:'center'}}>
+                          {l.tipoLuz==='incluido'?<span style={{color:C.light,fontSize:'10px'}}>Incluida</span>
+                            :<span style={{background:d.luzPagada?'rgba(52,199,89,.15)':'rgba(255,159,10,.15)',color:d.luzPagada?'#1A7F35':'#B25800',padding:'2px 8px',borderRadius:12,fontSize:'10px',fontWeight:600}}>{d.luzPagada?'✓ Pagada':'Pendiente'}</span>}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr style={{background:C.tealDark}}>
+                      <td colSpan={3} style={{border:`1px solid ${C.tealDark}`,padding:'8px',color:'white',fontWeight:700,fontSize:'12px'}}>TOTAL</td>
+                      <td style={{border:`1px solid ${C.tealDark}`,padding:'8px',color:'white',fontWeight:700,textAlign:'right'}}>L {fmt2(totalEsp)}</td>
+                      <td style={{border:`1px solid ${C.tealDark}`,padding:'8px',color:'white',textAlign:'center',fontSize:'11px'}}>Cobrado: L {fmt2(totRenta)}</td>
+                      <td style={{border:`1px solid ${C.tealDark}`,padding:'8px',color:'white',fontWeight:700,textAlign:'right'}}>{totalFact>0?`L ${fmt2(totalFact)}`:'—'}</td>
+                      <td style={{border:`1px solid ${C.tealDark}`,padding:'8px',color:'white',textAlign:'center',fontSize:'11px'}}>Cobrado: L {fmt2(totLuz)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* FOOTER */}
+              <div style={{background:'#2A2A2A',padding:'10px 36px',display:'flex',justifyContent:'center',alignItems:'center',gap:'16px',flexWrap:'wrap',fontSize:'10px',color:'#ccc'}}>
+                <span>📞 +504 9462-8618</span><span style={{color:C.teal}}>|</span>
+                <span>✉ soluciones_dyl@yahoo.com</span><span style={{color:C.teal}}>|</span>
+                <span>📍 Res. Altos de Venecia 1</span><span style={{color:C.teal}}>|</span>
+                <span>RTN: 0801-9022-372253</span>
+              </div>
+              <div style={{height:7,background:C.teal}}/>
             </div>
           </div>
         </div>
