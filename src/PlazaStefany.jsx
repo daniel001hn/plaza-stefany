@@ -382,13 +382,6 @@ const STYLES = `
 }
 `;
 
-  /* Labels inline en móvil */
-  .ps-local-renta .ps-label,
-  .ps-local-luz .ps-label { margin-bottom: 0 !important; min-width: 40px; }
-}
-`;
-
-
 const APPLE_GLOBAL_CSS = `
   * { -webkit-font-smoothing: antialiased; box-sizing: border-box; }
   body {
