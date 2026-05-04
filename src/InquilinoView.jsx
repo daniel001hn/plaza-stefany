@@ -13,20 +13,9 @@ async function loadMonth(year, monthIdx) {
   return {}
 }
 
-const DL_BIRD = `<svg viewBox="0 0 220 160" width="88" height="64" xmlns="http://www.w3.org/2000/svg">
-  <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
-  <polygon points="65,55 105,80 85,50" fill="#E66555"/>
-  <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
-  <polygon points="65,55 85,50 110,65 105,80" fill="#F37A72"/>
-  <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
-  <polygon points="130,60 150,75 145,55" fill="#E66555"/>
-  <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
-  <polygon points="170,58 190,62 185,72 175,72" fill="#E66555"/>
-  <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
-  <circle cx="180" cy="65" r="3" fill="#C84040"/>
-  <polygon points="55,130 40,155 70,148 80,125" fill="#F37A72"/>
-  <polygon points="40,155 70,148 55,160" fill="#E66555"/>
-</svg>`
+import { DL_LOGO } from './dlLogo'
+
+const DL_BIRD = `<img src="${DL_LOGO}" alt="D&L Soluciones" width="100" height="74" style="display:block" />`
 
 function buildPDF({ tipo, inquilino, localNum, periodo, fechaEmision, reciboNum,
   m2, precioUSD, tasa, isv, rentaBase, isvMonto, rentaTotal,

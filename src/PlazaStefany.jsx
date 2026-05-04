@@ -12,6 +12,7 @@ import {
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Cell, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
+import { DL_LOGO } from './dlLogo';
 
 const DEFAULT_CONFIG = {
   rentPerM2USD: 29,
@@ -3133,20 +3134,7 @@ function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
     : new Date().toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric' });
 
   const DLBird = () => (
-    <svg viewBox="0 0 220 160" width="90" height="65" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
-      <polygon points="65,55 105,80 85,50" fill="#E66555"/>
-      <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
-      <polygon points="65,55 85,50 110,65 105,80" fill="#F37A72"/>
-      <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
-      <polygon points="130,60 150,75 145,55" fill="#E66555"/>
-      <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
-      <polygon points="170,58 190,62 185,72 175,72" fill="#E66555"/>
-      <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
-      <circle cx="180" cy="65" r="3" fill="#C84040"/>
-      <polygon points="55,130 40,155 70,148 80,125" fill="#F37A72"/>
-      <polygon points="40,155 70,148 55,160" fill="#E66555"/>
-    </svg>
+    <img src={DL_LOGO} alt="D&L Soluciones" width="100" height="74" style={{display:'block'}} />
   );
 
   const fmt2 = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -3274,14 +3262,7 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
   const totalEsp    = rows.reduce((s,r)=>s+r.renta,0);
 
   const DLBird = () => (
-    <svg viewBox="0 0 220 160" width="70" height="51" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
-      <polygon points="65,55 105,80 85,50" fill="#E66555"/>
-      <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
-      <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
-      <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
-      <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
-    </svg>
+    <img src={DL_LOGO} alt="D&L Soluciones" width="78" height="58" style={{display:'block'}} />
   );
 
   const handlePrint = () => {
