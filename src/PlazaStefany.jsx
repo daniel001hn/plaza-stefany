@@ -465,10 +465,20 @@ export default function App({ supabase }) {
   );
 
   const updatePayment = async (localId, updates) => {
-    // Si se está marcando renta como pagada, congelar la tasa del día
+    // Si se está marcando renta como pagada, obtener la tasa BCH del momento exacto
     if (updates.rentaPagada === true && !(pagos[localId] || {}).rentaPagada) {
-      updates.tasaCambioCongelado = config.tasaCambio;
-      updates.fechaRentaPagada   = new Date().toISOString();
+      try {
+        const res  = await fetch('https://open.er-api.com/v6/latest/USD');
+        const data = await res.json();
+        const tasa = data?.rates?.HNL
+          ? Math.round(data.rates.HNL * 10000) / 10000
+          : config.tasaCambio;
+        updates.tasaCambioCongelado = tasa;
+        showToast(`Tasa BCH del día: L ${tasa}/$`);
+      } catch {
+        updates.tasaCambioCongelado = config.tasaCambio; // fallback
+      }
+      updates.fechaRentaPagada = new Date().toISOString();
     }
     const newPagos = { ...pagos, [localId]: { ...(pagos[localId] || {}), ...updates } };
     const next = { factura, pagos: newPagos };
