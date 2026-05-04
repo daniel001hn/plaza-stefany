@@ -74,8 +74,8 @@ function LoginScreen({ onLogin }) {
         <h1 style={{color:'#fff',fontSize:'22px',fontWeight:'700',textAlign:'center',margin:'0 0 4px',letterSpacing:'-0.4px'}}>Plaza Stefany</h1>
         <p style={{color:'rgba(255,255,255,0.35)',fontSize:'13px',textAlign:'center',margin:'0 0 28px'}}>Portal de acceso</p>
         <form onSubmit={handleSubmit}>
-          <input className='li' type='text' placeholder='Usuario (dejar vacío si sos admin)' value={usuario} onChange={e=>{setUsuario(e.target.value);setError('')}} style={error?inpErr:inp} autoComplete='username' />
-          <input className='li' type='password' placeholder='Contraseña' value={password} onChange={e=>{setPassword(e.target.value);setError('')}} style={error?inpErr:inp} autoFocus={!usuario} autoComplete='current-password' />
+          <input className='li' type='text' placeholder='Usuario (dejar vacío si sos admin)' value={usuario} onChange={e=>{setUsuario(e.target.value);setError('')}} style={error?inpErr:inp} autoComplete='off' />
+          <input className='li' type='password' placeholder='Contraseña' value={password} onChange={e=>{setPassword(e.target.value);setError('')}} style={error?inpErr:inp} autoComplete='new-password' />
           {error && <p style={{color:'rgb(255,69,58)',fontSize:'12px',margin:'0 0 12px 2px'}}>{error}</p>}
           <button className='lb' type='submit' disabled={loading||!password} style={{width:'100%',padding:'14px',background:password&&!loading?'rgba(255,255,255,0.92)':'rgba(255,255,255,0.12)',color:password&&!loading?'#1c1c1e':'rgba(255,255,255,0.25)',border:'none',borderRadius:'12px',fontSize:'15px',fontFamily:'inherit',fontWeight:'600',marginTop:'4px'}}>
             {loading ? 'Verificando…' : 'Continuar'}
