@@ -465,6 +465,11 @@ export default function App({ supabase }) {
   );
 
   const updatePayment = async (localId, updates) => {
+    // Si se está marcando renta como pagada, congelar la tasa del día
+    if (updates.rentaPagada === true && !(pagos[localId] || {}).rentaPagada) {
+      updates.tasaCambioCongelado = config.tasaCambio;
+      updates.fechaRentaPagada   = new Date().toISOString();
+    }
     const newPagos = { ...pagos, [localId]: { ...(pagos[localId] || {}), ...updates } };
     const next = { factura, pagos: newPagos };
     setYearData((y) => ({ ...y, [monthIdx]: next }));

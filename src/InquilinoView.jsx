@@ -259,14 +259,16 @@ export default function InquilinoView({ session, onLogout }) {
 
   const generarRenta = (mes) => {
     registrarActividad(mes, 'Renta')
-    const renta = calcRenta(local)
-    const base  = (local.m2 || 0) * (config.rentPerM2USD || 29) * (config.tasaCambio || 25)
+    // Usar tasa congelada del día que el admin marcó como pagado, si existe
+    const tasaUsada = mes.data.tasaCambioCongelado || config.tasaCambio || 25
+    const base  = (local.m2 || 0) * (config.rentPerM2USD || 29) * tasaUsada
+    const renta = base * (1 + (config.isv || 0.15))
     abrirPDF(buildPDF({
       tipo: 'renta', inquilino: session.nombre || local?.inquilino || 'Inquilino',
       localNum: local?.numero, periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
       fechaEmision: fechaHoy(),
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-${String(local?.numero).padStart(3,'0')}`,
-      m2: local?.m2, precioUSD: config.rentPerM2USD || 29, tasa: config.tasaCambio || 25,
+      m2: local?.m2, precioUSD: config.rentPerM2USD || 29, tasa: tasaUsada,
       isv: config.isv || 0.15, rentaBase: base, isvMonto: base*(config.isv||0.15), rentaTotal: renta,
     }))
   }
@@ -329,6 +331,12 @@ export default function InquilinoView({ session, onLogout }) {
           const montoLuz    = consumo !== null && tarifaEf > 0 ? consumo * tarifaEf : (data.luzMonto || 0)
           const tieneLuz    = luzAplica && montoLuz > 0 && tarifaEf > 0
           const luzNueva    = tieneLuz && !luzPagada && esActual
+          // El recibo de renta solo está disponible si ya fue registrado por el admin
+          const reciboRentaDisponible = rentaPagada || !esActual
+          // Monto de renta con tasa congelada (o actual si no hay congelada aún)
+          const tasaMes  = data.tasaCambioCongelado || config.tasaCambio || 25
+          const baseMes  = (local?.m2 || 0) * (config.rentPerM2USD || 29) * tasaMes
+          const rentaMes = baseMes * (1 + (config.isv || 0.15))
 
           return (
             <div key={`${mes.year}-${mes.monthIdx}`} className="card">
@@ -340,7 +348,7 @@ export default function InquilinoView({ session, onLogout }) {
                 </div>
                 <div style={{textAlign:'right',flexShrink:0,marginLeft:'1rem'}}>
                   <div style={{fontSize:'.67rem',color:'#888'}}>Renta</div>
-                  <div style={{fontWeight:600,fontSize:'.88rem',fontVariantNumeric:'tabular-nums'}}>L {fmt(renta)}</div>
+                  <div style={{fontWeight:600,fontSize:'.88rem',fontVariantNumeric:'tabular-nums'}}>L {fmt(rentaMes)}</div>
                   {luzAplica && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#bbb',fontVariantNumeric:'tabular-nums'}}>{tieneLuz ? `L ${fmt(montoLuz)}` : '—'}</div></>}
                 </div>
               </div>
@@ -359,17 +367,21 @@ export default function InquilinoView({ session, onLogout }) {
 
                 {/* ── RENTA ── */}
                 <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
-                  <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
-                  <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
-                    background: mes.data.comprobanteRenta ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
-                    border: mes.data.comprobanteRenta ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
-                    color: mes.data.comprobanteRenta ? '#1A7F35' : '#666',
-                    backdropFilter:'blur(8px)',
-                  }}>
-                    <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
-                      onChange={e => subirComprobante(mes,'Renta',e.target.files[0])} />
-                    {mes.data.comprobanteRenta ? '✅ Comprobante renta' : '📎 Subir comprobante'}
-                  </label>
+                  {reciboRentaDisponible
+                    ? <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
+                    : <button className="btn-r" disabled style={{opacity:.4,cursor:'default'}}>📄 Recibo pendiente</button>}
+                  {reciboRentaDisponible && (
+                    <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
+                      background: mes.data.comprobanteRenta ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
+                      border: mes.data.comprobanteRenta ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
+                      color: mes.data.comprobanteRenta ? '#1A7F35' : '#666',
+                      backdropFilter:'blur(8px)',
+                    }}>
+                      <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
+                        onChange={e => subirComprobante(mes,'Renta',e.target.files[0])} />
+                      {mes.data.comprobanteRenta ? '✅ Comprobante renta' : '📎 Subir comprobante'}
+                    </label>
+                  )}
                   {mes.data.comprobanteRenta && (
                     <img src={mes.data.comprobanteRenta} alt="comp renta"
                       style={{width:36,height:28,objectFit:'cover',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
