@@ -220,7 +220,7 @@ export default function InquilinoView({ session, onLogout }) {
     img.src = url
   })
 
-  const subirComprobante = async (mes, file) => {
+  const subirComprobante = async (mes, tipo, file) => {
     if (!file) return
     try {
       const b64 = await comprimirImagen(file)
@@ -230,20 +230,35 @@ export default function InquilinoView({ session, onLogout }) {
       data.pagos = data.pagos || {}
       data.pagos[session.localId] = {
         ...(data.pagos[session.localId] || {}),
-        comprobante: b64,
-        comprobanteDate: new Date().toISOString(),
+        [`comprobante${tipo}`]: b64,
+        [`comprobante${tipo}Date`]: new Date().toISOString(),
       }
       await window.storage.set(key, JSON.stringify(data))
-      // Actualizar estado local
       setMeses(prev => prev.map(m =>
         m.year === mes.year && m.monthIdx === mes.monthIdx
-          ? { ...m, data: { ...m.data, comprobante: b64 } }
+          ? { ...m, data: { ...m.data, [`comprobante${tipo}`]: b64 } }
           : m
       ))
     } catch(e) { alert('Error al subir la imagen. Intentá de nuevo.') }
   }
 
+  const registrarActividad = async (mes, tipo) => {
+    try {
+      const key = `pagos:${mes.year}-${String(mes.monthIdx).padStart(2,'0')}`
+      const r = await window.storage.get(key)
+      const data = r ? JSON.parse(r) : { pagos: {}, factura: {} }
+      data.pagos = data.pagos || {}
+      data.pagos[session.localId] = {
+        ...(data.pagos[session.localId] || {}),
+        [`actividad${tipo}`]: new Date().toISOString(),
+        [`actividadNombre`]: session.nombre || local?.inquilino || 'Inquilino',
+      }
+      await window.storage.set(key, JSON.stringify(data))
+    } catch(e) {}
+  }
+
   const generarRenta = (mes) => {
+    registrarActividad(mes, 'Renta')
     const renta = calcRenta(local)
     const base  = (local.m2 || 0) * (config.rentPerM2USD || 29) * (config.tasaCambio || 25)
     abrirPDF(buildPDF({
@@ -257,6 +272,7 @@ export default function InquilinoView({ session, onLogout }) {
   }
 
   const generarLuz = (mes) => {
+    registrarActividad(mes, 'Luz')
     const { data, factura } = mes
     const lecturaAnt = data.lecturaAnterior ?? (data.lecturaInicial ?? 0)
     const lecturaAct = data.lecturaActual ?? 0
@@ -339,41 +355,54 @@ export default function InquilinoView({ session, onLogout }) {
                 {!luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz</span><span className="pill-x"><span className="dx"/>Incluida</span></>}
               </div>
 
-              <div style={{borderTop:'1px solid rgba(255,255,255,.5)',paddingTop:'.65rem',display:'flex',gap:'.5rem',flexWrap:'wrap',alignItems:'center'}}>
-                <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
-                {luzAplica && (
-                  tieneLuz
-                    ? <button className="btn-l" onClick={() => generarLuz(mes)}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
-                    : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>
-                )}
-                {/* Comprobante de pago */}
-                <label style={{
-                  display:'inline-flex',alignItems:'center',gap:'.35rem',
-                  padding:'.5rem .85rem',borderRadius:10,cursor:'pointer',
-                  background: mes.data.comprobante ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
-                  border: mes.data.comprobante ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
-                  fontSize:'.78rem',fontWeight:600,
-                  color: mes.data.comprobante ? '#1A7F35' : '#555',
-                  backdropFilter:'blur(8px)',
-                  transition:'all .18s',
-                }}>
-                  <input type="file" accept="image/*" style={{display:'none'}}
-                    onChange={e => subirComprobante(mes, e.target.files[0])} />
-                  {mes.data.comprobante ? '✅ Comprobante enviado' : '📎 Subir comprobante'}
-                </label>
-              </div>
-              {/* Thumbnail del comprobante */}
-              {mes.data.comprobante && (
-                <div style={{marginTop:'.65rem',display:'flex',alignItems:'flex-start',gap:'.65rem'}}>
-                  <img src={mes.data.comprobante} alt="Comprobante"
-                    style={{width:80,height:60,objectFit:'cover',borderRadius:8,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
-                    onClick={() => window.open(mes.data.comprobante,'_blank')} />
-                  <div style={{fontSize:'.72rem',color:'#666',lineHeight:1.5}}>
-                    <div style={{fontWeight:600,color:'#1A7F35'}}>✅ Comprobante de pago enviado</div>
-                    <div>Toca la imagen para ver en tamaño completo</div>
-                  </div>
+              <div style={{borderTop:'1px solid rgba(255,255,255,.5)',paddingTop:'.75rem',display:'flex',flexDirection:'column',gap:'.55rem'}}>
+
+                {/* ── RENTA ── */}
+                <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
+                  <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
+                  <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
+                    background: mes.data.comprobanteRenta ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
+                    border: mes.data.comprobanteRenta ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
+                    color: mes.data.comprobanteRenta ? '#1A7F35' : '#666',
+                    backdropFilter:'blur(8px)',
+                  }}>
+                    <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
+                      onChange={e => subirComprobante(mes,'Renta',e.target.files[0])} />
+                    {mes.data.comprobanteRenta ? '✅ Comprobante renta' : '📎 Subir comprobante'}
+                  </label>
+                  {mes.data.comprobanteRenta && (
+                    <img src={mes.data.comprobanteRenta} alt="comp renta"
+                      style={{width:36,height:28,objectFit:'cover',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
+                      onClick={() => window.open(mes.data.comprobanteRenta,'_blank')} />
+                  )}
                 </div>
-              )}
+
+                {/* ── LUZ ── */}
+                {luzAplica && (
+                  <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
+                    {tieneLuz
+                      ? <button className="btn-l" onClick={() => generarLuz(mes)}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
+                      : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>}
+                    {tieneLuz && (
+                      <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
+                        background: mes.data.comprobanteLuz ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
+                        border: mes.data.comprobanteLuz ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
+                        color: mes.data.comprobanteLuz ? '#1A7F35' : '#666',
+                        backdropFilter:'blur(8px)',
+                      }}>
+                        <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
+                          onChange={e => subirComprobante(mes,'Luz',e.target.files[0])} />
+                        {mes.data.comprobanteLuz ? '✅ Comprobante luz' : '📎 Subir comprobante'}
+                      </label>
+                    )}
+                    {mes.data.comprobanteLuz && (
+                      <img src={mes.data.comprobanteLuz} alt="comp luz"
+                        style={{width:36,height:28,objectFit:'cover',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
+                        onClick={() => window.open(mes.data.comprobanteLuz,'_blank')} />
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )
         })}

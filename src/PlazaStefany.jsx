@@ -771,6 +771,9 @@ function DashboardView({
         <LocalBreakdown perLocal={perLocal} />
       </div>
 
+      {/* ── ALERTAS DE ACTIVIDAD DE INQUILINOS ── */}
+      <ActividadInquilinos pagos={pagos} locales={locales} monthIdx={monthIdx} year={year} />
+
       <div className="ps-card" style={{ padding: '1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div>
@@ -1454,6 +1457,81 @@ function YearlyChart({ data, year, total }) {
   );
 }
 
+// =================================================================
+// ACTIVIDAD INQUILINOS — alertas cuando generan recibos
+// =================================================================
+function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
+  const tiempoRelativo = (iso) => {
+    if (!iso) return null
+    const diff = Math.floor((Date.now() - new Date(iso)) / 1000)
+    if (diff < 60)   return 'hace unos segundos'
+    if (diff < 3600) return `hace ${Math.floor(diff/60)} min`
+    if (diff < 86400) return `hace ${Math.floor(diff/3600)}h`
+    return `hace ${Math.floor(diff/86400)} días`
+  }
+
+  const alertas = []
+  locales.forEach(l => {
+    const d = pagos[l.id] || {}
+    const nombre = l.inquilino || `Local ${l.numero}`
+    if (d.actividadRenta) alertas.push({
+      id: l.id + 'r', tipo: 'renta', nombre,
+      localNum: l.numero, ts: d.actividadRenta,
+      comprobante: d.comprobanteRenta,
+    })
+    if (d.actividadLuz) alertas.push({
+      id: l.id + 'l', tipo: 'luz', nombre,
+      localNum: l.numero, ts: d.actividadLuz,
+      comprobante: d.comprobanteLuz,
+    })
+  })
+
+  // Ordenar más reciente primero
+  alertas.sort((a, b) => new Date(b.ts) - new Date(a.ts))
+
+  if (alertas.length === 0) return null
+
+  return (
+    <div className="ps-card" style={{ padding: '1.25rem', borderLeft: '3px solid #F59E0B' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.85rem' }}>
+        <AlertCircle size={15} style={{ color: '#F59E0B' }} />
+        <div className="ps-eyebrow" style={{ color: '#F59E0B' }}>ACTIVIDAD DE INQUILINOS</div>
+        <span style={{ marginLeft: 'auto', background: '#F59E0B', color: 'white', borderRadius: 999, fontSize: '.65rem', fontWeight: 700, padding: '.1rem .5rem' }}>{alertas.length}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+        {alertas.map(a => (
+          <div key={a.id} style={{
+            display: 'flex', alignItems: 'center', gap: '.75rem',
+            background: a.tipo === 'renta' ? 'rgba(99,102,241,0.07)' : 'rgba(14,165,233,0.07)',
+            border: `1px solid ${a.tipo === 'renta' ? 'rgba(99,102,241,0.2)' : 'rgba(14,165,233,0.2)'}`,
+            borderRadius: 10, padding: '.65rem .9rem',
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>{a.tipo === 'renta' ? '📄' : '⚡'}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '.88rem', fontWeight: 600 }}>
+                <span style={{ color: a.tipo === 'renta' ? '#6366F1' : '#0EA5E9' }}>Local {a.localNum}</span>
+                {' · '}{a.nombre}
+              </div>
+              <div style={{ fontSize: '.74rem', color: '#888', marginTop: '.1rem' }}>
+                Generó recibo de <b>{a.tipo}</b> — {tiempoRelativo(a.ts)}
+              </div>
+            </div>
+            {a.comprobante
+              ? <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                  <img src={a.comprobante} alt="comprobante"
+                    style={{ width: 40, height: 32, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
+                    onClick={() => window.open(a.comprobante, '_blank')} />
+                  <span style={{ fontSize: '.7rem', color: '#1A7F35', fontWeight: 600 }}>✅ Pagado</span>
+                </div>
+              : <span style={{ fontSize: '.7rem', color: '#F59E0B', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '.15rem .45rem', borderRadius: 6, border: '1px solid rgba(245,158,11,0.3)' }}>⏳ Sin comprobante</span>
+            }
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function LocalBreakdown({ perLocal }) {
   const max = Math.max(...perLocal.map((l) => l.total), 1);
   return (
@@ -1872,19 +1950,33 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
           <textarea className="ps-input" rows={2} value={form.notas} onChange={(e) => set('notas', e.target.value)} placeholder="Abonos parciales, observaciones..." />
         </div>
 
-        {/* Comprobante subido por el inquilino */}
-        {data.comprobante && (
+        {/* Comprobantes subidos por el inquilino */}
+        {(data.comprobanteRenta || data.comprobanteLuz) && (
           <div style={{ marginBottom: '1.25rem', background: 'rgba(52,199,89,0.08)', border: '1px solid rgba(52,199,89,0.25)', borderRadius: 12, padding: '1rem' }}>
-            <div className="ps-label" style={{ marginBottom: '.5rem', color: '#1A7F35' }}>✅ Comprobante de pago del inquilino</div>
-            <div style={{ display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
-              <img src={data.comprobante} alt="Comprobante"
-                style={{ width: 90, height: 68, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
-                onClick={() => window.open(data.comprobante, '_blank')} />
-              <div style={{ fontSize: '.78rem', color: '#555', lineHeight: 1.6 }}>
-                <div style={{ fontWeight: 600, color: '#1A7F35', marginBottom: '.2rem' }}>Transferencia adjunta</div>
-                {data.comprobanteDate && <div style={{ color: '#888' }}>Enviado: {new Date(data.comprobanteDate).toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })}</div>}
-                <div style={{ marginTop: '.3rem' }}><a href={data.comprobante} target="_blank" rel="noreferrer" style={{ color: '#6366F1', fontSize: '.75rem' }}>Ver imagen completa →</a></div>
-              </div>
+            <div className="ps-label" style={{ marginBottom: '.65rem', color: '#1A7F35' }}>✅ Comprobantes del inquilino</div>
+            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+              {data.comprobanteRenta && (
+                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                  <img src={data.comprobanteRenta} alt="comp renta"
+                    style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
+                    onClick={() => window.open(data.comprobanteRenta, '_blank')} />
+                  <div style={{ fontSize: '.74rem', color: '#555' }}>
+                    <div style={{ fontWeight: 600, color: '#1A7F35' }}>📄 Renta</div>
+                    {data.comprobanteRentaDate && <div style={{ color: '#888', marginTop: '.15rem' }}>{new Date(data.comprobanteRentaDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
+                  </div>
+                </div>
+              )}
+              {data.comprobanteLuz && (
+                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                  <img src={data.comprobanteLuz} alt="comp luz"
+                    style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer' }}
+                    onClick={() => window.open(data.comprobanteLuz, '_blank')} />
+                  <div style={{ fontSize: '.74rem', color: '#555' }}>
+                    <div style={{ fontWeight: 600, color: '#0EA5E9' }}>⚡ Luz</div>
+                    {data.comprobanteLuzDate && <div style={{ color: '#888', marginTop: '.15rem' }}>{new Date(data.comprobanteLuzDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
