@@ -57,6 +57,20 @@ async function saveMonth(year, monthIdx, data) {
   catch (e) { return false; }
 }
 
+// Devuelve el precio por m² aplicable a un mes/año determinado.
+// Usa config.precioHistorial si existe; si no, cae al precio actual.
+function getPrecioForMonth(config, year, monthIdx) {
+  if (year != null && monthIdx != null) {
+    const targetKey = `${year}-${String(monthIdx).padStart(2, '0')}`;
+    const hist = (config.precioHistorial || []).filter(h => h.desde <= targetKey);
+    if (hist.length > 0) {
+      hist.sort((a, b) => b.desde.localeCompare(a.desde));
+      return hist[0].precio;
+    }
+  }
+  return config.rentPerM2USD || 29;
+}
+
 function calcConsumoLocal(locale, pagos, prevPagos) {
   if ((locale.tipoLuz || 'incluido') !== 'medidor') return null;
   const lecturaActual = pagos[locale.id]?.lecturaActual;
@@ -462,7 +476,7 @@ export default function App({ supabase }) {
   }, [year]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
-  const calcRenta = (m2) => (m2 || 0) * (config.rentPerM2USD || 29) * (config.tasaCambio || 25) * (1 + config.isv);
+  const calcRenta = (m2, y, m) => (m2 || 0) * getPrecioForMonth(config, y, m) * (config.tasaCambio || 25) * (1 + config.isv);
 
   const navigateMonth = (delta) => {
     let m = monthIdx + delta, y = year;
@@ -541,7 +555,77 @@ export default function App({ supabase }) {
     showToast('Local eliminado');
   };
 
+  // Cierra contrato del inquilino actual: borra pagos del local en todos los meses
+  // del año actual + año anterior, borra el usuario del portal, y limpia inquilino.
+  // No borra el local en sí — queda listo para asignar nuevo inquilino.
+  const cerrarContrato = async (localId) => {
+    const local = locales.find(l => l.id === localId);
+    if (!local) return;
+    const inquilino = local.inquilino || '(sin asignar)';
+    if (!confirm(
+      `¿Cerrar contrato del Local ${local.numero} (${inquilino})?\n\n` +
+      `Esto va a:\n` +
+      `• Borrar todos los pagos registrados de este local\n` +
+      `• Borrar el acceso al portal del inquilino\n` +
+      `• Dejar el local libre para nuevo inquilino\n\n` +
+      `Esta acción NO se puede deshacer.`
+    )) return;
+
+    // 1. Wipe pagos del local en año actual y anterior
+    for (const y of [year, year - 1]) {
+      for (let m = 0; m < 12; m++) {
+        const md = await loadMonth(y, m);
+        if (md && md.pagos && md.pagos[localId]) {
+          const newPagos = { ...md.pagos };
+          delete newPagos[localId];
+          await saveMonth(y, m, { ...md, pagos: newPagos });
+        }
+      }
+    }
+
+    // 2. Reset inquilino del local (mantener m², n°, tipoLuz para nuevo inquilino)
+    const newLocales = locales.map(l =>
+      l.id === localId ? { ...l, inquilino: '', lecturaInicial: null } : l
+    );
+    setLocales(newLocales);
+
+    // 3. Borrar usuario del portal asociado a este local
+    const newUsuarios = (config.usuarios || []).filter(u => u.localId !== localId);
+    const newConfig = { ...config, usuarios: newUsuarios };
+    setConfig(newConfig);
+
+    // 4. Persist
+    await saveCfg({ config: newConfig, locales: newLocales });
+
+    // 5. Reload yearData para refrescar dashboard
+    const result = {};
+    for (let m = 0; m < 12; m++) result[m] = await loadMonth(year, m);
+    result['_prevDec'] = await loadMonth(year - 1, 11);
+    setYearData(result);
+
+    setEditingLocal(null);
+    showToast(`Contrato cerrado. Local ${local.numero} listo para nuevo inquilino.`);
+  };
+
   const saveConfig = async (newConfig) => {
+    // Detectar cambio de precio por m². Si cambió, guardar snapshot del precio anterior
+    // como historico. El precio nuevo aplica desde el mes actual en adelante.
+    const oldPrecio = config.rentPerM2USD;
+    const newPrecio = newConfig.rentPerM2USD;
+    if (oldPrecio != null && newPrecio != null && oldPrecio !== newPrecio) {
+      const today = new Date();
+      const desdeKey = `${today.getFullYear()}-${String(today.getMonth()).padStart(2, '0')}`;
+      let hist = newConfig.precioHistorial || config.precioHistorial || [];
+      // Si historial vacío, sembrar con precio viejo aplicable desde siempre
+      if (hist.length === 0) {
+        hist = [{ precio: oldPrecio, desde: '0000-00' }];
+      }
+      // Agregar nuevo entry (si ya hay uno para este mes, lo reemplaza)
+      hist = hist.filter(h => h.desde !== desdeKey);
+      hist.push({ precio: newPrecio, desde: desdeKey });
+      hist.sort((a, b) => a.desde.localeCompare(b.desde));
+      newConfig = { ...newConfig, precioHistorial: hist };
+    }
     setConfig(newConfig);
     await saveCfg({ config: newConfig, locales });
     showToast('Configuración guardada');
@@ -637,7 +721,7 @@ export default function App({ supabase }) {
       )}
 
       {editingLocal && (
-        <LocalEditModal locale={editingLocal} onClose={() => setEditingLocal(null)} onSave={saveLocale} calcRenta={calcRenta} />
+        <LocalEditModal locale={editingLocal} onClose={() => setEditingLocal(null)} onSave={saveLocale} calcRenta={calcRenta} onCerrarContrato={cerrarContrato} />
       )}
 
       {editingFactura && (
@@ -769,7 +853,7 @@ function DashboardView({
       const tarifa = calcTarifaEfectiva(fact, locales, p, prevP);
       locales.forEach((l) => {
         const d = p[l.id] || {};
-        if (d.rentaPagada) renta += calcRenta(l.m2);
+        if (d.rentaPagada) renta += calcRenta(l.m2, year, idx);
         if (d.luzPagada) {
           const consumo = calcConsumoLocal(l, p, prevP);
           if (l.tipoLuz === 'medidor' && consumo != null && tarifa) luz += consumo * tarifa;
@@ -892,7 +976,7 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
       const localData = {};
       locales.forEach((l) => {
         const d = p[l.id] || {};
-        const renta = calcRenta(l.m2);
+        const renta = calcRenta(l.m2, year, idx);
         const consumo = calcConsumoLocal(l, p, prevP);
         const luz = (l.tipoLuz === 'medidor' && consumo != null && tarifa)
           ? consumo * tarifa : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
@@ -2337,7 +2421,7 @@ function Field({ label, children }) {
   );
 }
 
-function LocalEditModal({ locale, onClose, onSave, calcRenta }) {
+function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }) {
   const [f, setF] = useState({
     id: locale.id,
     numero: locale.numero || '',
@@ -2453,9 +2537,21 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem' }}>
-          <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
-          <button onClick={handleSave} className="ps-btn"><Save size={14} strokeWidth={2.5} /> Guardar</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', alignItems: 'center' }}>
+          {locale.id && locale.inquilino && onCerrarContrato ? (
+            <button
+              onClick={() => onCerrarContrato(locale.id)}
+              className="ps-btn-ghost"
+              style={{ color: '#FF3B30', borderColor: 'rgba(255,59,48,0.25)', fontSize: '.8rem' }}
+              title="Cerrar contrato y dejar el local libre"
+            >
+              ⊘ Cerrar contrato
+            </button>
+          ) : <span />}
+          <div style={{ display: 'flex', gap: '.5rem' }}>
+            <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
+            <button onClick={handleSave} className="ps-btn"><Save size={14} strokeWidth={2.5} /> Guardar</button>
+          </div>
         </div>
       </div>
     </div>
@@ -2686,7 +2782,8 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
 // =================================================================
 function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
   const tasaUsada  = data.tasaCambioCongelado || config.tasaCambio || 25;
-  const base       = (local.m2 || 0) * (config.rentPerM2USD || 29) * tasaUsada;
+  const precioM2   = getPrecioForMonth(config, year, monthIdx);
+  const base       = (local.m2 || 0) * precioM2 * tasaUsada;
   const isvMonto   = base * (config.isv || 0.15);
   const total      = base + isvMonto;
   const reciboNum  = `PS-${year}-${String(monthIdx + 1).padStart(2,'0')}-R${String(local.numero || '').padStart(2,'0')}`;
@@ -2777,9 +2874,9 @@ function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
                   </tr></thead>
                   <tbody>
                     <tr><td style={tC}>Área arrendada</td><td style={{...tC,textAlign:'center',color:C.light}}>{local.m2} m²</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
-                    <tr style={{background:C.lbl}}><td style={tC}>Precio por m²</td><td style={{...tC,textAlign:'center',color:C.light}}>$ {(config.rentPerM2USD||29).toFixed(2)} / m²</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
+                    <tr style={{background:C.lbl}}><td style={tC}>Precio por m²</td><td style={{...tC,textAlign:'center',color:C.light}}>$ {precioM2.toFixed(2)} / m²</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
                     <tr><td style={tC}>Tipo de cambio BCH (venta)</td><td style={{...tC,textAlign:'center',color:C.light}}>L {tasaUsada} / US$</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
-                    <tr style={{background:C.lbl}}><td style={tC}>Base ({local.m2} × ${config.rentPerM2USD||29} × {tasaUsada})</td><td style={{...tC,textAlign:'center'}}></td><td style={{...tC,textAlign:'right'}}>{fmt2(base)}</td></tr>
+                    <tr style={{background:C.lbl}}><td style={tC}>Base ({local.m2} × ${precioM2} × {tasaUsada})</td><td style={{...tC,textAlign:'center'}}></td><td style={{...tC,textAlign:'right'}}>{fmt2(base)}</td></tr>
                     <tr><td style={tC}>ISV ({((config.isv||0.15)*100).toFixed(0)}%)</td><td style={{...tC,textAlign:'center',color:C.light}}>L {fmt2(base)} × {((config.isv||0.15)*100).toFixed(0)}%</td><td style={{...tC,textAlign:'right'}}>{fmt2(isvMonto)}</td></tr>
                     <tr style={{background:C.tealDark}}>
                       <td colSpan={2} style={{...tC,color:'white',fontWeight:700,fontSize:'13px',border:`1px solid ${C.tealDark}`}}>TOTAL A PAGAR</td>
@@ -2788,7 +2885,7 @@ function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
                   </tbody>
                 </table>
                 <div style={{background:'#FFFBEA',borderLeft:'4px solid #D4A800',padding:'10px 14px',fontSize:'11px',lineHeight:1.6,marginTop:'14px',color:'#555'}}>
-                  <b style={{color:C.text}}>Nota:</b> Renta mensual calculada sobre {local.m2} m² al precio pactado de US${config.rentPerM2USD||29}/m², convertido al tipo de cambio BCH (venta) de L {tasaUsada}/US$ al momento del pago. ISV ({((config.isv||0.15)*100).toFixed(0)}%) incluido en el total.
+                  <b style={{color:C.text}}>Nota:</b> Renta mensual calculada sobre {local.m2} m² al precio pactado de US${precioM2}/m², convertido al tipo de cambio BCH (venta) de L {tasaUsada}/US$ al momento del pago. ISV ({((config.isv||0.15)*100).toFixed(0)}%) incluido en el total.
                 </div>
               </div>
               {/* FOOTER */}
@@ -2819,7 +2916,8 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
   const rows = locales.map(l => {
     const d = pagos[l.id] || {};
     const tasaMes = d.tasaCambioCongelado || config.tasaCambio || 25;
-    const base    = l.m2 * (config.rentPerM2USD||29) * tasaMes;
+    const precioM2 = getPrecioForMonth(config, year, monthIdx);
+    const base    = l.m2 * precioM2 * tasaMes;
     const renta   = base * (1 + (config.isv||0.15));
     const luzM    = d.luzMonto || 0;
     return { l, d, renta, luzM, tasaMes };

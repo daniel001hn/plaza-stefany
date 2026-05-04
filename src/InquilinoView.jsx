@@ -197,6 +197,19 @@ export default function InquilinoView({ session, onLogout }) {
     return base * (1 + (config.isv || 0.15))
   }
 
+  // Devuelve el precio por m² aplicable a un mes/año determinado (lee historial si existe).
+  const getPrecioMes = (year, monthIdx) => {
+    if (year != null && monthIdx != null) {
+      const targetKey = `${year}-${String(monthIdx).padStart(2, '0')}`
+      const hist = (config.precioHistorial || []).filter(h => h.desde <= targetKey)
+      if (hist.length > 0) {
+        hist.sort((a, b) => b.desde.localeCompare(a.desde))
+        return hist[0].precio
+      }
+    }
+    return config.rentPerM2USD || 29
+  }
+
   const fechaHoy = () => new Date().toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric' })
 
   // Comprimir imagen a base64 (max 800px, calidad 0.7)
@@ -261,14 +274,15 @@ export default function InquilinoView({ session, onLogout }) {
     registrarActividad(mes, 'Renta')
     // Usar tasa congelada del día que el admin marcó como pagado, si existe
     const tasaUsada = mes.data.tasaCambioCongelado || config.tasaCambio || 25
-    const base  = (local.m2 || 0) * (config.rentPerM2USD || 29) * tasaUsada
+    const precioM2  = getPrecioMes(mes.year, mes.monthIdx)
+    const base  = (local.m2 || 0) * precioM2 * tasaUsada
     const renta = base * (1 + (config.isv || 0.15))
     abrirPDF(buildPDF({
       tipo: 'renta', inquilino: session.nombre || local?.inquilino || 'Inquilino',
       localNum: local?.numero, periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
       fechaEmision: fechaHoy(),
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-${String(local?.numero).padStart(3,'0')}`,
-      m2: local?.m2, precioUSD: config.rentPerM2USD || 29, tasa: tasaUsada,
+      m2: local?.m2, precioUSD: precioM2, tasa: tasaUsada,
       isv: config.isv || 0.15, rentaBase: base, isvMonto: base*(config.isv||0.15), rentaTotal: renta,
     }))
   }
@@ -335,7 +349,8 @@ export default function InquilinoView({ session, onLogout }) {
           const reciboRentaDisponible = rentaPagada || !esActual
           // Monto de renta con tasa congelada (o actual si no hay congelada aún)
           const tasaMes  = data.tasaCambioCongelado || config.tasaCambio || 25
-          const baseMes  = (local?.m2 || 0) * (config.rentPerM2USD || 29) * tasaMes
+          const precioM2Mes = getPrecioMes(mes.year, mes.monthIdx)
+          const baseMes  = (local?.m2 || 0) * precioM2Mes * tasaMes
           const rentaMes = baseMes * (1 + (config.isv || 0.15))
 
           return (
