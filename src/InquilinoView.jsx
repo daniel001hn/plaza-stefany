@@ -178,10 +178,17 @@ export default function InquilinoView({ session, onLogout }) {
       setConfig(cfg)
       const loc = locales.find(l => l.id === session.localId)
       setLocal(loc)
+      // Si el local tiene contratoDesde, no mostrar meses anteriores a esa fecha.
+      // Esto evita que un inquilino nuevo vea pagos del inquilino anterior.
+      const desdeStr = loc?.contratoDesde // 'YYYY-MM-DD'
+      const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null
       const months = []
       for (let i = 0; i < 12; i++) {
         const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
         const y = d.getFullYear(); const m = d.getMonth()
+        // Comparar contra el inicio del mes; si contratoDesde es después del fin del mes, lo ocultamos
+        const finDeMes = new Date(y, m + 1, 0) // último día del mes
+        if (desde && desde > finDeMes) continue
         const data = await loadMonth(y, m)
         const pago = (data.pagos || {})[session.localId] || {}
         months.push({ year: y, monthIdx: m, data: pago, factura: data.factura || {} })

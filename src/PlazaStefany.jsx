@@ -539,8 +539,21 @@ export default function App({ supabase }) {
 
   const saveLocale = async (locale) => {
     let next;
-    if (locale.id) next = locales.map((l) => (l.id === locale.id ? locale : l));
-    else { const id = `loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; next = [...locales, { ...locale, id }]; }
+    if (locale.id) {
+      // Si cambió el inquilino (o se asigna por primera vez), setear contratoDesde
+      const prev = locales.find(l => l.id === locale.id) || {};
+      const inquilinoChanged = (prev.inquilino || '') !== (locale.inquilino || '');
+      const inquilinoAssigned = !!locale.inquilino;
+      let updatedLocale = locale;
+      if (inquilinoChanged && inquilinoAssigned) {
+        updatedLocale = { ...locale, contratoDesde: new Date().toISOString().slice(0, 10) };
+      }
+      next = locales.map((l) => (l.id === locale.id ? updatedLocale : l));
+    } else {
+      const id = `loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const contratoDesde = locale.inquilino ? new Date().toISOString().slice(0, 10) : null;
+      next = [...locales, { ...locale, id, contratoDesde }];
+    }
     setLocales(next);
     await saveCfg({ config, locales: next });
     setEditingLocal(null);
@@ -555,9 +568,12 @@ export default function App({ supabase }) {
     showToast('Local eliminado');
   };
 
-  // Cierra contrato del inquilino actual: borra pagos del local en todos los meses
-  // del año actual + año anterior, borra el usuario del portal, y limpia inquilino.
-  // No borra el local en sí — queda listo para asignar nuevo inquilino.
+  // Cierra contrato del inquilino actual:
+  // - Borra el usuario del portal (corta su acceso)
+  // - Libera el local (inquilino vacío, lecturaInicial reset)
+  // - Limpia contratoDesde
+  // PRESERVA todo el historial de pagos para que el admin pueda consultarlo siempre.
+  // El próximo inquilino solo verá meses desde su nueva fecha de contrato.
   const cerrarContrato = async (localId) => {
     const local = locales.find(l => l.id === localId);
     if (!local) return;
@@ -565,46 +581,27 @@ export default function App({ supabase }) {
     if (!confirm(
       `¿Cerrar contrato del Local ${local.numero} (${inquilino})?\n\n` +
       `Esto va a:\n` +
-      `• Borrar todos los pagos registrados de este local\n` +
-      `• Borrar el acceso al portal del inquilino\n` +
-      `• Dejar el local libre para nuevo inquilino\n\n` +
-      `Esta acción NO se puede deshacer.`
+      `• Cortar el acceso al portal del inquilino actual\n` +
+      `• Liberar el local para nuevo inquilino\n` +
+      `• El historial de pagos de este local SE CONSERVA y vos lo seguís viendo en el panel admin\n\n` +
+      `El próximo inquilino solo verá los pagos a partir de su fecha de inicio.`
     )) return;
 
-    // 1. Wipe pagos del local en año actual y anterior
-    for (const y of [year, year - 1]) {
-      for (let m = 0; m < 12; m++) {
-        const md = await loadMonth(y, m);
-        if (md && md.pagos && md.pagos[localId]) {
-          const newPagos = { ...md.pagos };
-          delete newPagos[localId];
-          await saveMonth(y, m, { ...md, pagos: newPagos });
-        }
-      }
-    }
-
-    // 2. Reset inquilino del local (mantener m², n°, tipoLuz para nuevo inquilino)
+    // Reset inquilino del local + limpiar contratoDesde
     const newLocales = locales.map(l =>
-      l.id === localId ? { ...l, inquilino: '', lecturaInicial: null } : l
+      l.id === localId ? { ...l, inquilino: '', lecturaInicial: null, contratoDesde: null } : l
     );
     setLocales(newLocales);
 
-    // 3. Borrar usuario del portal asociado a este local
+    // Borrar usuario del portal asociado a este local
     const newUsuarios = (config.usuarios || []).filter(u => u.localId !== localId);
     const newConfig = { ...config, usuarios: newUsuarios };
     setConfig(newConfig);
 
-    // 4. Persist
     await saveCfg({ config: newConfig, locales: newLocales });
 
-    // 5. Reload yearData para refrescar dashboard
-    const result = {};
-    for (let m = 0; m < 12; m++) result[m] = await loadMonth(year, m);
-    result['_prevDec'] = await loadMonth(year - 1, 11);
-    setYearData(result);
-
     setEditingLocal(null);
-    showToast(`Contrato cerrado. Local ${local.numero} listo para nuevo inquilino.`);
+    showToast(`Contrato cerrado. Local ${local.numero} libre. Historial preservado.`);
   };
 
   const saveConfig = async (newConfig) => {
