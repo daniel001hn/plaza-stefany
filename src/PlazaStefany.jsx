@@ -90,8 +90,13 @@ function getPrecioForMonth(config, year, monthIdx) {
 
 function calcConsumoLocal(locale, pagos, prevPagos) {
   if ((locale.tipoLuz || 'incluido') !== 'medidor') return null;
-  const lecturaActual = pagos[locale.id]?.lecturaActual;
+  const pago = pagos[locale.id] || {};
+  const lecturaActual = pago.lecturaActual;
   if (lecturaActual == null) return null;
+  // Si este mes el medidor fue reemplazado, partir desde lecturaInicialReseteo (no del mes anterior)
+  if (pago.medidorReemplazado && pago.lecturaInicialReseteo != null) {
+    return lecturaActual - pago.lecturaInicialReseteo;
+  }
   const lecturaAnterior = prevPagos[locale.id]?.lecturaActual ?? locale.lecturaInicial;
   if (lecturaAnterior == null) return null;
   return lecturaActual - lecturaAnterior;
@@ -997,6 +1002,13 @@ function DashboardView({
         tarifaEfectiva={tarifaEfectiva} onEdit={onEditFactura}
       />
 
+      <ComprobantesInbox
+        locales={locales} pagos={pagos} monthIdx={monthIdx} year={year}
+        onAprobar={(localId, tipo) => onTogglePago(localId, tipo === 'renta'
+          ? { rentaPagada: true, fechaRenta: new Date().toISOString().slice(0,10) }
+          : { luzPagada: true, fechaLuz: new Date().toISOString().slice(0,10) })}
+      />
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
         <KPI label="Cobrado este mes" value={kpis.totalCobrado} target={kpis.totalEsperado} accent="#1D4ED8" icon={<Wallet size={14} />} big />
         <KPI label="Renta" value={kpis.cobradoRenta} target={kpis.totalRenta} accent="#1D4ED8" icon={<Receipt size={14} />} />
@@ -1042,6 +1054,7 @@ function DashboardView({
 // =================================================================
 function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) {
   const [subView, setSubView] = useState('plaza');
+  const [filtro, setFiltro] = useState('');
 
   // Build month-by-month data
   const monthsData = useMemo(() => {
@@ -1097,9 +1110,16 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.75rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
           <button className="ps-btn-icon" onClick={() => setYear(year - 1)}><ChevronLeft size={16} /></button>
-          <div className="ps-card" style={{ padding: '.5rem 1rem' }}>
-            <span className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 500 }}>Año {year}</span>
-          </div>
+          <select
+            value={year}
+            onChange={(e) => setYear(Number(e.target.value))}
+            className="ps-input ps-mono"
+            style={{ padding: '.5rem .85rem', fontSize: '.95rem', fontWeight: 500, cursor: 'pointer', minWidth: 110 }}
+          >
+            {Array.from({ length: 12 }, (_, i) => new Date().getFullYear() + 1 - i).map(y => (
+              <option key={y} value={y}>Año {y}</option>
+            ))}
+          </select>
           <button className="ps-btn-icon" onClick={() => setYear(year + 1)}><ChevronRight size={16} /></button>
         </div>
 
@@ -1116,9 +1136,32 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         </div>
       </div>
 
-      {subView === 'plaza' && <HistorialPlaza monthsData={monthsData} year={year} />}
-      {subView === 'locales' && <HistorialLocales monthsData={monthsData} locales={locales} year={year} />}
-      {subView === 'enee' && <HistorialENEE monthsData={monthsData} year={year} />}
+      {/* Búsqueda / filtro */}
+      <input
+        type="text"
+        placeholder="🔍 Filtrar mes (ej: mayo, abril...)"
+        value={filtro}
+        onChange={(e) => setFiltro(e.target.value)}
+        className="ps-input"
+        style={{ fontSize: '.85rem', maxWidth: 360 }}
+      />
+
+      {(() => {
+        const filtered = filtro
+          ? monthsData.filter(m => {
+              const f = filtro.toLowerCase();
+              return (m.mes || '').toLowerCase().includes(f)
+                || (m.mesLargo || '').toLowerCase().includes(f);
+            })
+          : monthsData;
+        return (
+          <>
+            {subView === 'plaza' && <HistorialPlaza monthsData={filtered} year={year} />}
+            {subView === 'locales' && <HistorialLocales monthsData={filtered} locales={locales} year={year} />}
+            {subView === 'enee' && <HistorialENEE monthsData={filtered} year={year} />}
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -2007,14 +2050,20 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
     luzPagada: !!data.luzPagada,
     fechaLuz: data.fechaLuz || '',
     lecturaActual: data.lecturaActual ?? '',
+    medidorReemplazado: !!data.medidorReemplazado,
+    lecturaInicialReseteo: data.lecturaInicialReseteo ?? '',
     notas: data.notas || '',
   });
   const tipoLuz = local.tipoLuz || 'incluido';
   const renta = calcRenta(local.m2);
   const lecturaAnterior = prevData.lecturaActual ?? local.lecturaInicial ?? null;
 
-  const consumo = tipoLuz === 'medidor' && form.lecturaActual !== '' && lecturaAnterior != null
-    ? Number(form.lecturaActual) - Number(lecturaAnterior) : null;
+  // Si medidor fue reemplazado este mes, calcular consumo desde la lectura inicial nueva
+  const consumo = tipoLuz === 'medidor' && form.lecturaActual !== ''
+    ? (form.medidorReemplazado && form.lecturaInicialReseteo !== ''
+        ? Number(form.lecturaActual) - Number(form.lecturaInicialReseteo)
+        : (lecturaAnterior != null ? Number(form.lecturaActual) - Number(lecturaAnterior) : null))
+    : null;
 
   const montoLuzCalc = tipoLuz === 'medidor' && consumo != null && tarifaEfectiva
     ? consumo * tarifaEfectiva : (tipoLuz === 'fijo' ? (local.luzFija || 0) : 0);
@@ -2030,7 +2079,12 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
     if (tipoLuz !== 'incluido') {
       out.luzPagada = form.luzPagada;
       out.fechaLuz = form.fechaLuz;
-      if (tipoLuz === 'medidor') out.lecturaActual = form.lecturaActual === '' ? null : Number(form.lecturaActual);
+      if (tipoLuz === 'medidor') {
+        out.lecturaActual = form.lecturaActual === '' ? null : Number(form.lecturaActual);
+        out.medidorReemplazado = !!form.medidorReemplazado;
+        out.lecturaInicialReseteo = form.medidorReemplazado && form.lecturaInicialReseteo !== ''
+          ? Number(form.lecturaInicialReseteo) : null;
+      }
       out.montoLuz = montoLuzCalc;
     }
     onSave(out);
@@ -2150,6 +2204,23 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                       {consumo != null ? `${consumo} kWh` : '—'}
                     </div>
                   </div>
+                </div>
+
+                {/* Medidor reemplazado */}
+                <div style={{ marginBottom: '.85rem', padding: '.6rem .85rem', background: 'rgba(251, 146, 60, 0.06)', border: '1px solid rgba(251, 146, 60, 0.25)', borderRadius: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', fontSize: '.8rem' }}>
+                    <input type="checkbox" className="ps-checkbox" checked={form.medidorReemplazado} onChange={(e) => set('medidorReemplazado', e.target.checked)} />
+                    <span>🔧 Submedidor reemplazado este mes</span>
+                  </label>
+                  {form.medidorReemplazado && (
+                    <div style={{ marginTop: '.5rem' }}>
+                      <div className="ps-label" style={{ marginBottom: '.3rem', fontSize: '.7rem' }}>Lectura inicial del nuevo medidor</div>
+                      <input type="number" className="ps-input ps-mono" value={form.lecturaInicialReseteo} onChange={(e) => set('lecturaInicialReseteo', e.target.value)} placeholder="0" style={{ fontSize: '.85rem' }} />
+                      <div style={{ fontSize: '.7rem', color: '#999', marginTop: '.3rem' }}>
+                        El consumo de este mes se calcula desde esta lectura, no desde el mes anterior.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -2380,6 +2451,93 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
 
       {/* ── AUDIT LOG ── */}
       <AuditLogSection />
+    </div>
+  );
+}
+
+function ComprobantesInbox({ locales, pagos, monthIdx, year, onAprobar }) {
+  // Buscar comprobantes subidos pero pago aún no marcado como pagado
+  const pendientes = useMemo(() => {
+    const out = [];
+    locales.forEach(l => {
+      const p = pagos[l.id] || {};
+      if (p.comprobanteRenta && !p.rentaPagada) {
+        out.push({
+          local: l, tipo: 'renta',
+          comprobante: p.comprobanteRenta,
+          fechaSubida: p.comprobanteRentaDate,
+        });
+      }
+      if (p.comprobanteLuz && !p.luzPagada) {
+        out.push({
+          local: l, tipo: 'luz',
+          comprobante: p.comprobanteLuz,
+          fechaSubida: p.comprobanteLuzDate,
+        });
+      }
+    });
+    return out;
+  }, [locales, pagos]);
+
+  if (pendientes.length === 0) return null;
+
+  const fechaFmt = (iso) => {
+    if (!iso) return '';
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString('es-HN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    } catch { return ''; }
+  };
+
+  return (
+    <div className="ps-card-elevated" style={{ padding: '1.25rem 1.5rem', borderColor: 'rgba(52, 199, 89, 0.3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '1rem' }}>
+        <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(52,199,89,0.12)', display: 'grid', placeItems: 'center', fontSize: '18px' }}>📥</div>
+        <div>
+          <div className="ps-eyebrow" style={{ color: '#1A7F35', marginBottom: '.15rem' }}>COMPROBANTES PENDIENTES</div>
+          <div style={{ fontSize: '.95rem', fontWeight: 600 }}>{pendientes.length} esperando tu aprobación</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gap: '.5rem' }}>
+        {pendientes.map((item, i) => (
+          <div key={i} style={{
+            display: 'grid', gridTemplateColumns: '60px 1fr auto auto', gap: '.75rem',
+            alignItems: 'center', padding: '.6rem .8rem',
+            background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.7)',
+            borderRadius: 10,
+          }}>
+            <img src={item.comprobante} alt="comprobante"
+              style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '1px solid #e2e8f0' }}
+              onClick={() => window.open(item.comprobante, '_blank')}
+            />
+            <div>
+              <div style={{ fontSize: '.85rem', fontWeight: 600 }}>
+                {item.local.inquilino || `Local ${item.local.numero}`}
+                <span style={{ marginLeft: '.5rem', fontSize: '.7rem', fontWeight: 500, padding: '.1rem .4rem', borderRadius: 4,
+                  background: item.tipo === 'renta' ? 'rgba(99,102,241,0.12)' : 'rgba(251,146,60,0.12)',
+                  color: item.tipo === 'renta' ? '#6366F1' : '#FB923C',
+                }}>
+                  {item.tipo === 'renta' ? '🏠 Renta' : '⚡ Luz'}
+                </span>
+              </div>
+              <div style={{ fontSize: '.7rem', color: '#888', marginTop: '.15rem' }}>
+                Subido {fechaFmt(item.fechaSubida)} · Click en imagen para ver
+              </div>
+            </div>
+            <button
+              className="ps-btn-ghost"
+              style={{ fontSize: '.75rem', padding: '.4rem .65rem' }}
+              onClick={() => window.open(item.comprobante, '_blank')}
+            >👁 Ver</button>
+            <button
+              className="ps-btn"
+              style={{ fontSize: '.75rem', padding: '.4rem .75rem', background: '#34C759' }}
+              onClick={() => onAprobar(item.local.id, item.tipo)}
+            >✓ Aprobar</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
