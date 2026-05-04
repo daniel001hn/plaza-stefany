@@ -13,7 +13,20 @@ async function loadMonth(year, monthIdx) {
   return {}
 }
 
-const DL_BIRD = `<svg viewBox="0 0 90 85" width="68" height="64" xmlns="http://www.w3.org/2000/svg"><path d="M45 8 L71 58 L56 58 L45 36 L34 58 L19 58 Z" fill="#C8706A"/><path d="M32 42 L8 66 L26 55 Z" fill="#C8706A" opacity=".7"/><path d="M58 42 L82 66 L64 55 Z" fill="#C8706A" opacity=".7"/><path d="M38 58 L30 78 L45 67 L60 78 L52 58 Z" fill="#C8706A" opacity=".5"/></svg>`
+const DL_BIRD = `<svg viewBox="0 0 220 160" width="88" height="64" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
+  <polygon points="65,55 105,80 85,50" fill="#E66555"/>
+  <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
+  <polygon points="65,55 85,50 110,65 105,80" fill="#F37A72"/>
+  <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
+  <polygon points="130,60 150,75 145,55" fill="#E66555"/>
+  <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
+  <polygon points="170,58 190,62 185,72 175,72" fill="#E66555"/>
+  <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
+  <circle cx="180" cy="65" r="3" fill="#C84040"/>
+  <polygon points="55,130 40,155 70,148 80,125" fill="#F37A72"/>
+  <polygon points="40,155 70,148 55,160" fill="#E66555"/>
+</svg>`
 
 function buildPDF({ tipo, inquilino, localNum, periodo, fechaEmision, reciboNum,
   m2, precioUSD, tasa, isv, rentaBase, isvMonto, rentaTotal,
@@ -27,9 +40,9 @@ function buildPDF({ tipo, inquilino, localNum, periodo, fechaEmision, reciboNum,
   const lecturas = !esRenta ? `
     <h3 class="sh">L E C T U R A S &nbsp; D E L &nbsp; S U B M E D I D O R</h3>
     <table class="tbl"><thead><tr class="thr">
-      <th style="color:#C8706A">LECTURA ANTERIOR (kWh)</th>
-      <th style="color:#C8706A">LECTURA ACTUAL (kWh)</th>
-      <th style="color:#C8706A">CONSUMO (kWh)</th>
+      <th style="color:#F37A72">LECTURA ANTERIOR (kWh)</th>
+      <th style="color:#F37A72">LECTURA ACTUAL (kWh)</th>
+      <th style="color:#F37A72">CONSUMO (kWh)</th>
     </tr></thead><tbody><tr>
       <td class="cen">${fmt0(lecturaAnt)}</td>
       <td class="cen">${fmt0(lecturaAct)}</td>
@@ -57,11 +70,12 @@ function buildPDF({ tipo, inquilino, localNum, periodo, fechaEmision, reciboNum,
 @page{size:Letter;margin:0}*{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .page{width:816px;min-height:1056px;margin:0 auto;display:flex;flex-direction:column}
-.hdr{display:flex;align-items:center;justify-content:center;gap:18px;padding:26px 50px 14px}
-.dlt h1{font-size:28px;font-weight:900;color:#3B8A8F;letter-spacing:3px;line-height:1}
-.dlt h2{font-size:16px;font-weight:700;color:#3B8A8F;letter-spacing:5px;line-height:1.2}
-.bar{height:9px;display:flex}
-.bc{background:#C8706A;width:30%}.bt{background:#3B8A8F;flex:1}
+.hdr{display:flex;align-items:center;justify-content:center;gap:22px;padding:26px 50px 14px}
+.dlt h1{font-size:38px;font-weight:900;color:#1E7A8A;letter-spacing:6px;line-height:1;margin:0}
+.dlt h2{font-size:20px;font-weight:700;color:#1E7A8A;letter-spacing:5px;line-height:1.2;margin:0}
+.dlt p{font-size:9px;color:#888;margin:3px 0 0;letter-spacing:1px}
+.bar{height:8px;display:flex}
+.bt{background:#1E7A8A;width:15%}.bc{background:#F37A72;flex:1}
 .tit{text-align:center;padding:18px 50px 10px}
 .tit h2{font-size:19px;font-weight:900;letter-spacing:6px;color:#333}
 .tit p{font-size:10px;letter-spacing:3px;color:#666;margin-top:3px}
@@ -70,22 +84,22 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
 .inf td{padding:7px 10px;font-size:10px;border-bottom:1px solid #eee}
 .lbl{background:#F2F2F2;color:#666;width:36%}
 .body{padding:0 50px 20px;flex:1}
-.sh{font-size:11px;font-weight:700;color:#3B8A8F;letter-spacing:2px;border-bottom:1.5px solid #3B8A8F;padding-bottom:3px;margin:14px 0 7px}
+.sh{font-size:11px;font-weight:700;color:#1E7A8A;letter-spacing:2px;border-bottom:1.5px solid #3B8A8F;padding-bottom:3px;margin:14px 0 7px}
 .tbl{width:100%;border-collapse:collapse}
 .tbl th{padding:7px 10px;font-size:9px;font-weight:700;text-align:center;border:1px solid #ccc}
 .tbl td{padding:7px 10px;font-size:11px;border:1px solid #ccc}
 .thr{background:#F5C9C2}
 .alt{background:#F9F9F9}
 .det{width:55%}.val{text-align:center;color:#555;font-size:10.5px}.mon{text-align:right}.cen{text-align:center}
-.tot td{background:#2A6268;color:white;font-weight:700;font-size:13px;padding:9px 10px;border:1px solid #2A6268}
+.tot td{background:#155F6E;color:white;font-weight:700;font-size:13px;padding:9px 10px;border:1px solid #155F6E}
 .nota{border-left:4px solid #D4A800;background:#FFFBEA;padding:10px 14px;font-size:10px;line-height:1.6;margin-top:14px}
 .foot{margin-top:auto}
 .fd{background:#2A2A2A;padding:12px 50px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:8px;font-size:9px;color:#ccc}
-.ft{height:9px;background:#3B8A8F}
+.ft{height:8px;background:#1E7A8A}
 </style></head><body>
 <div class="page">
-  <div class="hdr">${DL_BIRD}<div class="dlt"><h1>D &amp; L</h1><h2>SOLUCIONES</h2></div></div>
-  <div class="bar"><div class="bc"></div><div class="bt"></div></div>
+  <div class="hdr">${DL_BIRD}<div class="dlt"><h1>D &amp; L</h1><h2>SOLUCIONES</h2><p>S DE R.L.</p></div></div>
+  <div class="bar"><div class="bt"></div><div class="bc"></div></div>
   <div class="tit"><h2>P L A Z A &nbsp; S T E F A N Y</h2><p>${titulo}</p></div>
   <div class="inf"><table>
     <tr><td class="lbl">Recibo N°</td><td>${reciboNum}</td></tr>
@@ -99,9 +113,9 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
     <h3 class="sh">${seccion}</h3>
     <table class="tbl">
       <thead><tr class="thr">
-        <th class="det" style="color:#C8706A;text-align:left">DETALLE</th>
-        <th style="color:#C8706A">VALOR</th>
-        <th style="color:#C8706A">MONTO (L)</th>
+        <th class="det" style="color:#F37A72;text-align:left">DETALLE</th>
+        <th style="color:#F37A72">VALOR</th>
+        <th style="color:#F37A72">MONTO (L)</th>
       </tr></thead>
       <tbody>${filas}
         <tr class="tot"><td colspan="2">TOTAL A PAGAR</td><td class="mon">L &nbsp;${fmt(total)}</td></tr>
@@ -111,9 +125,9 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
   </div>
   <div class="foot">
     <div class="fd">
-      <span>📞 +504 9462-8518</span><span style="color:#3B8A8F">|</span>
-      <span>✉ soluciones_dyl@yahoo.com</span><span style="color:#3B8A8F">|</span>
-      <span>📍 Res. Altos de venecia 1</span><span style="color:#3B8A8F">|</span>
+      <span>📞 +504 9462-8618</span><span style="color:#1E7A8A">|</span>
+      <span>✉ soluciones_dyl@yahoo.com</span><span style="color:#1E7A8A">|</span>
+      <span>📍 Res. Altos de Venecia 1</span><span style="color:#1E7A8A">|</span>
       <span>RTN: 0801-9022-372253</span>
     </div>
     <div class="ft"></div>

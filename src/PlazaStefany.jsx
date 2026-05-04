@@ -2274,26 +2274,28 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
     setTimeout(() => { w.print(); }, 300);
   };
 
-  // D&L bird SVG logo (faithful recreation)
+  // D&L bird SVG logo — idéntico al membrete oficial
   const DLLogo = () => (
-    <svg viewBox="0 0 120 110" width="80" height="73" xmlns="http://www.w3.org/2000/svg">
-      {/* Bird body - layered triangles */}
-      <path d="M60 10 L90 65 L75 65 L60 40 L45 65 L30 65 Z" fill="#C8706A" />
-      <path d="M60 25 L82 70 L70 70 L60 52 L50 70 L38 70 Z" fill="#C8706A" opacity="0.85"/>
-      <path d="M60 42 L72 72 L64 72 L60 63 L56 72 L48 72 Z" fill="#C8706A" opacity="0.7"/>
-      {/* Wing left */}
-      <path d="M45 45 L20 75 L38 62 Z" fill="#C8706A" opacity="0.6"/>
-      {/* Wing right */}
-      <path d="M75 45 L100 75 L82 62 Z" fill="#C8706A" opacity="0.6"/>
-      {/* Tail */}
-      <path d="M52 68 L45 90 L60 78 L75 90 L68 68 Z" fill="#C8706A" opacity="0.5"/>
+    <svg viewBox="0 0 220 160" width="90" height="65" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
+      <polygon points="65,55 105,80 85,50" fill="#E66555"/>
+      <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
+      <polygon points="65,55 85,50 110,65 105,80" fill="#F37A72"/>
+      <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
+      <polygon points="130,60 150,75 145,55" fill="#E66555"/>
+      <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
+      <polygon points="170,58 190,62 185,72 175,72" fill="#E66555"/>
+      <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
+      <circle cx="180" cy="65" r="3" fill="#C84040"/>
+      <polygon points="55,130 40,155 70,148 80,125" fill="#F37A72"/>
+      <polygon points="40,155 70,148 55,160" fill="#E66555"/>
     </svg>
   );
 
-  const C = { // color palette
-    coral: '#C8706A',
-    teal: '#3B8A8F',
-    tealDark: '#2A6268',
+  const C = { // color palette — membrete oficial D&L
+    coral: '#F37A72',
+    teal: '#1E7A8A',
+    tealDark: '#155F6E',
     rowHead: '#F5C9C2',
     border: '#ccc',
     text: '#333',
@@ -2324,19 +2326,20 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
           <div id="recibo-print-area">
             <div style={{ background: 'white', maxWidth: 700, margin: '0 auto', fontFamily: 'Arial, Helvetica, sans-serif', color: C.text, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', minHeight: 900 }}>
 
-              {/* ── HEADER ── */}
-              <div style={{ padding: '28px 40px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+              {/* ── HEADER — igual al membrete oficial ── */}
+              <div style={{ padding: '26px 40px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '22px' }}>
                 <DLLogo />
                 <div>
-                  <div style={{ fontSize: '30px', fontWeight: 900, color: C.teal, letterSpacing: '3px', lineHeight: 1 }}>D &amp; L</div>
-                  <div style={{ fontSize: '19px', fontWeight: 700, color: C.teal, letterSpacing: '5px', lineHeight: 1.2 }}>SOLUCIONES</div>
+                  <div style={{ fontSize: '36px', fontWeight: 900, color: C.teal, letterSpacing: '6px', lineHeight: 1 }}>D &amp; L</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: C.teal, letterSpacing: '5px', lineHeight: 1.3 }}>SOLUCIONES</div>
+                  <div style={{ fontSize: '9px', color: '#888', letterSpacing: '1px', marginTop: '3px' }}>S DE R.L.</div>
                 </div>
               </div>
 
-              {/* ── DECORATIVE BAR ── */}
-              <div style={{ display: 'flex', height: 10 }}>
-                <div style={{ width: '30%', background: C.coral }} />
-                <div style={{ flex: 1, background: C.teal }} />
+              {/* ── BARRA DECORATIVA — 15% teal + 85% coral (membrete oficial) ── */}
+              <div style={{ display: 'flex', height: 8 }}>
+                <div style={{ width: '15%', background: C.teal }} />
+                <div style={{ flex: 1, background: C.coral }} />
               </div>
 
               {/* ── TITLE SECTION ── */}
@@ -2439,15 +2442,15 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
               {/* ── FOOTER ── */}
               <div style={{ marginTop: 'auto' }}>
                 <div style={{ background: '#2A2A2A', padding: '12px 40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', flexWrap: 'wrap', fontSize: '11px', color: '#ccc' }}>
-                  <span>📞 +504 9462-8518</span>
-                  <span style={{ color: C.teal }}>|</span>
+                  <span>📞 +504 9462-8618</span>
+                  <span style={{ color: '#1E7A8A' }}>|</span>
                   <span>✉ soluciones_dyl@yahoo.com</span>
-                  <span style={{ color: C.teal }}>|</span>
-                  <span>📍 Res. Altos de venecia 1</span>
-                  <span style={{ color: C.teal }}>|</span>
+                  <span style={{ color: '#1E7A8A' }}>|</span>
+                  <span>📍 Res. Altos de Venecia 1</span>
+                  <span style={{ color: '#1E7A8A' }}>|</span>
                   <span>RTN: 0801-9022-372253</span>
                 </div>
-                <div style={{ height: 10, background: C.teal }} />
+                <div style={{ height: 8, background: '#1E7A8A' }} />
               </div>
 
             </div>
