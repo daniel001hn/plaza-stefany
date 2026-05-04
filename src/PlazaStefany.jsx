@@ -57,6 +57,23 @@ async function saveMonth(year, monthIdx, data) {
   catch (e) { return false; }
 }
 
+// Audit log: registra acciones del admin (toggles de pagos, cambios de lectura, etc.)
+// Cap a 500 entries para no inflar storage.
+async function appendAuditLog(entry) {
+  try {
+    const raw = await window.storage.get('audit-log');
+    const log = raw ? JSON.parse(raw) : [];
+    log.unshift({ ...entry, fecha: new Date().toISOString() });
+    await window.storage.set('audit-log', JSON.stringify(log.slice(0, 500)));
+  } catch (e) {}
+}
+async function loadAuditLog() {
+  try {
+    const raw = await window.storage.get('audit-log');
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
 // Devuelve el precio por m² aplicable a un mes/año determinado.
 // Usa config.precioHistorial si existe; si no, cae al precio actual.
 function getPrecioForMonth(config, year, monthIdx) {
@@ -498,8 +515,10 @@ export default function App({ supabase }) {
   );
 
   const updatePayment = async (localId, updates) => {
+    const prevPago = pagos[localId] || {};
+
     // Si se está marcando renta como pagada, obtener la tasa BCH del momento exacto
-    if (updates.rentaPagada === true && !(pagos[localId] || {}).rentaPagada) {
+    if (updates.rentaPagada === true && !prevPago.rentaPagada) {
       try {
         const res  = await fetch('https://open.er-api.com/v6/latest/USD');
         const data = await res.json();
@@ -521,11 +540,42 @@ export default function App({ supabase }) {
       }
       updates.fechaRentaPagada = new Date().toISOString();
     }
-    const newPagos = { ...pagos, [localId]: { ...(pagos[localId] || {}), ...updates } };
+
+    // Si se está volviendo a Pendiente, limpiar tasa congelada y fecha
+    // para que la próxima vez que paguen use la tasa del día real.
+    if (updates.rentaPagada === false && prevPago.rentaPagada) {
+      updates.tasaCambioCongelado = null;
+      updates.fechaRentaPagada = null;
+    }
+
+    const newPagos = { ...pagos, [localId]: { ...prevPago, ...updates } };
     const next = { factura, pagos: newPagos };
     setYearData((y) => ({ ...y, [monthIdx]: next }));
     const ok = await saveMonth(year, monthIdx, next);
-    if (ok) showToast('Guardado');
+
+    // Audit log: registrar acción admin
+    if (ok) {
+      try {
+        const local = locales.find(l => l.id === localId);
+        const acciones = [];
+        if (updates.rentaPagada === true && !prevPago.rentaPagada) acciones.push('Marcó renta PAGADA');
+        if (updates.rentaPagada === false && prevPago.rentaPagada) acciones.push('Revirtió renta a PENDIENTE');
+        if (updates.luzPagada === true && !prevPago.luzPagada) acciones.push('Marcó luz PAGADA');
+        if (updates.luzPagada === false && prevPago.luzPagada) acciones.push('Revirtió luz a PENDIENTE');
+        if (updates.lecturaActual != null && updates.lecturaActual !== prevPago.lecturaActual) {
+          acciones.push(`Lectura submedidor: ${prevPago.lecturaActual ?? '—'} → ${updates.lecturaActual}`);
+        }
+        for (const accion of acciones) {
+          await appendAuditLog({
+            actor: 'admin',
+            accion,
+            local: local ? `Local ${local.numero} (${local.inquilino || 'sin asignar'})` : localId,
+            mes: `${MESES_LARGO[monthIdx]} ${year}`,
+          });
+        }
+      } catch {}
+      showToast('Guardado');
+    }
   };
 
   const updateFactura = async (updates) => {
@@ -539,23 +589,45 @@ export default function App({ supabase }) {
 
   const saveLocale = async (locale) => {
     let next;
+    let logEntry = null;
     if (locale.id) {
-      // Si cambió el inquilino (o se asigna por primera vez), setear contratoDesde
       const prev = locales.find(l => l.id === locale.id) || {};
       const inquilinoChanged = (prev.inquilino || '') !== (locale.inquilino || '');
       const inquilinoAssigned = !!locale.inquilino;
       let updatedLocale = locale;
       if (inquilinoChanged && inquilinoAssigned) {
         updatedLocale = { ...locale, contratoDesde: new Date().toISOString().slice(0, 10) };
+        logEntry = {
+          actor: 'admin',
+          accion: prev.inquilino
+            ? `Cambió inquilino: ${prev.inquilino} → ${locale.inquilino}`
+            : `Asignó inquilino: ${locale.inquilino}`,
+          local: `Local ${locale.numero}`,
+          mes: '',
+        };
+      } else if (JSON.stringify(prev) !== JSON.stringify(locale)) {
+        logEntry = {
+          actor: 'admin',
+          accion: 'Editó datos del local',
+          local: `Local ${locale.numero}`,
+          mes: '',
+        };
       }
       next = locales.map((l) => (l.id === locale.id ? updatedLocale : l));
     } else {
       const id = `loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const contratoDesde = locale.inquilino ? new Date().toISOString().slice(0, 10) : null;
       next = [...locales, { ...locale, id, contratoDesde }];
+      logEntry = {
+        actor: 'admin',
+        accion: `Creó nuevo local: Local ${locale.numero}${locale.inquilino ? ' (' + locale.inquilino + ')' : ''}`,
+        local: `Local ${locale.numero}`,
+        mes: '',
+      };
     }
     setLocales(next);
     await saveCfg({ config, locales: next });
+    if (logEntry) await appendAuditLog(logEntry);
     setEditingLocal(null);
     showToast(locale.id ? 'Local actualizado' : 'Local agregado');
   };
@@ -600,31 +672,48 @@ export default function App({ supabase }) {
 
     await saveCfg({ config: newConfig, locales: newLocales });
 
+    await appendAuditLog({
+      actor: 'admin',
+      accion: `Cerró contrato del inquilino: ${inquilino}`,
+      local: `Local ${local.numero}`,
+      mes: '',
+    });
+
     setEditingLocal(null);
     showToast(`Contrato cerrado. Local ${local.numero} libre. Historial preservado.`);
   };
 
   const saveConfig = async (newConfig) => {
-    // Detectar cambio de precio por m². Si cambió, guardar snapshot del precio anterior
-    // como historico. El precio nuevo aplica desde el mes actual en adelante.
     const oldPrecio = config.rentPerM2USD;
     const newPrecio = newConfig.rentPerM2USD;
+    const cambios = [];
     if (oldPrecio != null && newPrecio != null && oldPrecio !== newPrecio) {
+      cambios.push(`Precio m²: $${oldPrecio} → $${newPrecio}`);
       const today = new Date();
       const desdeKey = `${today.getFullYear()}-${String(today.getMonth()).padStart(2, '0')}`;
       let hist = newConfig.precioHistorial || config.precioHistorial || [];
-      // Si historial vacío, sembrar con precio viejo aplicable desde siempre
       if (hist.length === 0) {
         hist = [{ precio: oldPrecio, desde: '0000-00' }];
       }
-      // Agregar nuevo entry (si ya hay uno para este mes, lo reemplaza)
       hist = hist.filter(h => h.desde !== desdeKey);
       hist.push({ precio: newPrecio, desde: desdeKey });
       hist.sort((a, b) => a.desde.localeCompare(b.desde));
       newConfig = { ...newConfig, precioHistorial: hist };
     }
+    if (config.tasaCambio !== newConfig.tasaCambio) {
+      cambios.push(`Tasa: L ${config.tasaCambio} → L ${newConfig.tasaCambio}`);
+    }
+    if (config.isv !== newConfig.isv) {
+      cambios.push(`ISV: ${(config.isv * 100).toFixed(0)}% → ${(newConfig.isv * 100).toFixed(0)}%`);
+    }
+    if (config.plazaNombre !== newConfig.plazaNombre) {
+      cambios.push(`Nombre plaza: ${config.plazaNombre} → ${newConfig.plazaNombre}`);
+    }
     setConfig(newConfig);
     await saveCfg({ config: newConfig, locales });
+    for (const cambio of cambios) {
+      await appendAuditLog({ actor: 'admin', accion: `Configuración: ${cambio}`, local: '', mes: '' });
+    }
     showToast('Configuración guardada');
   };
 
@@ -2288,6 +2377,103 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
           alert(`Borradores de email creados para ${usuarios.length} inquilino(s). Revisá tu Gmail para enviarlos.`);
         }}
       />
+
+      {/* ── AUDIT LOG ── */}
+      <AuditLogSection />
+    </div>
+  );
+}
+
+function AuditLogSection() {
+  const [log, setLog] = useState([]);
+  const [filtro, setFiltro] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const data = await loadAuditLog();
+      if (alive) { setLog(data); setLoading(false); }
+    })();
+    const interval = setInterval(async () => {
+      const data = await loadAuditLog();
+      if (alive) setLog(data);
+    }, 5000);
+    return () => { alive = false; clearInterval(interval); };
+  }, []);
+
+  const filtered = log.filter(e => {
+    if (!filtro) return true;
+    const f = filtro.toLowerCase();
+    return (e.accion || '').toLowerCase().includes(f)
+      || (e.local || '').toLowerCase().includes(f)
+      || (e.mes || '').toLowerCase().includes(f);
+  });
+  const visible = showAll ? filtered : filtered.slice(0, 20);
+
+  const fechaFmt = (iso) => {
+    try {
+      const d = new Date(iso);
+      return d.toLocaleString('es-HN', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+    } catch { return iso; }
+  };
+
+  return (
+    <div className="ps-card" style={{ padding: '1.4rem 1.5rem', marginTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
+        <div>
+          <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}>📋 ACTIVIDAD ADMIN</div>
+          <div style={{ fontSize: '1rem', fontWeight: 600 }}>Registro de acciones</div>
+        </div>
+        <input
+          type="text" placeholder="🔍 Filtrar..."
+          value={filtro} onChange={(e) => setFiltro(e.target.value)}
+          className="ps-input" style={{ maxWidth: 220, fontSize: '.8rem' }}
+        />
+      </div>
+
+      {loading ? (
+        <div style={{ color: '#888', fontSize: '.85rem', padding: '.5rem 0' }}>Cargando…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ color: '#888', fontSize: '.85rem', padding: '.5rem 0' }}>
+          {filtro ? 'No hay coincidencias.' : 'Aún no hay actividad registrada.'}
+        </div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gap: '.4rem' }}>
+            {visible.map((e, i) => (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '140px 1fr', gap: '.7rem',
+                alignItems: 'baseline', padding: '.5rem .75rem',
+                background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.6)',
+                borderRadius: 8, fontSize: '.8rem',
+              }}>
+                <span style={{ color: '#888', fontSize: '.72rem', whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace' }}>
+                  {fechaFmt(e.fecha)}
+                </span>
+                <div>
+                  <div style={{ fontWeight: 500, color: '#1c1c1e' }}>{e.accion}</div>
+                  {(e.local || e.mes) && (
+                    <div style={{ fontSize: '.7rem', color: '#888', marginTop: '.15rem' }}>
+                      {e.local}{e.local && e.mes ? ' · ' : ''}{e.mes}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          {filtered.length > 20 && (
+            <button onClick={() => setShowAll(s => !s)} className="ps-btn-ghost"
+              style={{ marginTop: '.75rem', fontSize: '.8rem' }}>
+              {showAll ? `Ver menos` : `Ver todos (${filtered.length})`}
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
