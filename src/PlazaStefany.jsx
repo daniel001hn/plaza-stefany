@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Trash2, Edit3, ExternalLink,
   Receipt, Save, TrendingUp, Activity, Wallet, AlertCircle,
   Sparkles, Circle, ArrowRight, FileText, Info, Calculator,
-  History, ChevronDown, ChevronUp, Printer, Download,
+  History, ChevronDown, ChevronUp, Printer, Download, Users,
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Cell, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
@@ -2011,6 +2011,106 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
           </div>
         )}
       </div>
+
+      {/* ── USUARIOS INQUILINOS ── */}
+      <UsuariosSection config={config} locales={locales} onSaveConfig={onSaveConfig} />
+    </div>
+  );
+}
+
+function UsuariosSection({ config, locales, onSaveConfig }) {
+  const usuarios = config.usuarios || [];
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ localId: '', nombre: '', usuario: '', password: '' });
+  const [editIdx, setEditIdx] = useState(null);
+
+  const handleSave = () => {
+    if (!form.localId || !form.usuario || !form.password) { alert('Completá todos los campos.'); return; }
+    const list = [...usuarios];
+    if (editIdx !== null) list[editIdx] = form;
+    else list.push(form);
+    onSaveConfig({ ...config, usuarios: list });
+    setShowForm(false); setEditIdx(null);
+    setForm({ localId: '', nombre: '', usuario: '', password: '' });
+  };
+
+  const handleEdit = (u, i) => {
+    setForm({ ...u });
+    setEditIdx(i);
+    setShowForm(true);
+  };
+
+  const handleDelete = (i) => {
+    if (!confirm('¿Eliminar este usuario?')) return;
+    const list = usuarios.filter((_, j) => j !== i);
+    onSaveConfig({ ...config, usuarios: list });
+  };
+
+  return (
+    <div className="ps-card" style={{ padding: '1.4rem 1.5rem', marginTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div>
+          <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}><Users size={10} /> ACCESO INQUILINOS</div>
+          <div style={{ fontSize: '1rem', fontWeight: 600 }}>Usuarios del portal</div>
+        </div>
+        <button onClick={() => { setShowForm(true); setEditIdx(null); setForm({ localId: '', nombre: '', usuario: '', password: '' }); }} className="ps-btn">
+          <Plus size={14} strokeWidth={2.5} /> Agregar usuario
+        </button>
+      </div>
+
+      {usuarios.length === 0 && !showForm && (
+        <div style={{ color: '#888', fontSize: '.85rem', padding: '.5rem 0' }}>
+          No hay usuarios creados. Los inquilinos podrán acceder al portal con sus credenciales.
+        </div>
+      )}
+
+      {usuarios.map((u, i) => {
+        const loc = locales.find(l => l.id === u.localId);
+        return (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto auto', gap: '.75rem', alignItems: 'center', background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.7)', borderRadius: 10, padding: '.7rem 1rem', marginBottom: '.5rem' }}>
+            <span style={{ fontSize: '1.2rem' }}>👤</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{u.nombre || u.usuario}</div>
+              <div style={{ fontSize: '.75rem', color: '#888' }}>
+                Usuario: <b>{u.usuario}</b> · Local {loc?.numero || '?'} — {loc?.inquilino || 'Sin asignar'}
+              </div>
+            </div>
+            <button onClick={() => handleEdit(u, i)} className="ps-btn-icon"><Edit3 size={13} /></button>
+            <button onClick={() => handleDelete(i)} className="ps-btn-icon" style={{ color: '#FF5C5C' }}><Trash2 size={13} /></button>
+          </div>
+        );
+      })}
+
+      {showForm && (
+        <div style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 12, padding: '1.2rem', marginTop: '.5rem' }}>
+          <div style={{ fontWeight: 600, marginBottom: '.85rem', fontSize: '.9rem' }}>{editIdx !== null ? 'Editar usuario' : 'Nuevo usuario'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem', marginBottom: '.75rem' }}>
+            <div>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Local</div>
+              <select value={form.localId} onChange={e => setForm(p => ({ ...p, localId: e.target.value }))} className="ps-input" style={{ height: 40 }}>
+                <option value="">Seleccionar local…</option>
+                {locales.map(l => <option key={l.id} value={l.id}>Local {l.numero} — {l.inquilino || 'Sin asignar'}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Nombre visible</div>
+              <input className="ps-input" placeholder="ej: Tatys" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
+            </div>
+            <div>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Usuario</div>
+              <input className="ps-input" placeholder="ej: tatys" value={form.usuario} onChange={e => setForm(p => ({ ...p, usuario: e.target.value.toLowerCase().replace(/\s/g,'') }))} autoComplete="off" />
+            </div>
+            <div>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Contraseña</div>
+              <input className="ps-input" placeholder="Contraseña del inquilino" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} autoComplete="off" />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '.5rem' }}>
+            <button onClick={handleSave} className="ps-btn"><Save size={13} /> Guardar</button>
+            <button onClick={() => { setShowForm(false); setEditIdx(null); }} className="ps-btn-ghost">Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
