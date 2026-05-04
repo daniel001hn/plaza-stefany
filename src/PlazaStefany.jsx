@@ -2439,7 +2439,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
                   input: {
                     to: u.email,
                     subject: `Plaza Stefany — Su recibo de ${mes} está disponible`,
-                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Plaza Stefany.\n\nPuede acceder en: https://plaza-stefany.vercel.app\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nPlaza Stefany\n+504 9462-8618`
+                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Plaza Stefany.\n\nPuede acceder en: https://plaza-stefany.vercel.app\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nPlaza Stefany\n+504 9462-8518`
                   }
                 })
               });
@@ -3098,16 +3098,16 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
 
               {/* ── FOOTER ── */}
               <div style={{ marginTop: 'auto' }}>
-                <div style={{ background: '#2A2A2A', padding: '12px 40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', flexWrap: 'wrap', fontSize: '11px', color: '#ccc' }}>
-                  <span>📞 +504 9462-8618</span>
-                  <span style={{ color: '#1E7A8A' }}>|</span>
-                  <span>✉ soluciones_dyl@yahoo.com</span>
-                  <span style={{ color: '#1E7A8A' }}>|</span>
-                  <span>📍 Res. Altos de Venecia 1</span>
-                  <span style={{ color: '#1E7A8A' }}>|</span>
+                <div style={{ background: '#E8E8E5', padding: '12px 40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', flexWrap: 'wrap', fontSize: '11px', color: '#444' }}>
+                  <span style={{ color: C.coral }}>📞</span><span>+504 9462-8518</span>
+                  <span style={{ color: C.coral }}>|</span>
+                  <span style={{ color: C.coral }}>✉</span><span>soluciones_dyl@yahoo.com</span>
+                  <span style={{ color: C.coral }}>|</span>
+                  <span style={{ color: C.coral }}>📍</span><span>Res. Altos de Venecia 1</span>
+                  <span style={{ color: C.coral }}>|</span>
                   <span>RTN: 0801-9022-372253</span>
                 </div>
-                <div style={{ height: 8, background: '#1E7A8A' }} />
+                <div style={{ height: 8, background: C.coral }} />
               </div>
 
             </div>
@@ -3231,13 +3231,16 @@ function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
               </div>
               {/* FOOTER */}
               <div style={{marginTop:'auto'}}>
-                <div style={{background:'#2A2A2A',padding:'12px 40px',display:'flex',justifyContent:'center',alignItems:'center',gap:'20px',flexWrap:'wrap',fontSize:'11px',color:'#ccc'}}>
-                  <span>📞 +504 9462-8618</span><span style={{color:C.teal}}>|</span>
-                  <span>✉ soluciones_dyl@yahoo.com</span><span style={{color:C.teal}}>|</span>
-                  <span>📍 Res. Altos de Venecia 1</span><span style={{color:C.teal}}>|</span>
+                <div style={{background:'#E8E8E5',padding:'12px 40px',display:'flex',justifyContent:'center',alignItems:'center',gap:'20px',flexWrap:'wrap',fontSize:'11px',color:'#444'}}>
+                  <span style={{color:C.coral}}>📞</span><span>+504 9462-8518</span>
+                  <span style={{color:C.coral}}>|</span>
+                  <span style={{color:C.coral}}>✉</span><span>soluciones_dyl@yahoo.com</span>
+                  <span style={{color:C.coral}}>|</span>
+                  <span style={{color:C.coral}}>📍</span><span>Res. Altos de Venecia 1</span>
+                  <span style={{color:C.coral}}>|</span>
                   <span>RTN: 0801-9022-372253</span>
                 </div>
-                <div style={{height:8,background:C.teal}}/>
+                <div style={{height:8,background:C.coral}}/>
               </div>
             </div>
           </div>
@@ -3382,13 +3385,16 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
               </div>
 
               {/* FOOTER */}
-              <div style={{background:'#2A2A2A',padding:'10px 36px',display:'flex',justifyContent:'center',alignItems:'center',gap:'16px',flexWrap:'wrap',fontSize:'10px',color:'#ccc'}}>
-                <span>📞 +504 9462-8618</span><span style={{color:C.teal}}>|</span>
-                <span>✉ soluciones_dyl@yahoo.com</span><span style={{color:C.teal}}>|</span>
-                <span>📍 Res. Altos de Venecia 1</span><span style={{color:C.teal}}>|</span>
+              <div style={{background:'#E8E8E5',padding:'10px 36px',display:'flex',justifyContent:'center',alignItems:'center',gap:'16px',flexWrap:'wrap',fontSize:'10px',color:'#444'}}>
+                <span style={{color:C.coral}}>📞</span><span>+504 9462-8518</span>
+                <span style={{color:C.coral}}>|</span>
+                <span style={{color:C.coral}}>✉</span><span>soluciones_dyl@yahoo.com</span>
+                <span style={{color:C.coral}}>|</span>
+                <span style={{color:C.coral}}>📍</span><span>Res. Altos de Venecia 1</span>
+                <span style={{color:C.coral}}>|</span>
                 <span>RTN: 0801-9022-372253</span>
               </div>
-              <div style={{height:7,background:C.teal}}/>
+              <div style={{height:7,background:C.coral}}/>
             </div>
           </div>
         </div>

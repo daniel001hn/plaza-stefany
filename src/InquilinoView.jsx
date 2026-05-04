@@ -94,8 +94,8 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
 .tot td{background:#155F6E;color:white;font-weight:700;font-size:13px;padding:9px 10px;border:1px solid #155F6E}
 .nota{border-left:4px solid #D4A800;background:#FFFBEA;padding:10px 14px;font-size:10px;line-height:1.6;margin-top:14px}
 .foot{margin-top:auto}
-.fd{background:#2A2A2A;padding:12px 50px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:8px;font-size:9px;color:#ccc}
-.ft{height:8px;background:#1E7A8A}
+.fd{background:#E8E8E5;padding:12px 50px;display:flex;justify-content:space-around;align-items:center;flex-wrap:wrap;gap:8px;font-size:9px;color:#444}
+.ft{height:8px;background:#F37A72}
 </style></head><body>
 <div class="page">
   <div class="hdr">${DL_BIRD}<div class="dlt"><h1>D &amp; L</h1><h2>SOLUCIONES</h2><p>S DE R.L.</p></div></div>
@@ -125,9 +125,9 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
   </div>
   <div class="foot">
     <div class="fd">
-      <span>📞 +504 9462-8618</span><span style="color:#1E7A8A">|</span>
-      <span>✉ soluciones_dyl@yahoo.com</span><span style="color:#1E7A8A">|</span>
-      <span>📍 Res. Altos de Venecia 1</span><span style="color:#1E7A8A">|</span>
+      <span style="color:#F37A72">📞</span><span>+504 9462-8518</span><span style="color:#F37A72">|</span>
+      <span style="color:#F37A72">✉</span><span>soluciones_dyl@yahoo.com</span><span style="color:#F37A72">|</span>
+      <span style="color:#F37A72">📍</span><span>Res. Altos de Venecia 1</span><span style="color:#F37A72">|</span>
       <span>RTN: 0801-9022-372253</span>
     </div>
     <div class="ft"></div>
