@@ -87,8 +87,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
 .ft{height:8px;background:#F37A72}
 </style></head><body>
 <div class="page">
-  <div class="hdr">${DL_BIRD}<div class="dlt"><h1>D &amp; L</h1><h2>SOLUCIONES</h2><p>S DE R.L.</p></div></div>
-  <div class="bar"><div class="bt"></div><div class="bc"></div></div>
+  <img src="${DL_LOGO}" alt="D&L Soluciones" style="width:100%;display:block" />
   <div class="tit"><h2>P L A Z A &nbsp; S T E F A N Y</h2><p>${titulo}</p></div>
   <div class="inf"><table>
     <tr><td class="lbl">Recibo N°</td><td>${reciboNum}</td></tr>

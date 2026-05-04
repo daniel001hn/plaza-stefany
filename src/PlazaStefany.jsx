@@ -2984,21 +2984,8 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
           <div id="recibo-print-area">
             <div style={{ background: 'white', maxWidth: 700, margin: '0 auto', fontFamily: 'Arial, Helvetica, sans-serif', color: C.text, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', minHeight: 900 }}>
 
-              {/* ── HEADER — igual al membrete oficial ── */}
-              <div style={{ padding: '26px 40px 14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '22px' }}>
-                <DLLogo />
-                <div>
-                  <div style={{ fontSize: '36px', fontWeight: 900, color: C.teal, letterSpacing: '6px', lineHeight: 1 }}>D &amp; L</div>
-                  <div style={{ fontSize: '20px', fontWeight: 700, color: C.teal, letterSpacing: '5px', lineHeight: 1.3 }}>SOLUCIONES</div>
-                  <div style={{ fontSize: '9px', color: '#888', letterSpacing: '1px', marginTop: '3px' }}>S DE R.L.</div>
-                </div>
-              </div>
-
-              {/* ── BARRA DECORATIVA — 15% teal + 85% coral (membrete oficial) ── */}
-              <div style={{ display: 'flex', height: 8 }}>
-                <div style={{ width: '15%', background: C.teal }} />
-                <div style={{ flex: 1, background: C.coral }} />
-              </div>
+              {/* ── HEADER — imagen del membrete oficial ── */}
+              <img src={DL_LOGO} alt="D&L Soluciones" style={{ width: '100%', display: 'block' }} />
 
               {/* ── TITLE SECTION ── */}
               <div style={{ textAlign: 'center', padding: '20px 40px 10px' }}>
@@ -3167,19 +3154,8 @@ function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
         <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'78vh',overflowY:'auto'}}>
           <div id="recibo-renta-print">
             <div style={{background:'white',maxWidth:700,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)',display:'flex',flexDirection:'column',minHeight:900}}>
-              {/* HEADER */}
-              <div style={{padding:'26px 40px 14px',display:'flex',alignItems:'center',justifyContent:'center',gap:'22px'}}>
-                <DLBird/>
-                <div>
-                  <div style={{fontSize:'36px',fontWeight:900,color:C.teal,letterSpacing:'6px',lineHeight:1}}>D &amp; L</div>
-                  <div style={{fontSize:'20px',fontWeight:700,color:C.teal,letterSpacing:'5px',lineHeight:1.3}}>SOLUCIONES</div>
-                  <div style={{fontSize:'9px',color:'#888',letterSpacing:'1px',marginTop:'3px'}}>S DE R.L.</div>
-                </div>
-              </div>
-              <div style={{display:'flex',height:8}}>
-                <div style={{width:'15%',background:C.teal}}/>
-                <div style={{flex:1,background:C.coral}}/>
-              </div>
+              {/* HEADER — imagen del membrete oficial */}
+              <img src={DL_LOGO} alt="D&L Soluciones" style={{width:'100%',display:'block'}} />
               <div style={{textAlign:'center',padding:'18px 40px 10px'}}>
                 <div style={{fontSize:'20px',fontWeight:900,letterSpacing:'6px',color:C.text}}>P L A Z A &nbsp; S T E F A N Y</div>
                 <div style={{fontSize:'11px',letterSpacing:'3px',color:C.light,marginTop:'4px'}}>R E C I B O &nbsp; D E &nbsp; R E N T A</div>
@@ -3289,15 +3265,8 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
         <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'80vh',overflowY:'auto'}}>
           <div id="reporte-print">
             <div style={{background:'white',maxWidth:750,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)'}}>
-              {/* HEADER */}
-              <div style={{padding:'22px 36px 12px',display:'flex',alignItems:'center',justifyContent:'center',gap:'18px'}}>
-                <DLBird/>
-                <div>
-                  <div style={{fontSize:'28px',fontWeight:900,color:C.teal,letterSpacing:'5px',lineHeight:1}}>D &amp; L</div>
-                  <div style={{fontSize:'16px',fontWeight:700,color:C.teal,letterSpacing:'4px'}}>SOLUCIONES</div>
-                </div>
-              </div>
-              <div style={{display:'flex',height:7}}><div style={{width:'15%',background:C.teal}}/><div style={{flex:1,background:C.coral}}/></div>
+              {/* HEADER — imagen del membrete oficial */}
+              <img src={DL_LOGO} alt="D&L Soluciones" style={{width:'100%',display:'block'}} />
               <div style={{textAlign:'center',padding:'14px 36px 8px'}}>
                 <div style={{fontSize:'18px',fontWeight:900,letterSpacing:'5px'}}>P L A Z A &nbsp; S T E F A N Y</div>
                 <div style={{fontSize:'11px',letterSpacing:'3px',color:C.light,marginTop:'3px'}}>R E P O R T E &nbsp; M E N S U A L &nbsp; D E &nbsp; C O B R A N Z A</div>
