@@ -1872,6 +1872,23 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
           <textarea className="ps-input" rows={2} value={form.notas} onChange={(e) => set('notas', e.target.value)} placeholder="Abonos parciales, observaciones..." />
         </div>
 
+        {/* Comprobante subido por el inquilino */}
+        {data.comprobante && (
+          <div style={{ marginBottom: '1.25rem', background: 'rgba(52,199,89,0.08)', border: '1px solid rgba(52,199,89,0.25)', borderRadius: 12, padding: '1rem' }}>
+            <div className="ps-label" style={{ marginBottom: '.5rem', color: '#1A7F35' }}>✅ Comprobante de pago del inquilino</div>
+            <div style={{ display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
+              <img src={data.comprobante} alt="Comprobante"
+                style={{ width: 90, height: 68, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
+                onClick={() => window.open(data.comprobante, '_blank')} />
+              <div style={{ fontSize: '.78rem', color: '#555', lineHeight: 1.6 }}>
+                <div style={{ fontWeight: 600, color: '#1A7F35', marginBottom: '.2rem' }}>Transferencia adjunta</div>
+                {data.comprobanteDate && <div style={{ color: '#888' }}>Enviado: {new Date(data.comprobanteDate).toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' })}</div>}
+                <div style={{ marginTop: '.3rem' }}><a href={data.comprobante} target="_blank" rel="noreferrer" style={{ color: '#6366F1', fontSize: '.75rem' }}>Ver imagen completa →</a></div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
           <div>
             {tipoLuz !== 'incluido' && montoLuzCalc > 0 && (

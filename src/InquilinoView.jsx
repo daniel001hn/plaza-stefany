@@ -199,6 +199,50 @@ export default function InquilinoView({ session, onLogout }) {
 
   const fechaHoy = () => new Date().toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric' })
 
+  // Comprimir imagen a base64 (max 800px, calidad 0.7)
+  const comprimirImagen = (file) => new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const max = 900
+      let w = img.width, h = img.height
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max }
+        else       { w = Math.round(w * max / h); h = max }
+      }
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.72))
+    }
+    img.onerror = reject
+    img.src = url
+  })
+
+  const subirComprobante = async (mes, file) => {
+    if (!file) return
+    try {
+      const b64 = await comprimirImagen(file)
+      const key = `pagos:${mes.year}-${String(mes.monthIdx).padStart(2,'0')}`
+      const r = await window.storage.get(key)
+      const data = r ? JSON.parse(r) : { pagos: {}, factura: {} }
+      data.pagos = data.pagos || {}
+      data.pagos[session.localId] = {
+        ...(data.pagos[session.localId] || {}),
+        comprobante: b64,
+        comprobanteDate: new Date().toISOString(),
+      }
+      await window.storage.set(key, JSON.stringify(data))
+      // Actualizar estado local
+      setMeses(prev => prev.map(m =>
+        m.year === mes.year && m.monthIdx === mes.monthIdx
+          ? { ...m, data: { ...m.data, comprobante: b64 } }
+          : m
+      ))
+    } catch(e) { alert('Error al subir la imagen. Intentá de nuevo.') }
+  }
+
   const generarRenta = (mes) => {
     const renta = calcRenta(local)
     const base  = (local.m2 || 0) * (config.rentPerM2USD || 29) * (config.tasaCambio || 25)
@@ -295,19 +339,46 @@ export default function InquilinoView({ session, onLogout }) {
                 {!luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz</span><span className="pill-x"><span className="dx"/>Incluida</span></>}
               </div>
 
-              <div style={{borderTop:'1px solid rgba(255,255,255,.5)',paddingTop:'.65rem',display:'flex',gap:'.5rem',flexWrap:'wrap'}}>
+              <div style={{borderTop:'1px solid rgba(255,255,255,.5)',paddingTop:'.65rem',display:'flex',gap:'.5rem',flexWrap:'wrap',alignItems:'center'}}>
                 <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
                 {luzAplica && (
                   tieneLuz
                     ? <button className="btn-l" onClick={() => generarLuz(mes)}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
                     : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>
                 )}
+                {/* Comprobante de pago */}
+                <label style={{
+                  display:'inline-flex',alignItems:'center',gap:'.35rem',
+                  padding:'.5rem .85rem',borderRadius:10,cursor:'pointer',
+                  background: mes.data.comprobante ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
+                  border: mes.data.comprobante ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
+                  fontSize:'.78rem',fontWeight:600,
+                  color: mes.data.comprobante ? '#1A7F35' : '#555',
+                  backdropFilter:'blur(8px)',
+                  transition:'all .18s',
+                }}>
+                  <input type="file" accept="image/*" style={{display:'none'}}
+                    onChange={e => subirComprobante(mes, e.target.files[0])} />
+                  {mes.data.comprobante ? '✅ Comprobante enviado' : '📎 Subir comprobante'}
+                </label>
               </div>
+              {/* Thumbnail del comprobante */}
+              {mes.data.comprobante && (
+                <div style={{marginTop:'.65rem',display:'flex',alignItems:'flex-start',gap:'.65rem'}}>
+                  <img src={mes.data.comprobante} alt="Comprobante"
+                    style={{width:80,height:60,objectFit:'cover',borderRadius:8,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
+                    onClick={() => window.open(mes.data.comprobante,'_blank')} />
+                  <div style={{fontSize:'.72rem',color:'#666',lineHeight:1.5}}>
+                    <div style={{fontWeight:600,color:'#1A7F35'}}>✅ Comprobante de pago enviado</div>
+                    <div>Toca la imagen para ver en tamaño completo</div>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })}
 
-        <div style={{textAlign:'center',marginTop:'1.5rem',fontSize:'.72rem',color:'rgba(60,60,70,.35)'}}>Plaza Stefany · D&L Soluciones</div>
+        <div style={{textAlign:'center',marginTop:'1.5rem',fontSize:'.72rem',color:'rgba(60,60,70,.35)'}}>Plaza Stefany · D&amp;L Soluciones</div>
       </div>
     </div>
   )
