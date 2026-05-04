@@ -432,6 +432,23 @@ export default function App({ supabase }) {
       setConfig({ ...DEFAULT_CONFIG, ...cl.config });
       setLocales(cl.locales || []);
       setLoading(false);
+
+      // Auto-jalar tasa BCH al abrir la app (1 vez al día como mucho)
+      try {
+        const hoy = new Date().toISOString().slice(0, 10);
+        if (cl.config?.tasaFechaActualizada !== hoy) {
+          const res = await fetch('https://open.er-api.com/v6/latest/USD');
+          const data = await res.json();
+          if (data?.rates?.HNL) {
+            const tasa = Math.round(data.rates.HNL * 10000) / 10000;
+            const newConfig = { ...DEFAULT_CONFIG, ...cl.config, tasaCambio: tasa, tasaFechaActualizada: hoy };
+            setConfig(newConfig);
+            await saveCfg({ config: newConfig, locales: cl.locales || [] });
+            setToast(`Tasa BCH actualizada: L ${tasa.toFixed(4)}/$`);
+            setTimeout(() => setToast(null), 2800);
+          }
+        }
+      } catch {}
     })();
   }, []);
 
@@ -484,7 +501,7 @@ export default function App({ supabase }) {
           hist.unshift({ fecha: new Date().toISOString(), tasa, mes: `${MESES_LARGO[monthIdx]} ${year}`, localId });
           await window.storage.set(histKey, JSON.stringify(hist.slice(0, 100)));
         } catch {}
-        showToast(`Tasa BCH del día: L ${tasa}/$`);
+        showToast(`Tasa BCH del día: L ${tasa.toFixed(4)}/$`);
       } catch {
         updates.tasaCambioCongelado = config.tasaCambio; // fallback
       }
@@ -2067,9 +2084,9 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
       const res = await fetch('https://open.er-api.com/v6/latest/USD');
       const data = await res.json();
       if (data && data.rates && data.rates.HNL) {
-        const tasa = Math.round(data.rates.HNL * 100) / 100;
+        const tasa = Math.round(data.rates.HNL * 10000) / 10000;
         setDraft(d => ({ ...d, tasaCambio: tasa }));
-        setTasaMsg(`✓ Tasa BCH: L ${tasa}/$`);
+        setTasaMsg(`✓ Tasa BCH: L ${tasa.toFixed(4)}/$`);
       } else {
         setTasaMsg('No se pudo obtener la tasa.');
       }
