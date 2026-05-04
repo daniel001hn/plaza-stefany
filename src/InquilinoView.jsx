@@ -269,9 +269,6 @@ export default function InquilinoView({ session, onLogout }) {
           const montoLuz    = consumo !== null && tarifaEf > 0 ? consumo * tarifaEf : (data.luzMonto || 0)
           const tieneLuz    = luzAplica && montoLuz > 0 && tarifaEf > 0
           const luzNueva    = tieneLuz && !luzPagada && esActual
-          // El botón de luz aparece a partir del 1 del mes siguiente (día que se sacan las lecturas)
-          const primerSiguiente = new Date(mes.year, mes.monthIdx + 1, 1)
-          const luzDisponible   = luzAplica && today >= primerSiguiente
 
           return (
             <div key={`${mes.year}-${mes.monthIdx}`} className="card">
@@ -284,15 +281,15 @@ export default function InquilinoView({ session, onLogout }) {
                 <div style={{textAlign:'right',flexShrink:0,marginLeft:'1rem'}}>
                   <div style={{fontSize:'.67rem',color:'#888'}}>Renta</div>
                   <div style={{fontWeight:600,fontSize:'.88rem',fontVariantNumeric:'tabular-nums'}}>L {fmt(renta)}</div>
-                  {luzDisponible && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#aaa',fontVariantNumeric:'tabular-nums'}}>L {fmt(montoLuz)}</div></>}
+                  {luzAplica && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#bbb',fontVariantNumeric:'tabular-nums'}}>{tieneLuz ? `L ${fmt(montoLuz)}` : '—'}</div></>}
                 </div>
               </div>
 
               <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap',marginBottom:'.65rem',alignItems:'center'}}>
                 <span style={{fontSize:'.67rem',color:'#888'}}>Renta</span>
                 {rentaPagada ? <span className="pill-g"><span className="dg"/>Pagada</span> : <span className="pill-o"><span className="do"/>Pendiente</span>}
-                {luzDisponible && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz</span>
-                  {!tieneLuz ? <span className="pill-x"><span className="dx"/>Pendiente datos</span>
+                {luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz</span>
+                  {!tieneLuz ? <span className="pill-x"><span className="dx"/>No disponible</span>
                     : luzPagada ? <span className="pill-g"><span className="dg"/>Pagada</span>
                     : <span className="pill-o"><span className="do"/>Pendiente</span>}</>}
                 {!luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz</span><span className="pill-x"><span className="dx"/>Incluida</span></>}
@@ -300,10 +297,10 @@ export default function InquilinoView({ session, onLogout }) {
 
               <div style={{borderTop:'1px solid rgba(255,255,255,.5)',paddingTop:'.65rem',display:'flex',gap:'.5rem',flexWrap:'wrap'}}>
                 <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
-                {luzDisponible && (
+                {luzAplica && (
                   tieneLuz
                     ? <button className="btn-l" onClick={() => generarLuz(mes)}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
-                    : <button className="btn-l" disabled style={{opacity:.45,cursor:'default'}}>⚡ Luz disponible — L 0.00</button>
+                    : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>
                 )}
               </div>
             </div>
