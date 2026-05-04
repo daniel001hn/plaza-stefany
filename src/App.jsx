@@ -44,7 +44,7 @@ function LoginScreen({ onLogin }) {
     try {
       const raw = await window.storage.get('config-and-locales')
       const data = raw ? JSON.parse(raw) : {}
-      const usuarios = data.usuarios || []
+      const usuarios = data.config?.usuarios || data.usuarios || []
       const match = usuarios.find(u =>
         u.usuario.toLowerCase() === usuario.trim().toLowerCase() &&
         u.password === password
