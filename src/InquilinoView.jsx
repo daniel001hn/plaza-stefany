@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { monthKey } from './keys'
+import { MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -88,7 +89,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
 .ft{height:8px;background:#F37A72}
 </style></head><body>
 <div class="page">
-  <img src="${DL_LOGO}" alt="D&L Soluciones" style="width:100%;display:block" />
+  ${MEMBRETE_HEADER_HTML}
   <div class="tit"><h2>P L A Z A &nbsp; S T E F A N Y</h2><p>${titulo}</p></div>
   <div class="inf"><table>
     <tr><td class="lbl">Recibo N°</td><td>${reciboNum}</td></tr>
@@ -113,13 +114,7 @@ body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-
     <div class="nota"><b>Nota:</b> ${nota}</div>
   </div>
   <div class="foot">
-    <div class="fd">
-      <span style="color:#F37A72">📞</span><span>+504 9462-8518</span><span style="color:#F37A72">|</span>
-      <span style="color:#F37A72">✉</span><span>soluciones_dyl@yahoo.com</span><span style="color:#F37A72">|</span>
-      <span style="color:#F37A72">📍</span><span>Res. Altos de Venecia 1</span><span style="color:#F37A72">|</span>
-      <span>RTN: 0801-9022-372253</span>
-    </div>
-    <div class="ft"></div>
+    ${MEMBRETE_FOOTER_HTML}
   </div>
 </div></body></html>`
 }

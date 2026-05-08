@@ -13,6 +13,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Cell, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
 import { DL_LOGO } from './dlLogo';
+import { MembreteHeader, MembreteFooter, MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete';
 import { monthKey } from './keys';
 
 const DEFAULT_CONFIG = {
@@ -2463,7 +2464,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
                   input: {
                     to: u.email,
                     subject: `Plaza Stefany — Su recibo de ${mes} está disponible`,
-                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Plaza Stefany.\n\nPuede acceder en: https://plaza-stefany.vercel.app\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nPlaza Stefany\n+504 9462-8518`
+                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Plaza Stefany.\n\nPuede acceder en: https://plaza-stefany.vercel.app\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nPlaza Stefany\n+504 9462-8618`
                   }
                 })
               });
@@ -3007,8 +3008,8 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
           <div id="recibo-print-area">
             <div style={{ background: 'white', maxWidth: 700, margin: '0 auto', fontFamily: 'Arial, Helvetica, sans-serif', color: C.text, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', minHeight: 900 }}>
 
-              {/* ── HEADER — imagen del membrete oficial ── */}
-              <img src={DL_LOGO} alt="D&L Soluciones" style={{ width: '100%', display: 'block' }} />
+              {/* ── HEADER — membrete oficial D&L (SVG vectorial) ── */}
+              <MembreteHeader />
 
               {/* ── TITLE SECTION ── */}
               <div style={{ textAlign: 'center', padding: '20px 40px 10px' }}>
@@ -3107,18 +3108,9 @@ function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthI
                 </div>
               </div>
 
-              {/* ── FOOTER ── */}
+              {/* ── FOOTER — membrete oficial D&L ── */}
               <div style={{ marginTop: 'auto' }}>
-                <div style={{ background: '#E8E8E5', padding: '12px 40px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', flexWrap: 'wrap', fontSize: '11px', color: '#444' }}>
-                  <span style={{ color: C.coral }}>📞</span><span>+504 9462-8518</span>
-                  <span style={{ color: C.coral }}>|</span>
-                  <span style={{ color: C.coral }}>✉</span><span>soluciones_dyl@yahoo.com</span>
-                  <span style={{ color: C.coral }}>|</span>
-                  <span style={{ color: C.coral }}>📍</span><span>Res. Altos de Venecia 1</span>
-                  <span style={{ color: C.coral }}>|</span>
-                  <span>RTN: 0801-9022-372253</span>
-                </div>
-                <div style={{ height: 8, background: C.coral }} />
+                <MembreteFooter />
               </div>
 
             </div>
@@ -3177,8 +3169,8 @@ function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
         <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'78vh',overflowY:'auto'}}>
           <div id="recibo-renta-print">
             <div style={{background:'white',maxWidth:700,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)',display:'flex',flexDirection:'column',minHeight:900}}>
-              {/* HEADER — imagen del membrete oficial */}
-              <img src={DL_LOGO} alt="D&L Soluciones" style={{width:'100%',display:'block'}} />
+              {/* HEADER — membrete oficial D&L */}
+              <MembreteHeader />
               <div style={{textAlign:'center',padding:'18px 40px 10px'}}>
                 <div style={{fontSize:'20px',fontWeight:900,letterSpacing:'6px',color:C.text}}>P L A Z A &nbsp; S T E F A N Y</div>
                 <div style={{fontSize:'11px',letterSpacing:'3px',color:C.light,marginTop:'4px'}}>R E C I B O &nbsp; D E &nbsp; R E N T A</div>
@@ -3216,18 +3208,9 @@ function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
                   <b style={{color:C.text}}>Nota:</b> Renta mensual calculada sobre {local.m2} m² al precio pactado de US${precioM2}/m², convertido al tipo de cambio BCH (venta) de L {tasaUsada}/US$ al momento del pago. ISV ({((config.isv||0.15)*100).toFixed(0)}%) incluido en el total.
                 </div>
               </div>
-              {/* FOOTER */}
+              {/* FOOTER — membrete oficial D&L */}
               <div style={{marginTop:'auto'}}>
-                <div style={{background:'#E8E8E5',padding:'12px 40px',display:'flex',justifyContent:'center',alignItems:'center',gap:'20px',flexWrap:'wrap',fontSize:'11px',color:'#444'}}>
-                  <span style={{color:C.coral}}>📞</span><span>+504 9462-8518</span>
-                  <span style={{color:C.coral}}>|</span>
-                  <span style={{color:C.coral}}>✉</span><span>soluciones_dyl@yahoo.com</span>
-                  <span style={{color:C.coral}}>|</span>
-                  <span style={{color:C.coral}}>📍</span><span>Res. Altos de Venecia 1</span>
-                  <span style={{color:C.coral}}>|</span>
-                  <span>RTN: 0801-9022-372253</span>
-                </div>
-                <div style={{height:8,background:C.coral}}/>
+                <MembreteFooter />
               </div>
             </div>
           </div>
@@ -3288,8 +3271,8 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
         <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'80vh',overflowY:'auto'}}>
           <div id="reporte-print">
             <div style={{background:'white',maxWidth:750,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)'}}>
-              {/* HEADER — imagen del membrete oficial */}
-              <img src={DL_LOGO} alt="D&L Soluciones" style={{width:'100%',display:'block'}} />
+              {/* HEADER — membrete oficial D&L */}
+              <MembreteHeader />
               <div style={{textAlign:'center',padding:'14px 36px 8px'}}>
                 <div style={{fontSize:'18px',fontWeight:900,letterSpacing:'5px'}}>P L A Z A &nbsp; S T E F A N Y</div>
                 <div style={{fontSize:'11px',letterSpacing:'3px',color:C.light,marginTop:'3px'}}>R E P O R T E &nbsp; M E N S U A L &nbsp; D E &nbsp; C O B R A N Z A</div>
@@ -3357,17 +3340,8 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
                 </table>
               </div>
 
-              {/* FOOTER */}
-              <div style={{background:'#E8E8E5',padding:'10px 36px',display:'flex',justifyContent:'center',alignItems:'center',gap:'16px',flexWrap:'wrap',fontSize:'10px',color:'#444'}}>
-                <span style={{color:C.coral}}>📞</span><span>+504 9462-8518</span>
-                <span style={{color:C.coral}}>|</span>
-                <span style={{color:C.coral}}>✉</span><span>soluciones_dyl@yahoo.com</span>
-                <span style={{color:C.coral}}>|</span>
-                <span style={{color:C.coral}}>📍</span><span>Res. Altos de Venecia 1</span>
-                <span style={{color:C.coral}}>|</span>
-                <span>RTN: 0801-9022-372253</span>
-              </div>
-              <div style={{height:7,background:C.coral}}/>
+              {/* FOOTER — membrete oficial D&L */}
+              <MembreteFooter />
             </div>
           </div>
         </div>
