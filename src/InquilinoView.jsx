@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { monthKey } from './keys'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -9,7 +10,7 @@ async function loadCfg() {
   return { config: {}, locales: [] }
 }
 async function loadMonth(year, monthIdx) {
-  try { const key = `pagos:${year}-${String(monthIdx).padStart(2,'0')}`; const r = await window.storage.get(key); if (r) return typeof r === 'string' ? JSON.parse(r) : r } catch(e) {}
+  try { const r = await window.storage.get(monthKey(year, monthIdx)); if (r) return typeof r === 'string' ? JSON.parse(r) : r } catch(e) {}
   return {}
 }
 
@@ -161,8 +162,10 @@ export default function InquilinoView({ session, onLogout }) {
   const today = new Date()
 
   useEffect(() => {
+    let cancelled = false
     async function load() {
       const { config: cfg, locales } = await loadCfg()
+      if (cancelled) return
       setConfig(cfg)
       const loc = locales.find(l => l.id === session.localId)
       setLocal(loc)
@@ -171,20 +174,27 @@ export default function InquilinoView({ session, onLogout }) {
       const desdeStr = loc?.contratoDesde // 'YYYY-MM-DD'
       const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null
       const months = []
+      const now = new Date()
       for (let i = 0; i < 12; i++) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const y = d.getFullYear(); const m = d.getMonth()
-        // Comparar contra el inicio del mes; si contratoDesde es después del fin del mes, lo ocultamos
-        const finDeMes = new Date(y, m + 1, 0) // último día del mes
+        const finDeMes = new Date(y, m + 1, 0)
         if (desde && desde > finDeMes) continue
         const data = await loadMonth(y, m)
         const pago = (data.pagos || {})[session.localId] || {}
         months.push({ year: y, monthIdx: m, data: pago, factura: data.factura || {} })
       }
+      if (cancelled) return
       setMeses(months); setLoading(false)
     }
     load()
-  }, [])
+    const onVisibility = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisibility)
+    const interval = setInterval(load, 30000)
+    let unsub = () => {}
+    try { unsub = window.storage?.subscribe?.(() => load()) || (() => {}) } catch {}
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisibility); clearInterval(interval); unsub() }
+  }, [session.localId])
 
   const calcRenta = (loc) => {
     if (!loc) return 0
@@ -232,7 +242,7 @@ export default function InquilinoView({ session, onLogout }) {
     if (!file) return
     try {
       const b64 = await comprimirImagen(file)
-      const key = `pagos:${mes.year}-${String(mes.monthIdx).padStart(2,'0')}`
+      const key = monthKey(mes.year, mes.monthIdx)
       const r = await window.storage.get(key)
       const data = r ? JSON.parse(r) : { pagos: {}, factura: {} }
       data.pagos = data.pagos || {}
@@ -252,7 +262,7 @@ export default function InquilinoView({ session, onLogout }) {
 
   const registrarActividad = async (mes, tipo) => {
     try {
-      const key = `pagos:${mes.year}-${String(mes.monthIdx).padStart(2,'0')}`
+      const key = monthKey(mes.year, mes.monthIdx)
       const r = await window.storage.get(key)
       const data = r ? JSON.parse(r) : { pagos: {}, factura: {} }
       data.pagos = data.pagos || {}

@@ -13,6 +13,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Cell, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
 import { DL_LOGO } from './dlLogo';
+import { monthKey } from './keys';
 
 const DEFAULT_CONFIG = {
   rentPerM2USD: 29,
@@ -26,7 +27,6 @@ const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Jul
 
 const fmt = (n) => new Intl.NumberFormat('es-HN', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0));
 const fmt2 = (n) => new Intl.NumberFormat('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
-const monthKey = (year, monthIdx) => `pagos:${year}-${String(monthIdx + 1).padStart(2, '0')}`;
 
 function getPagos(md) {
   if (!md || typeof md !== 'object') return {};
@@ -488,6 +488,29 @@ export default function App({ supabase }) {
       } catch {}
     })();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const reload = async () => {
+      if (cancelled) return;
+      const cl = await loadCfg();
+      if (cancelled) return;
+      setConfig((prev) => ({ ...prev, ...cl.config }));
+      setLocales(cl.locales || []);
+      const result = {};
+      for (let m = 0; m < 12; m++) result[m] = await loadMonth(year, m);
+      result['_prevDec'] = await loadMonth(year - 1, 11);
+      if (cancelled) return;
+      setYearData(result);
+    };
+    const onVisibility = () => { if (document.visibilityState === 'visible') reload(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    const interval = setInterval(reload, 30000);
+    // Realtime: cuando otro cliente actualiza la BD, refrescar automáticamente.
+    let unsub = () => {};
+    try { unsub = window.storage?.subscribe?.(() => reload()) || (() => {}); } catch {}
+    return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisibility); clearInterval(interval); unsub(); };
+  }, [year]);
 
   useEffect(() => {
     (async () => {

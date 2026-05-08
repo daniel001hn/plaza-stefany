@@ -26,6 +26,18 @@ const storage = {
   async delete(key) {
     const { error } = await supabase.from('kv_store').delete().eq('key', key)
     return !error
+  },
+  // Suscribirse a cambios en kv_store. callback({ key, value, eventType }).
+  // Si Realtime no está habilitado en Supabase, no falla — el polling es el fallback.
+  subscribe(callback) {
+    const channel = supabase
+      .channel('kv_store_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kv_store' }, (payload) => {
+        const row = payload.new || payload.old
+        if (row?.key) callback({ key: row.key, value: row.value, eventType: payload.eventType })
+      })
+      .subscribe()
+    return () => { try { supabase.removeChannel(channel) } catch {} }
   }
 }
 
