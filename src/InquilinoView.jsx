@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { monthKey } from './keys'
 import { MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete'
-import { descargarReciboRenta } from './docxRecibo'
+import { descargarReciboRenta, descargarReciboLuz } from './docxRecibo'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -307,14 +307,25 @@ export default function InquilinoView({ session, onLogout }) {
     const consumo    = lecturaAct - lecturaAnt
     const tarifaEf   = data.tarifaEfectiva || factura?.tarifaEfectiva || 0
     const montoLuz   = consumo * tarifaEf
-    abrirPDF(buildPDF({
-      tipo: 'luz', inquilino: session.nombre || local?.inquilino || 'Inquilino',
-      localNum: local?.numero, periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
-      fechaEmision: fechaHoy(),
+    descargarReciboLuz({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-L${String(local?.numero).padStart(2,'0')}`,
-      lecturaAnt, lecturaAct, consumo, tarifaEfectiva: tarifaEf, montoLuz,
-      kWhPlaza: factura?.kWhTotal || 0, montoPlaza: factura?.montoTotal || 0,
-    }))
+      inquilino: session.nombre || local?.inquilino || 'Inquilino',
+      local: `Local ${local?.numero ?? ''}`,
+      localNum: String(local?.numero ?? ''),
+      periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
+      fechaEmision: fechaHoy(),
+      lecturaAnterior: fmt0(lecturaAnt),
+      lecturaActual: fmt0(lecturaAct),
+      consumo: fmt0(consumo),
+      kWhPlaza: fmt0(factura?.kWhTotal || 0),
+      facturaEnee: fmt(factura?.montoTotal || 0),
+      tarifa: fmt(tarifaEf),
+      montoEnergia: fmt(montoLuz),
+      total: fmt(montoLuz),
+    }).catch(e => {
+      console.error('Error generando recibo de luz:', e)
+      alert('No se pudo generar el recibo de luz. Reintentá o avisá al admin.')
+    })
   }
 
   if (loading) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><style>{CSS}</style><div style={{color:'#6366F1',fontSize:'1rem',fontFamily:'Geist,sans-serif'}}>Cargando…</div></div>

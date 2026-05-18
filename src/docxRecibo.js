@@ -9,11 +9,18 @@
 import PizZip from 'pizzip'
 
 const TEMPLATE_URL_RENTA = '/templates/recibo-renta-template.docx'
+const TEMPLATE_URL_LUZ = '/recibo-luz-template.docx'
 
 const PLACEHOLDERS_RENTA = [
   'reciboNum', 'inquilino', 'local', 'periodo', 'fechaEmision',
   'm2', 'precioUSD', 'tasa', 'isvPct',
   'rentaBase', 'isvMonto', 'rentaTotal',
+]
+
+const PLACEHOLDERS_LUZ = [
+  'reciboNum', 'inquilino', 'local', 'periodo', 'fechaEmision',
+  'lecturaAnterior', 'lecturaActual', 'consumo',
+  'kWhPlaza', 'facturaEnee', 'tarifa', 'montoEnergia', 'total',
 ]
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -59,5 +66,12 @@ export async function descargarReciboRenta(data) {
   const buffer = await loadTemplate(TEMPLATE_URL_RENTA)
   const blob = fillTemplate(buffer, PLACEHOLDERS_RENTA, data)
   const filename = `Recibo-Renta-${safeFilename(data.periodo)}-Local-${safeFilename(data.local)}.docx`
+  triggerDownload(blob, filename)
+}
+
+export async function descargarReciboLuz(data) {
+  const buffer = await loadTemplate(TEMPLATE_URL_LUZ)
+  const blob = fillTemplate(buffer, PLACEHOLDERS_LUZ, data)
+  const filename = `Recibo-Luz-${safeFilename(data.periodo)}-Local-${safeFilename(data.localNum ?? data.local)}.docx`
   triggerDownload(blob, filename)
 }
