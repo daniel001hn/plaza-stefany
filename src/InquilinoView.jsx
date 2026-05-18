@@ -383,23 +383,27 @@ export default function InquilinoView({ session, onLogout }) {
         <div style={{fontSize:'.67rem',fontWeight:600,color:'rgba(60,60,70,.55)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.6rem',paddingLeft:'.2rem'}}>Historial de pagos</div>
 
         {meses.map((mes, idx) => {
-          const { data, factura } = mes
+          const { data } = mes
           const rentaPagada = !!data.rentaPagada
-          const luzPagada   = !!data.luzPagada
           const tipoLuz     = local?.tipoLuz || 'incluido'
           const luzAplica   = tipoLuz !== 'incluido'
           const esActual    = mes.year === today.getFullYear() && mes.monthIdx === today.getMonth()
-          // Luz: calcular igual que el admin (tarifa = monto factura / kWh submedidores).
-          const pagosAll     = mes.pagosAll || {}
-          const prevPagosAll = meses[idx + 1]?.pagosAll || {}
-          const tarifaEf    = calcTarifaEfectiva(factura, locales, pagosAll, prevPagosAll) || 0
-          const consumo     = calcConsumoLocal(local, pagosAll, prevPagosAll)
-          const lecturaAct  = data.lecturaActual ?? null
-          const lecturaAnt  = prevPagosAll[session.localId]?.lecturaActual ?? local?.lecturaInicial ?? null
-          const kWhPlaza    = calcTotalKwhSubmedidores(locales, pagosAll, prevPagosAll)
+          // Reagrupado: la tarjeta del mes N muestra renta de N + luz de N-1
+          // (la luz se factura el mes siguiente al consumo). meses[idx+1] = mes anterior.
+          const luzMes      = meses[idx + 1] || null
+          const luzData     = luzMes?.data || {}
+          const luzPagada   = !!luzData.luzPagada
+          const luzPagosAll = luzMes?.pagosAll || {}
+          const luzPrevPagosAll = meses[idx + 2]?.pagosAll || {}
+          const tarifaEf    = luzMes ? (calcTarifaEfectiva(luzMes.factura, locales, luzPagosAll, luzPrevPagosAll) || 0) : 0
+          const consumo     = luzMes ? calcConsumoLocal(local, luzPagosAll, luzPrevPagosAll) : null
+          const lecturaAct  = luzData.lecturaActual ?? null
+          const lecturaAnt  = luzPrevPagosAll[session.localId]?.lecturaActual ?? local?.lecturaInicial ?? null
+          const kWhPlaza    = luzMes ? calcTotalKwhSubmedidores(locales, luzPagosAll, luzPrevPagosAll) : 0
           const montoLuz    = (consumo != null && consumo > 0 && tarifaEf > 0) ? consumo * tarifaEf : 0
-          const tieneLuz    = luzAplica && montoLuz > 0
-          const luzNueva    = tieneLuz && !luzPagada && esActual
+          const tieneLuz    = luzAplica && !!luzMes && montoLuz > 0
+          const luzNueva    = tieneLuz && !luzPagada
+          const luzLabel    = luzMes ? `${MESES[luzMes.monthIdx]} ${luzMes.year}` : null
           // El recibo de renta solo está disponible si ya fue registrado por el admin
           const reciboRentaDisponible = rentaPagada || !esActual
           // Monto de renta con tasa congelada (o actual si no hay congelada aún)
@@ -417,16 +421,16 @@ export default function InquilinoView({ session, onLogout }) {
                   {luzNueva && <span className="badge-luz">⚡ Factura luz disponible</span>}
                 </div>
                 <div style={{textAlign:'right',flexShrink:0,marginLeft:'1rem'}}>
-                  <div style={{fontSize:'.67rem',color:'#888'}}>Renta</div>
+                  <div style={{fontSize:'.67rem',color:'#888'}}>Renta · {MESES[mes.monthIdx]}</div>
                   <div style={{fontWeight:600,fontSize:'.88rem',fontVariantNumeric:'tabular-nums'}}>L {fmt(rentaMes)}</div>
-                  {luzAplica && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#bbb',fontVariantNumeric:'tabular-nums'}}>{tieneLuz ? `L ${fmt(montoLuz)}` : '—'}</div></>}
+                  {luzAplica && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz · {luzLabel || '—'}</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#bbb',fontVariantNumeric:'tabular-nums'}}>{tieneLuz ? `L ${fmt(montoLuz)}` : '—'}</div></>}
                 </div>
               </div>
 
               <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap',marginBottom:'.65rem',alignItems:'center'}}>
-                <span style={{fontSize:'.67rem',color:'#888'}}>Renta</span>
+                <span style={{fontSize:'.67rem',color:'#888'}}>Renta {MESES[mes.monthIdx]}</span>
                 {rentaPagada ? <span className="pill-g"><span className="dg"/>Pagada</span> : <span className="pill-o"><span className="do"/>Pendiente</span>}
-                {luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz</span>
+                {luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz {luzLabel || ''}</span>
                   {!tieneLuz ? <span className="pill-x"><span className="dx"/>No disponible</span>
                     : luzPagada ? <span className="pill-g"><span className="dg"/>Pagada</span>
                     : <span className="pill-o"><span className="do"/>Pendiente</span>}</>}
@@ -459,28 +463,28 @@ export default function InquilinoView({ session, onLogout }) {
                   )}
                 </div>
 
-                {/* ── LUZ ── */}
-                {luzAplica && (
+                {/* ── LUZ (mes anterior) ── */}
+                {luzAplica && luzMes && (
                   <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
                     {tieneLuz
-                      ? <button className="btn-l" onClick={() => generarLuz(mes, { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza })}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
+                      ? <button className="btn-l" onClick={() => generarLuz(luzMes, { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza })}>⚡ Recibo de luz {luzLabel} — L {fmt(montoLuz)}</button>
                       : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>}
                     {tieneLuz && (
                       <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
-                        background: mes.data.comprobanteLuz ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
-                        border: mes.data.comprobanteLuz ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
-                        color: mes.data.comprobanteLuz ? '#1A7F35' : '#666',
+                        background: luzData.comprobanteLuz ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
+                        border: luzData.comprobanteLuz ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
+                        color: luzData.comprobanteLuz ? '#1A7F35' : '#666',
                         backdropFilter:'blur(8px)',
                       }}>
                         <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
-                          onChange={e => subirComprobante(mes,'Luz',e.target.files[0])} />
-                        {mes.data.comprobanteLuz ? '✅ Comprobante luz' : '📎 Subir comprobante'}
+                          onChange={e => subirComprobante(luzMes,'Luz',e.target.files[0])} />
+                        {luzData.comprobanteLuz ? '✅ Comprobante luz' : '📎 Subir comprobante'}
                       </label>
                     )}
-                    {mes.data.comprobanteLuz && (
-                      <img src={mes.data.comprobanteLuz} alt="comp luz"
+                    {luzData.comprobanteLuz && (
+                      <img src={luzData.comprobanteLuz} alt="comp luz"
                         style={{width:36,height:28,objectFit:'cover',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
-                        onClick={() => window.open(mes.data.comprobanteLuz,'_blank')} />
+                        onClick={() => window.open(luzData.comprobanteLuz,'_blank')} />
                     )}
                   </div>
                 )}
