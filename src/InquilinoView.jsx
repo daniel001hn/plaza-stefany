@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { monthKey } from './keys'
 import { MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete'
+import { descargarReciboRenta } from './docxRecibo'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -276,15 +277,26 @@ export default function InquilinoView({ session, onLogout }) {
     const tasaUsada = mes.data.tasaCambioCongelado || config.tasaCambio || 25
     const precioM2  = getPrecioMes(mes.year, mes.monthIdx)
     const base  = (local.m2 || 0) * precioM2 * tasaUsada
-    const renta = base * (1 + (config.isv || 0.15))
-    abrirPDF(buildPDF({
-      tipo: 'renta', inquilino: session.nombre || local?.inquilino || 'Inquilino',
-      localNum: local?.numero, periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
-      fechaEmision: fechaHoy(),
+    const isv      = config.isv || 0.15
+    const isvMonto = base * isv
+    const renta    = base * (1 + isv)
+    descargarReciboRenta({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-${String(local?.numero).padStart(3,'0')}`,
-      m2: local?.m2, precioUSD: precioM2, tasa: tasaUsada,
-      isv: config.isv || 0.15, rentaBase: base, isvMonto: base*(config.isv||0.15), rentaTotal: renta,
-    }))
+      inquilino: session.nombre || local?.inquilino || 'Inquilino',
+      local: String(local?.numero ?? ''),
+      periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
+      fechaEmision: fechaHoy(),
+      m2: local?.m2 ?? '',
+      precioUSD: Number(precioM2).toFixed(2),
+      tasa: tasaUsada,
+      isvPct: (isv * 100).toFixed(0),
+      rentaBase: fmt(base),
+      isvMonto: fmt(isvMonto),
+      rentaTotal: fmt(renta),
+    }).catch(e => {
+      console.error('Error generando recibo de renta:', e)
+      alert('No se pudo generar el recibo. Reintentá o avisá al admin.')
+    })
   }
 
   const generarLuz = (mes) => {

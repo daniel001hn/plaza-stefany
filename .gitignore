@@ -1,0 +1,17 @@
+# Dependencias
+node_modules/
+
+# Build output (Vercel compila desde el source)
+dist/
+
+# Variables de entorno locales
+.env
+.env.local
+.env.*.local
+
+# Scripts temporales de diagnóstico
+scripts/_*
+
+# Sistema
+.DS_Store
+Thumbs.db

@@ -15,6 +15,7 @@ import {
 import { DL_LOGO } from './dlLogo';
 import { MembreteHeader, MembreteFooter, MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete';
 import { monthKey } from './keys';
+import { generarReciboLuzDocx } from './generarReciboDocx';
 
 const DEFAULT_CONFIG = {
   rentPerM2USD: 29,
@@ -452,7 +453,6 @@ export default function App({ supabase }) {
   const [paymentLocal, setPaymentLocal] = useState(null);
   const [editingLocal, setEditingLocal] = useState(null);
   const [editingFactura, setEditingFactura] = useState(false);
-  const [reciboLuz, setReciboLuz] = useState(null);
   const [reciboRenta, setReciboRenta] = useState(null);
   const [reporteMensual, setReporteMensual] = useState(false);
   const [toast, setToast] = useState(null);
@@ -796,26 +796,23 @@ export default function App({ supabase }) {
           factura={factura} tarifaEfectiva={tarifaEfectiva} config={config} calcRenta={calcRenta}
           onClose={() => setPaymentLocal(null)}
           onSave={async (updates) => { await updatePayment(paymentLocal.id, updates); setPaymentLocal(null); }}
-          onGenerateRecibo={() => setReciboLuz({
-            local: paymentLocal,
-            data: pagos[paymentLocal.id] || {},
-            prevData: prevPagos[paymentLocal.id] || {},
-            factura, tarifaEfectiva, monthIdx, year,
-          })}
+          onGenerateRecibo={async () => {
+            try {
+              await generarReciboLuzDocx({
+                local: paymentLocal,
+                data: pagos[paymentLocal.id] || {},
+                prevData: prevPagos[paymentLocal.id] || {},
+                factura, tarifaEfectiva, monthIdx, year,
+              });
+            } catch (e) {
+              alert('No se pudo generar el recibo de luz: ' + (e?.message || e));
+            }
+          }}
           onGenerateReciboRenta={() => setReciboRenta({
             local: paymentLocal,
             data: pagos[paymentLocal.id] || {},
             monthIdx, year,
           })}
-        />
-      )}
-
-      {reciboLuz && (
-        <ReciboLuzModal
-          local={reciboLuz.local} data={reciboLuz.data} prevData={reciboLuz.prevData}
-          factura={reciboLuz.factura} tarifaEfectiva={reciboLuz.tarifaEfectiva}
-          monthIdx={reciboLuz.monthIdx} year={reciboLuz.year} config={config}
-          onClose={() => setReciboLuz(null)}
         />
       )}
 
@@ -2917,203 +2914,6 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }
           <div style={{ display: 'flex', gap: '.5rem' }}>
             <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
             <button onClick={handleSave} className="ps-btn"><Save size={14} strokeWidth={2.5} /> Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =================================================================
-// =================================================================
-// RECIBO LUZ MODAL — based on D&L Soluciones template
-// =================================================================
-function ReciboLuzModal({ local, data, prevData, factura, tarifaEfectiva, monthIdx, year, config, onClose }) {
-  const lecturaAnterior = prevData.lecturaActual ?? local.lecturaInicial ?? 0;
-  const lecturaActual = data.lecturaActual ?? 0;
-  const consumo = lecturaActual - lecturaAnterior;
-  const tarifa = tarifaEfectiva || 0;
-  const montoEnergia = consumo * tarifa;
-  const totalPagar = montoEnergia;
-  const reciboNum = `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(local.numero || '').padStart(3, '0')}`;
-  const fechaEmision = new Date().toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' });
-  const kWhPlaza = tarifa > 0 ? Math.round((factura.montoTotal || 0) / tarifa) : 0;
-  const numLocales = config?.numLocales || 5;
-
-  const handlePrint = () => {
-    const printContents = document.getElementById('recibo-print-area').innerHTML;
-    const w = window.open('', '_blank');
-    w.document.write(`<!DOCTYPE html><html><head>
-      <title>Recibo Luz - Local ${local.numero} - ${MESES_LARGO[monthIdx]} ${year}</title>
-      <style>
-        @page { size: Letter; margin: 0; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, Helvetica, sans-serif; color: #333; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-      </style></head><body>${printContents}</body></html>`);
-    w.document.close();
-    w.focus();
-    setTimeout(() => { w.print(); }, 300);
-  };
-
-  // D&L bird SVG logo — idéntico al membrete oficial
-  const DLLogo = () => (
-    <svg viewBox="0 0 220 160" width="90" height="65" xmlns="http://www.w3.org/2000/svg">
-      <polygon points="30,110 65,55 105,80 80,125" fill="#F37A72"/>
-      <polygon points="65,55 105,80 85,50" fill="#E66555"/>
-      <polygon points="30,110 5,145 55,130 80,125" fill="#E66555"/>
-      <polygon points="65,55 85,50 110,65 105,80" fill="#F37A72"/>
-      <polygon points="105,80 130,60 150,75 130,95" fill="#F37A72"/>
-      <polygon points="130,60 150,75 145,55" fill="#E66555"/>
-      <polygon points="150,75 170,58 175,72 158,82" fill="#F37A72"/>
-      <polygon points="170,58 190,62 185,72 175,72" fill="#E66555"/>
-      <polygon points="185,62 210,68 190,74" fill="#F37A72"/>
-      <circle cx="180" cy="65" r="3" fill="#C84040"/>
-      <polygon points="55,130 40,155 70,148 80,125" fill="#F37A72"/>
-      <polygon points="40,155 70,148 55,160" fill="#E66555"/>
-    </svg>
-  );
-
-  const C = { // color palette — membrete oficial D&L
-    coral: '#F37A72',
-    teal: '#1E7A8A',
-    tealDark: '#155F6E',
-    rowHead: '#F5C9C2',
-    border: '#ccc',
-    text: '#333',
-    textLight: '#555',
-    labelBg: '#f0f0f0',
-  };
-
-  const tH = { border: `1px solid ${C.border}`, padding: '7px 10px', fontSize: '12px', fontWeight: 700, textAlign: 'center', color: C.text };
-  const tC = { border: `1px solid ${C.border}`, padding: '8px 10px', fontSize: '13px', color: C.text, verticalAlign: 'middle' };
-
-  return (
-    <div className="ps-modal-backdrop" onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 740, animation: 'psSlide .25s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-        {/* Toolbar */}
-        <div className="ps-card-elevated" style={{ padding: '.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '14px 14px 0 0', borderBottom: 'none' }}>
-          <div>
-            <div className="ps-eyebrow" style={{ color: '#6366F1' }}><Printer size={11} /> RECIBO DE LUZ</div>
-            <div style={{ fontSize: '.88rem', fontWeight: 600, marginTop: '.15rem' }}>Vista previa — Local {local.numero} · {MESES_LARGO[monthIdx]} {year}</div>
-          </div>
-          <div style={{ display: 'flex', gap: '.5rem' }}>
-            <button onClick={handlePrint} className="ps-btn"><Printer size={14} strokeWidth={2.5} /> Imprimir / PDF</button>
-            <button onClick={onClose} className="ps-btn-icon"><X size={16} /></button>
-          </div>
-        </div>
-
-        {/* Scrollable preview area */}
-        <div style={{ background: '#d8d8d4', borderRadius: '0 0 14px 14px', border: '1px solid #2E2E38', borderTop: 'none', padding: '1.25rem', maxHeight: '78vh', overflowY: 'auto' }}>
-          <div id="recibo-print-area">
-            <div style={{ background: 'white', maxWidth: 700, margin: '0 auto', fontFamily: 'Arial, Helvetica, sans-serif', color: C.text, boxShadow: '0 4px 24px rgba(0,0,0,0.12)', display: 'flex', flexDirection: 'column', minHeight: 900 }}>
-
-              {/* ── HEADER — membrete oficial D&L (SVG vectorial) ── */}
-              <MembreteHeader />
-
-              {/* ── TITLE SECTION ── */}
-              <div style={{ textAlign: 'center', padding: '20px 40px 10px' }}>
-                <div style={{ fontSize: '22px', fontWeight: 900, letterSpacing: '6px', color: C.text }}>P L A Z A &nbsp; S T E F A N Y</div>
-                <div style={{ fontSize: '12px', letterSpacing: '3px', color: C.textLight, marginTop: '4px' }}>R E C I B O &nbsp; D E &nbsp; E N E R G Í A &nbsp; E L É C T R I C A</div>
-              </div>
-
-              {/* ── INFO TABLE ── */}
-              <div style={{ padding: '10px 40px 16px' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', border: `1px solid ${C.border}` }}>
-                  <tbody>
-                    {[
-                      ['Recibo N°', reciboNum],
-                      ['Inquilino', local.inquilino || local.nombre || 'N/A'],
-                      ['Local', `Local ${local.numero}`],
-                      ['Período', `${MESES_LARGO[monthIdx]} ${year}`],
-                      ['Fecha de emisión', fechaEmision],
-                    ].map(([label, value]) => (
-                      <tr key={label}>
-                        <td style={{ ...tC, background: C.labelBg, width: '35%', color: C.textLight, fontSize: '12px' }}>{label}</td>
-                        <td style={{ ...tC }}>{value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* ── BODY ── */}
-              <div style={{ padding: '0 40px 24px', flex: 1 }}>
-
-                {/* LECTURAS */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: C.teal, letterSpacing: '2px', borderBottom: `2px solid ${C.teal}`, paddingBottom: '4px', marginBottom: '8px' }}>
-                    L E C T U R A S &nbsp; D E L &nbsp; S U B M E D I D O R
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: C.rowHead }}>
-                        <th style={{ ...tH, color: C.coral }}>LECTURA ANTERIOR (kWh)</th>
-                        <th style={{ ...tH, color: C.coral }}>LECTURA ACTUAL (kWh)</th>
-                        <th style={{ ...tH, color: C.coral }}>CONSUMO (kWh)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={{ ...tC, textAlign: 'center' }}>{fmt(lecturaAnterior)}</td>
-                        <td style={{ ...tC, textAlign: 'center' }}>{fmt(lecturaActual)}</td>
-                        <td style={{ ...tC, textAlign: 'center', fontWeight: 700 }}>{fmt(consumo)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* CÁLCULO */}
-                <div style={{ marginBottom: '16px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: 700, color: C.teal, letterSpacing: '2px', borderBottom: `2px solid ${C.teal}`, paddingBottom: '4px', marginBottom: '8px' }}>
-                    C Á L C U L O &nbsp; D E L &nbsp; M O N T O
-                  </div>
-                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: C.rowHead }}>
-                        <th style={{ ...tH, color: C.coral, width: '55%', textAlign: 'left' }}>DETALLE</th>
-                        <th style={{ ...tH, color: C.coral }}>VALOR</th>
-                        <th style={{ ...tH, color: C.coral }}>MONTO (L)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td style={tC}>Factura ENEE estimada (plaza)</td>
-                        <td style={{ ...tC, textAlign: 'center', color: C.textLight }}>{kWhPlaza > 0 ? `${fmt(kWhPlaza)} kWh` : '—'}</td>
-                        <td style={{ ...tC, textAlign: 'right' }}>{fmt2(factura.montoTotal || 0)}</td>
-                      </tr>
-                      <tr>
-                        <td style={tC}>Tarifa efectiva de energía</td>
-                        <td style={{ ...tC, textAlign: 'center', color: C.textLight }}>L/kWh</td>
-                        <td style={{ ...tC, textAlign: 'right' }}>{fmt2(tarifa)}</td>
-                      </tr>
-                      <tr>
-                        <td style={tC}>Energía consumida</td>
-                        <td style={{ ...tC, textAlign: 'center', color: C.textLight }}>{fmt(consumo)} × {fmt2(tarifa)}</td>
-                        <td style={{ ...tC, textAlign: 'right' }}>{fmt2(montoEnergia)}</td>
-                      </tr>
-                      <tr style={{ background: C.tealDark }}>
-                        <td colSpan={2} style={{ ...tC, color: 'white', fontWeight: 700, fontSize: '14px', border: `1px solid ${C.tealDark}` }}>TOTAL A PAGAR</td>
-                        <td style={{ ...tC, color: 'white', fontWeight: 700, fontSize: '15px', textAlign: 'right', border: `1px solid ${C.tealDark}` }}>L &nbsp;{fmt2(totalPagar)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* NOTA */}
-                <div style={{ background: '#FFFBEA', borderLeft: `4px solid #D4A800`, padding: '10px 14px', fontSize: '12px', lineHeight: 1.6, color: '#555' }}>
-                  <span style={{ fontWeight: 700, color: C.text }}>Método de cálculo: </span>
-                  El monto se obtiene prorrateando la factura ENEE de la plaza según el consumo real registrado en el submedidor de cada local.
-                  Este recibo no genera ISV.
-                </div>
-              </div>
-
-              {/* ── FOOTER — membrete oficial D&L ── */}
-              <div style={{ marginTop: 'auto' }}>
-                <MembreteFooter />
-              </div>
-
-            </div>
           </div>
         </div>
       </div>
