@@ -68,7 +68,7 @@ function P({ align, runs, shading, leftBorder, bottomBorder, indent, spaceBefore
   return `<w:p><w:pPr>${pPr.join('')}</w:pPr>${runs.map(R).join('')}</w:p>`;
 }
 
-// Celda: párrafo interno con spacing 0/0 y line apretado
+// Celda: párrafo interno con spacing 0/0 y line cómodo
 function TC({ width, shading, runs, align = 'left', mergeStart, mergeContinue }) {
   const tcPr = [];
   if (width) tcPr.push(`<w:tcW w:w="${width}" w:type="dxa"/>`);
@@ -79,7 +79,7 @@ function TC({ width, shading, runs, align = 'left', mergeStart, mergeContinue })
     ['top', 'left', 'bottom', 'right'].map(e => `<w:${e} w:val="single" w:sz="4" w:color="CCCCCC"/>`).join('') +
     '</w:tcBorders>');
   tcPr.push('<w:vAlign w:val="center"/>');
-  const pPrInner = `<w:pPr><w:spacing w:before="0" w:after="0" w:line="220" w:lineRule="auto"/>${align !== 'left' ? `<w:jc w:val="${align}"/>` : ''}</w:pPr>`;
+  const pPrInner = `<w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>${align !== 'left' ? `<w:jc w:val="${align}"/>` : ''}</w:pPr>`;
   return `<w:tc><w:tcPr>${tcPr.join('')}</w:tcPr><w:p>${pPrInner}${runs.map(R).join('')}</w:p></w:tc>`;
 }
 
@@ -95,12 +95,12 @@ function TBL(rows, gridCols) {
       ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']
         .map(e => `<w:${e} w:val="single" w:sz="4" w:color="CCCCCC"/>`).join('') +
     `</w:tblBorders>` +
-    // tblCellMar apretado para reducir altura de fila
+    // tblCellMar: padding interno de celda — cómodo para que respire
     `<w:tblCellMar>` +
-      `<w:top w:w="20" w:type="dxa"/>` +
-      `<w:left w:w="80" w:type="dxa"/>` +
-      `<w:bottom w:w="20" w:type="dxa"/>` +
-      `<w:right w:w="80" w:type="dxa"/>` +
+      `<w:top w:w="60" w:type="dxa"/>` +
+      `<w:left w:w="90" w:type="dxa"/>` +
+      `<w:bottom w:w="60" w:type="dxa"/>` +
+      `<w:right w:w="90" w:type="dxa"/>` +
     `</w:tblCellMar>` +
     `</w:tblPr>`;
   const tblGrid = `<w:tblGrid>${gridCols.map(c => `<w:gridCol w:w="${c}"/>`).join('')}</w:tblGrid>`;
@@ -108,19 +108,19 @@ function TBL(rows, gridCols) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// 4) Construir bloques (compactos, una sola página)
+// 4) Construir bloques (balanceados: legibles y en una sola página)
 // ──────────────────────────────────────────────────────────────────
 
-// BLOQUE 2 — Título y subtítulo (compactos)
+// BLOQUE 2 — Título y subtítulo
 const titleXml = P({
   align: 'center',
-  spaceAfter: 20,
-  runs: [{ text: 'PLAZA STEFANY', bold: true, size: 14, color: '333333', spacing: '60' }],
+  spaceAfter: 40,
+  runs: [{ text: 'PLAZA STEFANY', bold: true, size: 17, color: '333333', spacing: '60' }],
 });
 const subtitleXml = P({
   align: 'center',
-  spaceAfter: 120,
-  runs: [{ text: 'RECIBO DE ENERGÍA ELÉCTRICA', size: 8, color: '555555', spacing: '30' }],
+  spaceAfter: 160,
+  runs: [{ text: 'RECIBO DE ENERGÍA ELÉCTRICA', size: 9, color: '555555', spacing: '30' }],
 });
 
 // BLOQUE 3 — Tabla de identificación (5×2)
@@ -133,31 +133,31 @@ const idTable = TBL(
     ['Período', '{periodo}'],
     ['Fecha de emisión', '{fechaEmision}'],
   ].map(([label, value]) => TR([
-    TC({ width: ID_GRID[0], shading: 'F0F0F0', runs: [{ text: label, size: 9, color: '555555' }] }),
-    TC({ width: ID_GRID[1], runs: [{ text: value, size: 10, color: '333333' }] }),
+    TC({ width: ID_GRID[0], shading: 'F0F0F0', runs: [{ text: label, size: 10, color: '555555' }] }),
+    TC({ width: ID_GRID[1], runs: [{ text: value, size: 11, color: '333333' }] }),
   ])),
   ID_GRID
 );
 
 // BLOQUE 4 — Lecturas
 const lectHead = P({
-  spaceBefore: 120,
-  spaceAfter: 20,
+  spaceBefore: 180,
+  spaceAfter: 40,
   bottomBorder: { sz: 12, color: '1E7A8A' },
-  runs: [{ text: 'LECTURAS DEL SUBMEDIDOR', bold: true, size: 10, color: '1E7A8A', spacing: '40' }],
+  runs: [{ text: 'LECTURAS DEL SUBMEDIDOR', bold: true, size: 11, color: '1E7A8A', spacing: '40' }],
 });
 const LECT_GRID = [2833, 2833, 2834];
 const lectTable = TBL(
   [
     TR([
-      TC({ width: LECT_GRID[0], shading: 'F5C9C2', align: 'center', runs: [{ text: 'LECTURA ANTERIOR (kWh)', bold: true, size: 8, color: 'F37A72' }] }),
-      TC({ width: LECT_GRID[1], shading: 'F5C9C2', align: 'center', runs: [{ text: 'LECTURA ACTUAL (kWh)', bold: true, size: 8, color: 'F37A72' }] }),
-      TC({ width: LECT_GRID[2], shading: 'F5C9C2', align: 'center', runs: [{ text: 'CONSUMO (kWh)', bold: true, size: 8, color: 'F37A72' }] }),
+      TC({ width: LECT_GRID[0], shading: 'F5C9C2', align: 'center', runs: [{ text: 'LECTURA ANTERIOR (kWh)', bold: true, size: 9, color: 'F37A72' }] }),
+      TC({ width: LECT_GRID[1], shading: 'F5C9C2', align: 'center', runs: [{ text: 'LECTURA ACTUAL (kWh)', bold: true, size: 9, color: 'F37A72' }] }),
+      TC({ width: LECT_GRID[2], shading: 'F5C9C2', align: 'center', runs: [{ text: 'CONSUMO (kWh)', bold: true, size: 9, color: 'F37A72' }] }),
     ]),
     TR([
-      TC({ width: LECT_GRID[0], align: 'center', runs: [{ text: '{lecturaAnterior}', size: 10, color: '333333' }] }),
-      TC({ width: LECT_GRID[1], align: 'center', runs: [{ text: '{lecturaActual}', size: 10, color: '333333' }] }),
-      TC({ width: LECT_GRID[2], align: 'center', runs: [{ text: '{consumo}', bold: true, size: 10, color: '333333' }] }),
+      TC({ width: LECT_GRID[0], align: 'center', runs: [{ text: '{lecturaAnterior}', size: 11, color: '333333' }] }),
+      TC({ width: LECT_GRID[1], align: 'center', runs: [{ text: '{lecturaActual}', size: 11, color: '333333' }] }),
+      TC({ width: LECT_GRID[2], align: 'center', runs: [{ text: '{consumo}', bold: true, size: 11, color: '333333' }] }),
     ]),
   ],
   LECT_GRID
@@ -165,38 +165,38 @@ const lectTable = TBL(
 
 // BLOQUE 5 — Cálculo
 const calcHead = P({
-  spaceBefore: 120,
-  spaceAfter: 20,
+  spaceBefore: 180,
+  spaceAfter: 40,
   bottomBorder: { sz: 12, color: '1E7A8A' },
-  runs: [{ text: 'CÁLCULO DEL MONTO', bold: true, size: 10, color: '1E7A8A', spacing: '40' }],
+  runs: [{ text: 'CÁLCULO DEL MONTO', bold: true, size: 11, color: '1E7A8A', spacing: '40' }],
 });
 const CALC_GRID = [4675, 1700, 2125];
 const calcTable = TBL(
   [
     TR([
-      TC({ width: CALC_GRID[0], shading: 'F5C9C2', align: 'left', runs: [{ text: 'DETALLE', bold: true, size: 8, color: 'F37A72' }] }),
-      TC({ width: CALC_GRID[1], shading: 'F5C9C2', align: 'center', runs: [{ text: 'VALOR', bold: true, size: 8, color: 'F37A72' }] }),
-      TC({ width: CALC_GRID[2], shading: 'F5C9C2', align: 'center', runs: [{ text: 'MONTO (L)', bold: true, size: 8, color: 'F37A72' }] }),
+      TC({ width: CALC_GRID[0], shading: 'F5C9C2', align: 'left', runs: [{ text: 'DETALLE', bold: true, size: 9, color: 'F37A72' }] }),
+      TC({ width: CALC_GRID[1], shading: 'F5C9C2', align: 'center', runs: [{ text: 'VALOR', bold: true, size: 9, color: 'F37A72' }] }),
+      TC({ width: CALC_GRID[2], shading: 'F5C9C2', align: 'center', runs: [{ text: 'MONTO (L)', bold: true, size: 9, color: 'F37A72' }] }),
     ]),
     TR([
-      TC({ width: CALC_GRID[0], runs: [{ text: 'Factura ENEE estimada (plaza)', size: 9, color: '333333' }] }),
-      TC({ width: CALC_GRID[1], align: 'center', runs: [{ text: '{kWhPlaza} kWh', size: 9, color: '555555' }] }),
-      TC({ width: CALC_GRID[2], align: 'right', runs: [{ text: '{facturaEnee}', size: 9, color: '333333' }] }),
+      TC({ width: CALC_GRID[0], runs: [{ text: 'Factura ENEE estimada (plaza)', size: 10, color: '333333' }] }),
+      TC({ width: CALC_GRID[1], align: 'center', runs: [{ text: '{kWhPlaza} kWh', size: 10, color: '555555' }] }),
+      TC({ width: CALC_GRID[2], align: 'right', runs: [{ text: '{facturaEnee}', size: 10, color: '333333' }] }),
     ]),
     TR([
-      TC({ width: CALC_GRID[0], runs: [{ text: 'Tarifa efectiva de energía', size: 9, color: '333333' }] }),
-      TC({ width: CALC_GRID[1], align: 'center', runs: [{ text: 'L/kWh', size: 9, color: '555555' }] }),
-      TC({ width: CALC_GRID[2], align: 'right', runs: [{ text: '{tarifa}', size: 9, color: '333333' }] }),
+      TC({ width: CALC_GRID[0], runs: [{ text: 'Tarifa efectiva de energía', size: 10, color: '333333' }] }),
+      TC({ width: CALC_GRID[1], align: 'center', runs: [{ text: 'L/kWh', size: 10, color: '555555' }] }),
+      TC({ width: CALC_GRID[2], align: 'right', runs: [{ text: '{tarifa}', size: 10, color: '333333' }] }),
     ]),
     TR([
-      TC({ width: CALC_GRID[0], runs: [{ text: 'Energía consumida', size: 9, color: '333333' }] }),
-      TC({ width: CALC_GRID[1], align: 'center', runs: [{ text: '{consumo} × {tarifa}', size: 9, color: '555555' }] }),
-      TC({ width: CALC_GRID[2], align: 'right', runs: [{ text: '{montoEnergia}', size: 9, color: '333333' }] }),
+      TC({ width: CALC_GRID[0], runs: [{ text: 'Energía consumida', size: 10, color: '333333' }] }),
+      TC({ width: CALC_GRID[1], align: 'center', runs: [{ text: '{consumo} × {tarifa}', size: 10, color: '555555' }] }),
+      TC({ width: CALC_GRID[2], align: 'right', runs: [{ text: '{montoEnergia}', size: 10, color: '333333' }] }),
     ]),
     TR([
-      TC({ width: CALC_GRID[0], shading: '155F6E', mergeStart: true, runs: [{ text: 'TOTAL A PAGAR', bold: true, size: 10, color: 'FFFFFF' }] }),
+      TC({ width: CALC_GRID[0], shading: '155F6E', mergeStart: true, runs: [{ text: 'TOTAL A PAGAR', bold: true, size: 12, color: 'FFFFFF' }] }),
       TC({ width: CALC_GRID[1], shading: '155F6E', mergeContinue: true, runs: [] }),
-      TC({ width: CALC_GRID[2], shading: '155F6E', align: 'right', runs: [{ text: 'L  {total}', bold: true, size: 11, color: 'FFFFFF' }] }),
+      TC({ width: CALC_GRID[2], shading: '155F6E', align: 'right', runs: [{ text: 'L  {total}', bold: true, size: 13, color: 'FFFFFF' }] }),
     ]),
   ],
   CALC_GRID
@@ -204,13 +204,13 @@ const calcTable = TBL(
 
 // BLOQUE 6 — Nota
 const noteXml = P({
-  spaceBefore: 120,
+  spaceBefore: 180,
   shading: 'FFFBEA',
   leftBorder: { sz: 24, color: 'D4A800' },
   indent: 180,
   runs: [
-    { text: 'Método de cálculo: ', bold: true, size: 8, color: '333333' },
-    { text: 'El monto se obtiene prorrateando la factura ENEE de la plaza según el consumo real registrado en el submedidor de cada local. Este recibo no genera ISV.', size: 8, color: '555555' },
+    { text: 'Método de cálculo: ', bold: true, size: 9, color: '333333' },
+    { text: 'El monto se obtiene prorrateando la factura ENEE de la plaza según el consumo real registrado en el submedidor de cada local. Este recibo no genera ISV.', size: 9, color: '555555' },
   ],
 });
 

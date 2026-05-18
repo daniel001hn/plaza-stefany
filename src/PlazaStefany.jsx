@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Trash2, Edit3, ExternalLink,
   Receipt, Save, TrendingUp, Activity, Wallet, AlertCircle,
   Sparkles, Circle, ArrowRight, FileText, Info, Calculator,
-  History, ChevronDown, ChevronUp, Printer, Download, Users,
+  History, ChevronDown, ChevronUp, Printer, Download, Users, LogOut,
 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, Cell, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
@@ -441,7 +441,7 @@ const APPLE_GLOBAL_CSS = `
   ::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.4); }
 `;
 
-export default function App({ supabase }) {
+export default function App({ supabase, onLogout }) {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const [locales, setLocales] = useState([]);
   const [view, setView] = useState('dashboard');
@@ -760,7 +760,7 @@ export default function App({ supabase }) {
   return (
     <div className="ps-app">
       <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-        <Header config={config} view={view} setView={setView} monthIdx={monthIdx} year={year} navigateMonth={navigateMonth} today={today} />
+        <Header config={config} view={view} setView={setView} monthIdx={monthIdx} year={year} navigateMonth={navigateMonth} today={today} onLogout={onLogout} />
 
         {view === 'dashboard' && (
           <DashboardView
@@ -858,7 +858,7 @@ export default function App({ supabase }) {
   );
 }
 
-function Header({ config, view, setView, monthIdx, year, navigateMonth, today }) {
+function Header({ config, view, setView, monthIdx, year, navigateMonth, today, onLogout }) {
   const isCurrentMonth = monthIdx === today.getMonth() && year === today.getFullYear();
   return (
     <header style={{ marginBottom: '1.5rem' }}>
@@ -889,6 +889,13 @@ function Header({ config, view, setView, monthIdx, year, navigateMonth, today })
           </button>
           <button className={`ps-tab ${view === 'config' ? 'ps-tab-active' : ''}`} onClick={() => setView('config')}>
             <Settings size={14} /> Configuración
+          </button>
+          <button
+            className="ps-tab"
+            onClick={() => { if (confirm('¿Cerrar sesión?')) onLogout(); }}
+            style={{ color: '#FF5C5C', marginLeft: '.25rem' }}
+          >
+            <LogOut size={14} /> Salir
           </button>
         </div>
       </div>
