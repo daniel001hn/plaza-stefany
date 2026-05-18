@@ -7,6 +7,37 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmt0 = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
+// Cálculo de luz — réplica exacta de la lógica del admin (PlazaStefany.jsx).
+// El inquilino calcula la tarifa y el consumo él mismo en vez de depender de
+// campos que el "Guardar" del admin no persiste.
+function calcConsumoLocal(locale, pagos, prevPagos) {
+  if (!locale || (locale.tipoLuz || 'incluido') !== 'medidor') return null
+  const pago = pagos[locale.id] || {}
+  const lecturaActual = pago.lecturaActual
+  if (lecturaActual == null) return null
+  if (pago.medidorReemplazado && pago.lecturaInicialReseteo != null) {
+    return lecturaActual - pago.lecturaInicialReseteo
+  }
+  const lecturaAnterior = prevPagos[locale.id]?.lecturaActual ?? locale.lecturaInicial
+  if (lecturaAnterior == null) return null
+  return lecturaActual - lecturaAnterior
+}
+function calcTotalKwhSubmedidores(locales, pagos, prevPagos) {
+  let total = 0
+  for (const l of locales) {
+    const c = calcConsumoLocal(l, pagos, prevPagos)
+    if (c != null && c > 0) total += c
+  }
+  return total
+}
+function calcTarifaEfectiva(factura, locales, pagos, prevPagos) {
+  const monto = Number(factura?.montoTotal) || 0
+  if (monto <= 0) return null
+  const totalKwh = calcTotalKwhSubmedidores(locales, pagos, prevPagos)
+  if (totalKwh <= 0) return null
+  return monto / totalKwh
+}
+
 async function loadCfg() {
   try { const r = await window.storage.get('config-and-locales'); if (r) return typeof r === 'string' ? JSON.parse(r) : r } catch(e) {}
   return { config: {}, locales: [] }
@@ -152,6 +183,7 @@ body{margin:0;font-family:'Geist',-apple-system,sans-serif;-webkit-font-smoothin
 
 export default function InquilinoView({ session, onLogout }) {
   const [local, setLocal]     = useState(null)
+  const [locales, setLocales] = useState([])
   const [config, setConfig]   = useState({})
   const [meses, setMeses]     = useState([])
   const [loading, setLoading] = useState(true)
@@ -163,6 +195,7 @@ export default function InquilinoView({ session, onLogout }) {
       const { config: cfg, locales } = await loadCfg()
       if (cancelled) return
       setConfig(cfg)
+      setLocales(locales || [])
       const loc = locales.find(l => l.id === session.localId)
       setLocal(loc)
       // Si el local tiene contratoDesde, no mostrar meses anteriores a esa fecha.
@@ -178,7 +211,7 @@ export default function InquilinoView({ session, onLogout }) {
         if (desde && desde > finDeMes) continue
         const data = await loadMonth(y, m)
         const pago = (data.pagos || {})[session.localId] || {}
-        months.push({ year: y, monthIdx: m, data: pago, factura: data.factura || {} })
+        months.push({ year: y, monthIdx: m, data: pago, factura: data.factura || {}, pagosAll: data.pagos || {} })
       }
       if (cancelled) return
       setMeses(months); setLoading(false)
@@ -299,14 +332,9 @@ export default function InquilinoView({ session, onLogout }) {
     })
   }
 
-  const generarLuz = (mes) => {
+  // calc = { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza } ya computado en el render
+  const generarLuz = (mes, calc) => {
     registrarActividad(mes, 'Luz')
-    const { data, factura } = mes
-    const lecturaAnt = data.lecturaAnterior ?? (data.lecturaInicial ?? 0)
-    const lecturaAct = data.lecturaActual ?? 0
-    const consumo    = lecturaAct - lecturaAnt
-    const tarifaEf   = data.tarifaEfectiva || factura?.tarifaEfectiva || 0
-    const montoLuz   = consumo * tarifaEf
     descargarReciboLuz({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-L${String(local?.numero).padStart(2,'0')}`,
       inquilino: session.nombre || local?.inquilino || 'Inquilino',
@@ -314,14 +342,14 @@ export default function InquilinoView({ session, onLogout }) {
       localNum: String(local?.numero ?? ''),
       periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
       fechaEmision: fechaHoy(),
-      lecturaAnterior: fmt0(lecturaAnt),
-      lecturaActual: fmt0(lecturaAct),
-      consumo: fmt0(consumo),
-      kWhPlaza: fmt0(factura?.kWhTotal || 0),
-      facturaEnee: fmt(factura?.montoTotal || 0),
-      tarifa: fmt(tarifaEf),
-      montoEnergia: fmt(montoLuz),
-      total: fmt(montoLuz),
+      lecturaAnterior: fmt0(calc.lecturaAnt || 0),
+      lecturaActual: fmt0(calc.lecturaAct || 0),
+      consumo: fmt0(calc.consumo || 0),
+      kWhPlaza: fmt0(calc.kWhPlaza || 0),
+      facturaEnee: fmt(mes.factura?.montoTotal || 0),
+      tarifa: fmt(calc.tarifaEf || 0),
+      montoEnergia: fmt(calc.montoLuz || 0),
+      total: fmt(calc.montoLuz || 0),
     }).catch(e => {
       console.error('Error generando recibo de luz:', e)
       alert('No se pudo generar el recibo de luz. Reintentá o avisá al admin.')
@@ -354,19 +382,23 @@ export default function InquilinoView({ session, onLogout }) {
 
         <div style={{fontSize:'.67rem',fontWeight:600,color:'rgba(60,60,70,.55)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.6rem',paddingLeft:'.2rem'}}>Historial de pagos</div>
 
-        {meses.map((mes) => {
+        {meses.map((mes, idx) => {
           const { data, factura } = mes
           const rentaPagada = !!data.rentaPagada
           const luzPagada   = !!data.luzPagada
           const tipoLuz     = local?.tipoLuz || 'incluido'
           const luzAplica   = tipoLuz !== 'incluido'
           const esActual    = mes.year === today.getFullYear() && mes.monthIdx === today.getMonth()
-          const lecturaAnt  = data.lecturaAnterior ?? (data.lecturaInicial ?? null)
+          // Luz: calcular igual que el admin (tarifa = monto factura / kWh submedidores).
+          const pagosAll     = mes.pagosAll || {}
+          const prevPagosAll = meses[idx + 1]?.pagosAll || {}
+          const tarifaEf    = calcTarifaEfectiva(factura, locales, pagosAll, prevPagosAll) || 0
+          const consumo     = calcConsumoLocal(local, pagosAll, prevPagosAll)
           const lecturaAct  = data.lecturaActual ?? null
-          const tarifaEf    = data.tarifaEfectiva || factura?.tarifaEfectiva || 0
-          const consumo     = lecturaAnt !== null && lecturaAct !== null ? lecturaAct - lecturaAnt : null
-          const montoLuz    = consumo !== null && tarifaEf > 0 ? consumo * tarifaEf : (data.luzMonto || 0)
-          const tieneLuz    = luzAplica && montoLuz > 0 && tarifaEf > 0
+          const lecturaAnt  = prevPagosAll[session.localId]?.lecturaActual ?? local?.lecturaInicial ?? null
+          const kWhPlaza    = calcTotalKwhSubmedidores(locales, pagosAll, prevPagosAll)
+          const montoLuz    = (consumo != null && consumo > 0 && tarifaEf > 0) ? consumo * tarifaEf : 0
+          const tieneLuz    = luzAplica && montoLuz > 0
           const luzNueva    = tieneLuz && !luzPagada && esActual
           // El recibo de renta solo está disponible si ya fue registrado por el admin
           const reciboRentaDisponible = rentaPagada || !esActual
@@ -431,7 +463,7 @@ export default function InquilinoView({ session, onLogout }) {
                 {luzAplica && (
                   <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
                     {tieneLuz
-                      ? <button className="btn-l" onClick={() => generarLuz(mes)}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
+                      ? <button className="btn-l" onClick={() => generarLuz(mes, { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza })}>⚡ Recibo de luz — L {fmt(montoLuz)}</button>
                       : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>}
                     {tieneLuz && (
                       <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
