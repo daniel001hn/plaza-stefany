@@ -16,6 +16,7 @@ import { DL_LOGO } from './dlLogo';
 import { MembreteHeader, MembreteFooter, MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete';
 import { monthKey } from './keys';
 import { generarReciboLuzDocx } from './generarReciboDocx';
+import { descargarReciboRenta } from './docxRecibo';
 
 const DEFAULT_CONFIG = {
   rentPerM2USD: 29,
@@ -453,7 +454,6 @@ export default function App({ supabase, onLogout }) {
   const [paymentLocal, setPaymentLocal] = useState(null);
   const [editingLocal, setEditingLocal] = useState(null);
   const [editingFactura, setEditingFactura] = useState(false);
-  const [reciboRenta, setReciboRenta] = useState(null);
   const [reporteMensual, setReporteMensual] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -813,19 +813,42 @@ export default function App({ supabase, onLogout }) {
               setTimeout(() => setToast(null), 12000);
             }
           }}
-          onGenerateReciboRenta={() => setReciboRenta({
-            local: paymentLocal,
-            data: pagos[paymentLocal.id] || {},
-            monthIdx, year,
-          })}
-        />
-      )}
-
-      {reciboRenta && (
-        <ReciboRentaModal
-          local={reciboRenta.local} data={reciboRenta.data}
-          monthIdx={reciboRenta.monthIdx} year={reciboRenta.year} config={config}
-          onClose={() => setReciboRenta(null)}
+          onGenerateReciboRenta={async () => {
+            setToast('Generando recibo de renta…');
+            try {
+              const loc = paymentLocal;
+              const d = pagos[paymentLocal.id] || {};
+              const tasaUsada = d.tasaCambioCongelado || config.tasaCambio || 25;
+              const precioM2 = getPrecioForMonth(config, year, monthIdx);
+              const base = (loc.m2 || 0) * precioM2 * tasaUsada;
+              const isv = config.isv || 0.15;
+              const isvMonto = base * isv;
+              const total = base + isvMonto;
+              const fechaEmision = d.fechaRentaPagada
+                ? new Date(d.fechaRentaPagada).toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' })
+                : new Date().toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' });
+              await descargarReciboRenta({
+                reciboNum: `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-R${String(loc.numero || '').padStart(2, '0')}`,
+                inquilino: loc.inquilino || loc.nombre || 'N/A',
+                local: String(loc.numero ?? ''),
+                periodo: `${MESES_LARGO[monthIdx]} ${year}`,
+                fechaEmision,
+                m2: loc.m2 ?? '',
+                precioUSD: Number(precioM2).toFixed(2),
+                tasa: tasaUsada,
+                isvPct: (isv * 100).toFixed(0),
+                rentaBase: fmt2(base),
+                isvMonto: fmt2(isvMonto),
+                rentaTotal: fmt2(total),
+              });
+              setToast('Recibo de renta descargado — revisá tu carpeta Descargas');
+              setTimeout(() => setToast(null), 4000);
+            } catch (e) {
+              console.error('[Recibo renta] error:', e);
+              setToast('Error al generar recibo: ' + (e?.message || e));
+              setTimeout(() => setToast(null), 12000);
+            }
+          }}
         />
       )}
 
@@ -2926,105 +2949,6 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }
           <div style={{ display: 'flex', gap: '.5rem' }}>
             <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
             <button onClick={handleSave} className="ps-btn"><Save size={14} strokeWidth={2.5} /> Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// =================================================================
-// RECIBO RENTA MODAL — mismo membrete D&L que el de luz
-// =================================================================
-function ReciboRentaModal({ local, data, monthIdx, year, config, onClose }) {
-  const tasaUsada  = data.tasaCambioCongelado || config.tasaCambio || 25;
-  const precioM2   = getPrecioForMonth(config, year, monthIdx);
-  const base       = (local.m2 || 0) * precioM2 * tasaUsada;
-  const isvMonto   = base * (config.isv || 0.15);
-  const total      = base + isvMonto;
-  const reciboNum  = `PS-${year}-${String(monthIdx + 1).padStart(2,'0')}-R${String(local.numero || '').padStart(2,'0')}`;
-  const fechaEmision = data.fechaRentaPagada
-    ? new Date(data.fechaRentaPagada).toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric' })
-    : new Date().toLocaleDateString('es-HN', { day:'2-digit', month:'long', year:'numeric' });
-
-  const DLBird = () => (
-    <img src={DL_LOGO} alt="D&L Soluciones" width="100" height="74" style={{display:'block'}} />
-  );
-
-  const fmt2 = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const C = { coral:'#F37A72', teal:'#1E7A8A', tealDark:'#155F6E', rowHead:'#F5C9C2', border:'#ccc', text:'#333', light:'#555', lbl:'#f0f0f0' };
-  const tH = { border:`1px solid ${C.border}`, padding:'7px 10px', fontSize:'12px', fontWeight:700, textAlign:'center', color:C.text };
-  const tC = { border:`1px solid ${C.border}`, padding:'8px 10px', fontSize:'13px', color:C.text, verticalAlign:'middle' };
-
-  const handlePrint = () => {
-    const w = window.open('','_blank');
-    w.document.write(`<!DOCTYPE html><html><head><title>Recibo Renta ${MESES_LARGO[monthIdx]} ${year}</title>
-    <style>@page{size:Letter;margin:0}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,Helvetica,sans-serif;color:#333;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}</style>
-    </head><body>${document.getElementById('recibo-renta-print').innerHTML}</body></html>`);
-    w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
-  };
-
-  return (
-    <div className="ps-modal-backdrop" onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:740,animation:'psSlide .25s cubic-bezier(0.16,1,0.3,1)'}}>
-        <div className="ps-card-elevated" style={{padding:'.85rem 1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',borderRadius:'14px 14px 0 0',borderBottom:'none'}}>
-          <div>
-            <div className="ps-eyebrow" style={{color:'#6366F1'}}><Printer size={11}/> RECIBO DE RENTA</div>
-            <div style={{fontSize:'.88rem',fontWeight:600,marginTop:'.15rem'}}>Vista previa — Local {local.numero} · {MESES_LARGO[monthIdx]} {year}</div>
-          </div>
-          <div style={{display:'flex',gap:'.5rem'}}>
-            <button onClick={handlePrint} className="ps-btn"><Printer size={14} strokeWidth={2.5}/> Imprimir / PDF</button>
-            <button onClick={onClose} className="ps-btn-icon"><X size={16}/></button>
-          </div>
-        </div>
-        <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'78vh',overflowY:'auto'}}>
-          <div id="recibo-renta-print">
-            <div style={{background:'white',maxWidth:700,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)',display:'flex',flexDirection:'column',minHeight:900}}>
-              {/* HEADER — membrete oficial D&L */}
-              <MembreteHeader />
-              <div style={{textAlign:'center',padding:'18px 40px 10px'}}>
-                <div style={{fontSize:'20px',fontWeight:900,letterSpacing:'6px',color:C.text}}>P L A Z A &nbsp; S T E F A N Y</div>
-                <div style={{fontSize:'11px',letterSpacing:'3px',color:C.light,marginTop:'4px'}}>R E C I B O &nbsp; D E &nbsp; R E N T A</div>
-              </div>
-              {/* INFO */}
-              <div style={{padding:'8px 40px 14px'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',border:`1px solid ${C.border}`}}>
-                  {[['Recibo N°',reciboNum],['Inquilino',local.inquilino||local.nombre||'—'],['Local',`Local ${local.numero}`],['Período',`${MESES_LARGO[monthIdx]} ${year}`],['Fecha de emisión',fechaEmision]].map(([l,v])=>(
-                    <tr key={l}><td style={{...tC,background:C.lbl,width:'36%',color:C.light,fontSize:'11px'}}>{l}</td><td style={tC}>{v}</td></tr>
-                  ))}
-                </table>
-              </div>
-              {/* DETALLE */}
-              <div style={{padding:'0 40px 20px',flex:1}}>
-                <div style={{fontSize:'12px',fontWeight:700,color:C.teal,letterSpacing:'2px',borderBottom:`1.5px solid ${C.teal}`,paddingBottom:'4px',marginBottom:'8px'}}>D E T A L L E &nbsp; D E &nbsp; R E N T A</div>
-                <table style={{width:'100%',borderCollapse:'collapse'}}>
-                  <thead><tr style={{background:C.rowHead}}>
-                    <th style={{...tH,color:C.coral,textAlign:'left',width:'55%'}}>DETALLE</th>
-                    <th style={{...tH,color:C.coral}}>VALOR</th>
-                    <th style={{...tH,color:C.coral}}>MONTO (L)</th>
-                  </tr></thead>
-                  <tbody>
-                    <tr><td style={tC}>Área arrendada</td><td style={{...tC,textAlign:'center',color:C.light}}>{local.m2} m²</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
-                    <tr style={{background:C.lbl}}><td style={tC}>Precio por m²</td><td style={{...tC,textAlign:'center',color:C.light}}>$ {precioM2.toFixed(2)} / m²</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
-                    <tr><td style={tC}>Tipo de cambio BCH (venta)</td><td style={{...tC,textAlign:'center',color:C.light}}>L {tasaUsada} / US$</td><td style={{...tC,textAlign:'right'}}>—</td></tr>
-                    <tr style={{background:C.lbl}}><td style={tC}>Base ({local.m2} × ${precioM2} × {tasaUsada})</td><td style={{...tC,textAlign:'center'}}></td><td style={{...tC,textAlign:'right'}}>{fmt2(base)}</td></tr>
-                    <tr><td style={tC}>ISV ({((config.isv||0.15)*100).toFixed(0)}%)</td><td style={{...tC,textAlign:'center',color:C.light}}>L {fmt2(base)} × {((config.isv||0.15)*100).toFixed(0)}%</td><td style={{...tC,textAlign:'right'}}>{fmt2(isvMonto)}</td></tr>
-                    <tr style={{background:C.tealDark}}>
-                      <td colSpan={2} style={{...tC,color:'white',fontWeight:700,fontSize:'13px',border:`1px solid ${C.tealDark}`}}>TOTAL A PAGAR</td>
-                      <td style={{...tC,color:'white',fontWeight:700,fontSize:'14px',textAlign:'right',border:`1px solid ${C.tealDark}`}}>L &nbsp;{fmt2(total)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div style={{background:'#FFFBEA',borderLeft:'4px solid #D4A800',padding:'10px 14px',fontSize:'11px',lineHeight:1.6,marginTop:'14px',color:'#555'}}>
-                  <b style={{color:C.text}}>Nota:</b> Renta mensual calculada sobre {local.m2} m² al precio pactado de US${precioM2}/m², convertido al tipo de cambio BCH (venta) de L {tasaUsada}/US$ al momento del pago. ISV ({((config.isv||0.15)*100).toFixed(0)}%) incluido en el total.
-                </div>
-              </div>
-              {/* FOOTER — membrete oficial D&L */}
-              <div style={{marginTop:'auto'}}>
-                <MembreteFooter />
-              </div>
-            </div>
           </div>
         </div>
       </div>
