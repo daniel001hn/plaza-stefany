@@ -1095,6 +1095,7 @@ function DashboardView({
         <div style={{ display: 'grid', gap: '.5rem' }}>
           {perLocal.map((l, i) => (
             <LocalRow key={l.id} l={l} data={pagos[l.id] || {}} tarifaEfectiva={tarifaEfectiva}
+              prevData={prevPagos[l.id] || {}} mesAnterior={MESES_LARGO[(monthIdx + 11) % 12]}
               onClick={() => onOpenPayment(l)} i={i}
               onToggleRenta={() => onTogglePago(l.id, { rentaPagada: !((pagos[l.id] || {}).rentaPagada), fechaRenta: new Date().toISOString().slice(0,10) })}
               onToggleLuz={() => onTogglePago(l.id, { luzPagada: !((pagos[l.id] || {}).luzPagada) })}
@@ -1910,7 +1911,7 @@ function LocalBreakdown({ perLocal }) {
   );
 }
 
-function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggleLuz }) {
+function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick, i, onToggleRenta, onToggleLuz }) {
   const tipoLuz = l.tipoLuz || 'incluido';
   const luzAplica = tipoLuz !== 'incluido';
   const luzCalculable = tipoLuz === 'medidor' ? (l.consumo != null && tarifaEfectiva != null) : true;
@@ -1972,6 +1973,16 @@ function LocalRow({ l, data, tarifaEfectiva, onClick, i, onToggleRenta, onToggle
           )
         ) : (
           <span className="ps-pill ps-pill-na"><span className="ps-pill-dot" />Incluida</span>
+        )}
+        {luzAplica && (
+          <div style={{ marginTop: '.4rem', fontSize: '.7rem', color: '#6E6E78' }}>
+            Luz {mesAnterior}:{' '}
+            {prevData.luzPagada
+              ? <span style={{ color: '#16A34A', fontWeight: 700 }}>✓ pagada</span>
+              : prevData.lecturaActual != null
+                ? <span style={{ color: '#DC2626', fontWeight: 700 }}>○ pendiente</span>
+                : <span style={{ color: '#9CA3AF' }}>sin registrar</span>}
+          </div>
         )}
       </div>
 
