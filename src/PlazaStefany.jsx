@@ -804,6 +804,7 @@ export default function App({ supabase, onLogout }) {
                 prevData: prevPagos[paymentLocal.id] || {},
                 factura, tarifaEfectiva, monthIdx, year,
               });
+              showToast('Recibo de luz descargado — revisá tu carpeta Descargas');
             } catch (e) {
               alert('No se pudo generar el recibo de luz: ' + (e?.message || e));
             }
