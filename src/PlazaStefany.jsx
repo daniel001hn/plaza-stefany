@@ -797,6 +797,7 @@ export default function App({ supabase, onLogout }) {
           onClose={() => setPaymentLocal(null)}
           onSave={async (updates) => { await updatePayment(paymentLocal.id, updates); setPaymentLocal(null); }}
           onGenerateRecibo={async () => {
+            setToast('Generando recibo de luz…');
             try {
               await generarReciboLuzDocx({
                 local: paymentLocal,
@@ -804,9 +805,12 @@ export default function App({ supabase, onLogout }) {
                 prevData: prevPagos[paymentLocal.id] || {},
                 factura, tarifaEfectiva, monthIdx, year,
               });
-              showToast('Recibo de luz descargado — revisá tu carpeta Descargas');
+              setToast('Recibo de luz descargado — revisá tu carpeta Descargas');
+              setTimeout(() => setToast(null), 4000);
             } catch (e) {
-              alert('No se pudo generar el recibo de luz: ' + (e?.message || e));
+              console.error('[Recibo luz] error:', e);
+              setToast('Error al generar recibo: ' + (e?.message || e));
+              setTimeout(() => setToast(null), 12000);
             }
           }}
           onGenerateReciboRenta={() => setReciboRenta({
