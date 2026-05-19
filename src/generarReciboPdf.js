@@ -81,7 +81,9 @@ async function nuevoDoc(subtitulo) {
   const pw = doc.internal.pageSize.getWidth();
   const img = await loadHeaderImg();
   const imgH = pw * HEADER_RATIO;
-  doc.addImage(img, 'PNG', 0, 0, pw, imgH);
+  // compression 'SLOW' = deflate máximo; el membrete es line-art sobre blanco
+  // así que comprime muchísimo y el PDF queda liviano para compartir.
+  doc.addImage(img, 'PNG', 0, 0, pw, imgH, undefined, 'SLOW');
   let y = imgH + 13;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
