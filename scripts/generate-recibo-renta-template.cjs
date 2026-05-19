@@ -140,13 +140,13 @@ function TBL(rows, gridCols, { bordered = true, cellPadV = 140 } = {}) {
 
 const titleXml = P({
   align: 'center',
-  spaceBefore: 110,
-  spaceAfter: 40,
+  spaceBefore: 1300,
+  spaceAfter: 60,
   runs: [{ text: 'PLAZA STEFANY', bold: true, size: 20, color: '333333', spacing: '60' }],
 });
 const subtitleXml = P({
   align: 'center',
-  spaceAfter: 220,
+  spaceAfter: 260,
   runs: [{ text: 'RECIBO DE RENTA', size: 11, color: '555555', spacing: '30' }],
 });
 
@@ -168,8 +168,8 @@ const idTable = TBL(
 
 // Sección DETALLE DE RENTA
 const calcHead = P({
-  spaceBefore: 240,
-  spaceAfter: 70,
+  spaceBefore: 260,
+  spaceAfter: 90,
   bottomBorder: { sz: 12, color: '1E7A8A' },
   runs: [{ text: 'DETALLE DE RENTA', bold: true, size: 11, color: '1E7A8A', spacing: '40' }],
 });
@@ -226,7 +226,7 @@ const calcTable = TBL(
 
 // Nota
 const noteXml = P({
-  spaceBefore: 220,
+  spaceBefore: 260,
   shading: 'FFFBEA',
   leftBorder: { sz: 24, color: 'D4A800' },
   indent: 180,
