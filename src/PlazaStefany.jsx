@@ -15,8 +15,7 @@ import {
 import { DL_LOGO } from './dlLogo';
 import { MembreteHeader, MembreteFooter, MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete';
 import { monthKey } from './keys';
-import { generarReciboLuzDocx } from './generarReciboDocx';
-import { descargarReciboRenta } from './docxRecibo';
+import { generarReciboLuzPdf, generarReciboRentaPdf } from './generarReciboPdf';
 
 const DEFAULT_CONFIG = {
   rentPerM2USD: 29,
@@ -799,11 +798,29 @@ export default function App({ supabase, onLogout }) {
           onGenerateRecibo={async () => {
             setToast('Generando recibo de luz…');
             try {
-              await generarReciboLuzDocx({
-                local: paymentLocal,
-                data: pagos[paymentLocal.id] || {},
-                prevData: prevPagos[paymentLocal.id] || {},
-                factura, tarifaEfectiva, monthIdx, year,
+              const loc = paymentLocal;
+              const dd = pagos[loc.id] || {};
+              const pd = prevPagos[loc.id] || {};
+              const lecturaAnterior = pd.lecturaActual ?? loc.lecturaInicial ?? 0;
+              const lecturaActual = dd.lecturaActual ?? 0;
+              const consumo = lecturaActual - lecturaAnterior;
+              const tarifa = tarifaEfectiva || 0;
+              const montoEnergia = consumo * tarifa;
+              const kWhPlaza = tarifa > 0 ? Math.round((factura?.montoTotal || 0) / tarifa) : 0;
+              await generarReciboLuzPdf({
+                reciboNum: `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(loc.numero || '').padStart(3, '0')}`,
+                inquilino: loc.inquilino || loc.nombre || 'N/A',
+                local: String(loc.numero ?? ''),
+                periodo: `${MESES_LARGO[monthIdx]} ${year}`,
+                fechaEmision: new Date().toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' }),
+                lecturaAnterior: fmt(lecturaAnterior),
+                lecturaActual: fmt(lecturaActual),
+                consumo: fmt(consumo),
+                kWhPlaza: fmt(kWhPlaza),
+                facturaEnee: fmt2(factura?.montoTotal || 0),
+                tarifa: fmt2(tarifa),
+                montoEnergia: fmt2(montoEnergia),
+                total: fmt2(montoEnergia),
               });
               setToast('Recibo de luz descargado — revisá tu carpeta Descargas');
               setTimeout(() => setToast(null), 4000);
@@ -827,7 +844,7 @@ export default function App({ supabase, onLogout }) {
               const fechaEmision = d.fechaRentaPagada
                 ? new Date(d.fechaRentaPagada).toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' })
                 : new Date().toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' });
-              await descargarReciboRenta({
+              await generarReciboRentaPdf({
                 reciboNum: `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-R${String(loc.numero || '').padStart(2, '0')}`,
                 inquilino: loc.inquilino || loc.nombre || 'N/A',
                 local: String(loc.numero ?? ''),

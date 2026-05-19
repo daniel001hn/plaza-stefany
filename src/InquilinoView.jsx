@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { monthKey } from './keys'
 import { MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete'
-import { descargarReciboRenta, descargarReciboLuz } from './docxRecibo'
+import { generarReciboLuzPdf, generarReciboRentaPdf } from './generarReciboPdf'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -313,7 +313,7 @@ export default function InquilinoView({ session, onLogout }) {
     const isv      = config.isv || 0.15
     const isvMonto = base * isv
     const renta    = base * (1 + isv)
-    descargarReciboRenta({
+    generarReciboRentaPdf({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-${String(local?.numero).padStart(3,'0')}`,
       inquilino: session.nombre || local?.inquilino || 'Inquilino',
       local: String(local?.numero ?? ''),
@@ -335,11 +335,10 @@ export default function InquilinoView({ session, onLogout }) {
   // calc = { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza } ya computado en el render
   const generarLuz = (mes, calc) => {
     registrarActividad(mes, 'Luz')
-    descargarReciboLuz({
+    generarReciboLuzPdf({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-L${String(local?.numero).padStart(2,'0')}`,
       inquilino: session.nombre || local?.inquilino || 'Inquilino',
-      local: `Local ${local?.numero ?? ''}`,
-      localNum: String(local?.numero ?? ''),
+      local: String(local?.numero ?? ''),
       periodo: `${MESES[mes.monthIdx]} ${mes.year}`,
       fechaEmision: fechaHoy(),
       lecturaAnterior: fmt0(calc.lecturaAnt || 0),
