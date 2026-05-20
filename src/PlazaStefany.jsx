@@ -1031,6 +1031,7 @@ function DashboardView({
   factura, prevFactura, pagos, prevPagos, tarifaEfectiva,
   onOpenPayment, onEditFactura, onGoConfig, onTogglePago, onReporte,
 }) {
+  const [detalle, setDetalle] = useState(null); // 'total' | 'renta' | 'luz' | 'pendientes'
   const consumoPrincipal = calcConsumoPrincipal(factura, prevFactura);
   const consumoSubmedidores = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
   const areasComunes = consumoPrincipal != null && consumoSubmedidores > 0
@@ -1137,11 +1138,20 @@ function DashboardView({
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <KPI label="Cobrado este mes" value={kpis.totalCobrado} target={kpis.totalEsperado} accent="#1D4ED8" icon={<Wallet size={14} />} big />
-        <KPI label="Renta" value={kpis.cobradoRenta} target={kpis.totalRenta} accent="#1D4ED8" icon={<Receipt size={14} />} />
-        <KPI label="Luz" value={kpis.cobradoLuz} target={kpis.totalLuz} accent="#5AC8FA" icon={<Zap size={14} />} />
-        <KPIPending rentaPend={kpis.pendientesRenta} luzPend={kpis.pendientesLuz} />
+        <KPI label="Cobrado este mes" value={kpis.totalCobrado} target={kpis.totalEsperado} accent="#1D4ED8" icon={<Wallet size={14} />} big onClick={() => setDetalle('total')} />
+        <KPI label="Renta" value={kpis.cobradoRenta} target={kpis.totalRenta} accent="#1D4ED8" icon={<Receipt size={14} />} onClick={() => setDetalle('renta')} />
+        <KPI label="Luz" value={kpis.cobradoLuz} target={kpis.totalLuz} accent="#5AC8FA" icon={<Zap size={14} />} onClick={() => setDetalle('luz')} />
+        <KPIPending rentaPend={kpis.pendientesRenta} luzPend={kpis.pendientesLuz} onClick={() => setDetalle('pendientes')} />
       </div>
+
+      {detalle && (
+        <DetalleCobroModal
+          tipo={detalle} perLocal={perLocal} pagos={pagos}
+          mesLargo={MESES_LARGO[monthIdx]} year={year}
+          onClose={() => setDetalle(null)}
+          onOpenPayment={(l) => { setDetalle(null); onOpenPayment(l); }}
+        />
+      )}
 
       <div className="ps-chart-grid">
         <YearlyChart data={yearChart} year={year} total={yearTotal} />
@@ -1769,10 +1779,21 @@ function FacturaStat({ label, value, sub, accent, highlight }) {
   );
 }
 
-function KPI({ label, value, target, accent, icon, big }) {
+function KPI({ label, value, target, accent, icon, big, onClick }) {
   const pct = target > 0 ? (value / target) * 100 : 0;
+  const clickable = !!onClick;
   return (
-    <div className={big ? 'ps-card-elevated' : 'ps-card'} style={{ padding: '1.1rem 1.25rem' }}>
+    <div
+      onClick={onClick}
+      className={big ? 'ps-card-elevated' : 'ps-card'}
+      style={{
+        padding: '1.1rem 1.25rem',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'transform .12s, box-shadow .12s',
+      }}
+      onMouseEnter={(e) => { if (clickable) e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={(e) => { if (clickable) e.currentTarget.style.transform = ''; }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.6rem' }}>
         <div className="ps-label" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: accent }}>
           {icon} {label}
@@ -1789,7 +1810,7 @@ function KPI({ label, value, target, accent, icon, big }) {
         {fmt(value)}
       </div>
       <div className="ps-mono" style={{ fontSize: '.72rem', color: '#6E6E78', marginBottom: '.7rem' }}>
-        de L {fmt(target)}
+        de L {fmt(target)} {clickable && <span style={{ marginLeft: '.4rem', color: '#8E8E96' }}>· ver detalle →</span>}
       </div>
       <div className="ps-bar-bg">
         <div className="ps-bar-fill" style={{ width: `${pct}%`, background: accent, boxShadow: `0 0 8px ${accent}66` }} />
@@ -1798,10 +1819,21 @@ function KPI({ label, value, target, accent, icon, big }) {
   );
 }
 
-function KPIPending({ rentaPend, luzPend }) {
+function KPIPending({ rentaPend, luzPend, onClick }) {
   const total = rentaPend + luzPend;
+  const clickable = !!onClick && total > 0;
   return (
-    <div className="ps-card" style={{ padding: '1.1rem 1.25rem' }}>
+    <div
+      onClick={clickable ? onClick : undefined}
+      className="ps-card"
+      style={{
+        padding: '1.1rem 1.25rem',
+        cursor: clickable ? 'pointer' : 'default',
+        transition: 'transform .12s',
+      }}
+      onMouseEnter={(e) => { if (clickable) e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseLeave={(e) => { if (clickable) e.currentTarget.style.transform = ''; }}
+    >
       <div className="ps-label" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: '#8B5CF6', marginBottom: '.6rem' }}>
         <AlertCircle size={14} /> Pendientes
       </div>
@@ -1812,6 +1844,121 @@ function KPIPending({ rentaPend, luzPend }) {
         {rentaPend > 0 && <span className="ps-pill ps-pill-pending"><span className="ps-pill-dot" />{rentaPend} renta</span>}
         {luzPend > 0 && <span className="ps-pill ps-pill-pending"><span className="ps-pill-dot" />{luzPend} luz</span>}
         {total === 0 && <span className="ps-pill ps-pill-paid"><span className="ps-pill-dot" />Todo al día</span>}
+      </div>
+      {clickable && <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.5rem' }}>ver detalle →</div>}
+    </div>
+  );
+}
+
+function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onOpenPayment }) {
+  const titulos = {
+    total: { label: 'Total cobrado', icon: '💰', accent: '#1D4ED8' },
+    renta: { label: 'Renta', icon: '🧾', accent: '#1D4ED8' },
+    luz: { label: 'Luz', icon: '⚡', accent: '#0EA5E9' },
+    pendientes: { label: 'Pendientes de pago', icon: '⏳', accent: '#FF9F0A' },
+  };
+  const t = titulos[tipo] || titulos.total;
+
+  const rows = perLocal
+    .filter(l => {
+      if (!l.inquilino) return false;
+      if (tipo === 'pendientes') {
+        const d = pagos[l.id] || {};
+        const debeRenta = !d.rentaPagada && l.renta > 0;
+        const debeLuz = !d.luzPagada && l.luz > 0;
+        return debeRenta || debeLuz;
+      }
+      return true;
+    })
+    .map(l => {
+      const d = pagos[l.id] || {};
+      return { ...l, rentaPagada: !!d.rentaPagada, luzPagada: !!d.luzPagada, fechaRenta: d.fechaRenta, fechaLuz: d.fechaLuz };
+    });
+
+  const sumCobrado = rows.reduce((s, r) => s + (tipo === 'renta' ? (r.rentaPagada ? r.renta : 0) : tipo === 'luz' ? (r.luzPagada ? r.luz : 0) : r.cobrado), 0);
+  const sumTotal = rows.reduce((s, r) => s + (tipo === 'renta' ? r.renta : tipo === 'luz' ? r.luz : r.total), 0);
+
+  return (
+    <div className="ps-modal-backdrop" onClick={onClose}>
+      <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem', maxWidth: 580 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+          <div>
+            <div className="ps-eyebrow" style={{ color: t.accent, marginBottom: '.25rem' }}>{t.icon} {t.label.toUpperCase()} · {mesLargo} {year}</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>{tipo === 'pendientes' ? 'A cobrar todavía' : 'Estado por local'}</div>
+          </div>
+          <button onClick={onClose} className="ps-btn-icon"><X size={16} /></button>
+        </div>
+
+        <div className="ps-divider-soft" style={{ marginBottom: '1rem' }} />
+
+        {rows.length === 0 ? (
+          <div style={{ padding: '2rem 0', textAlign: 'center', color: '#6E6E78', fontSize: '.9rem' }}>
+            {tipo === 'pendientes' ? '✅ No hay pagos pendientes este mes.' : 'No hay locales con inquilino.'}
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gap: '.5rem', marginBottom: '1rem' }}>
+              {rows.map(r => {
+                const monto = tipo === 'renta' ? r.renta : tipo === 'luz' ? r.luz : r.total;
+                const pagado = tipo === 'renta' ? r.rentaPagada : tipo === 'luz' ? r.luzPagada : (r.rentaPagada && r.luzPagada);
+                const fecha = tipo === 'renta' ? r.fechaRenta : tipo === 'luz' ? r.fechaLuz : null;
+                return (
+                  <div key={r.id}
+                    onClick={() => onOpenPayment && onOpenPayment(r)}
+                    style={{
+                      padding: '.7rem .9rem',
+                      background: 'rgba(255,255,255,0.85)',
+                      border: '1px solid rgba(0,0,0,0.06)',
+                      borderRadius: 8, cursor: onOpenPayment ? 'pointer' : 'default',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.8rem',
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '.88rem', fontWeight: 600, color: '#1C1C1E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        L{r.numero} · {r.inquilino}
+                      </div>
+                      <div style={{ fontSize: '.72rem', color: '#6E6E78', marginTop: '.15rem' }}>
+                        {tipo === 'pendientes' ? (
+                          <>
+                            {!r.rentaPagada && r.renta > 0 && <span>Renta L {fmt(r.renta)}</span>}
+                            {!r.rentaPagada && !r.luzPagada && r.renta > 0 && r.luz > 0 && ' · '}
+                            {!r.luzPagada && r.luz > 0 && <span>Luz L {fmt(r.luz)}</span>}
+                          </>
+                        ) : pagado ? (
+                          <span style={{ color: '#1A7F35' }}>✓ Pagado{fecha ? ` el ${fecha}` : ''}</span>
+                        ) : (
+                          <span style={{ color: '#B25800' }}>⏳ Pendiente</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="ps-mono" style={{ fontSize: '.92rem', fontWeight: 700, color: pagado ? '#1A7F35' : '#1C1C1E', whiteSpace: 'nowrap' }}>
+                      L {fmt(monto)}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div style={{
+              padding: '.8rem 1rem', background: 'rgba(99,102,241,0.06)',
+              border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+            }}>
+              <div style={{ fontSize: '.78rem', color: '#6E6E78', fontWeight: 500 }}>
+                {tipo === 'pendientes' ? 'Total pendiente' : 'Cobrado / Esperado'}
+              </div>
+              <div className="ps-mono" style={{ fontSize: '1.05rem', fontWeight: 700, color: '#1C1C1E' }}>
+                {tipo === 'pendientes'
+                  ? <>L {fmt(sumTotal - sumCobrado)}</>
+                  : <>L {fmt(sumCobrado)} <span style={{ color: '#6E6E78', fontWeight: 500 }}>/ L {fmt(sumTotal)}</span></>}
+              </div>
+            </div>
+          </>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
+          <button onClick={onClose} className="ps-btn-ghost">Cerrar</button>
+        </div>
       </div>
     </div>
   );
@@ -3042,6 +3189,7 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }
     tipoLuz: locale.tipoLuz || 'medidor',
     lecturaInicial: locale.lecturaInicial ?? '',
     luzFija: locale.luzFija ?? '',
+    contratoDesde: locale.contratoDesde || '',
   });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
@@ -3051,6 +3199,7 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }
       ...f, m2: Number(f.m2),
       lecturaInicial: f.lecturaInicial === '' ? null : Number(f.lecturaInicial),
       luzFija: f.luzFija === '' ? null : Number(f.luzFija),
+      contratoDesde: f.contratoDesde || null,
     });
   };
 
@@ -3091,6 +3240,17 @@ function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }
             <input className="ps-input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} placeholder="DSD, Salón María, etc." />
           </Field>
         </div>
+
+        {f.inquilino && (
+          <div style={{ marginBottom: '.85rem' }}>
+            <Field label="Inicio del contrato (el inquilino verá solo desde este mes)">
+              <input type="date" className="ps-input" value={f.contratoDesde} onChange={(e) => set('contratoDesde', e.target.value)} />
+            </Field>
+            <div style={{ fontSize: '.72rem', color: '#6E6E78', marginTop: '.35rem' }}>
+              Si lo dejás vacío, el inquilino ve los 12 meses del año actual (algunos vacíos). Poner una fecha esconde los meses anteriores en su vista.
+            </div>
+          </div>
+        )}
 
         <div style={{ marginBottom: '.85rem' }}>
           <div className="ps-label" style={{ marginBottom: '.4rem' }}>Tipo de cobro de luz</div>
