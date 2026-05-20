@@ -1,119 +1,118 @@
-// Vercel serverless function: obtiene la tasa de cambio USD/HNL (venta)
-// publicada por BAC Honduras en el header de su banca en línea pública,
-// y la guarda en Supabase (kv_store, clave config-and-locales).
+// Vercel Edge Function: obtiene la tasa de cambio USD/HNL (venta).
 //
-// Endpoints usados (todos públicos, sin login):
-//   GET https://www.sucursalelectronica.com/redir/showLogin.go  (set session cookies)
-//   GET https://www.sucursalelectronica.com/ebac/common/GetExchangeRateInfo.go (JSON)
+// Fuente principal: BAC Honduras (banca en línea, header público "Tipo de Cambio")
+//   GET https://www.sucursalelectronica.com/ebac/common/GetExchangeRateInfo.go
+// Fallback: open.er-api.com (forex genérico, ~0.3% off del oficial)
+//   GET https://open.er-api.com/v6/latest/USD
 //
-// Variables de entorno requeridas (en Vercel):
-//   SUPABASE_URL                 (o reusa VITE_SUPABASE_URL)
-//   SUPABASE_SERVICE_ROLE_KEY    (NO la anon — necesita permisos de write)
+// Corre como Edge Function (no Node) — distinto egress, fetch nativo, evita
+// el bloqueo de Akamai sobre IPs de data centers tradicionales de Vercel.
 //
-// Cron: ver vercel.json (corre 1×/día). El front-end también puede llamarlo
-// con ?dryRun=1 para previsualizar sin escribir a DB.
+// Env vars (en Vercel):
+//   SUPABASE_URL  (o VITE_SUPABASE_URL)
+//   SUPABASE_SERVICE_ROLE_KEY  (la "secret" — NO la anon)
+//
+// Cron diario: ver vercel.json. Front-end llama con ?dryRun=1 para preview.
 
 import { createClient } from '@supabase/supabase-js';
-import https from 'https';
-import zlib from 'zlib';
+
+export const config = { runtime: 'edge' };
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-function fetchUrl(url, cookies = '') {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = https.request({
-      hostname: u.hostname,
-      path: u.pathname + u.search,
-      method: 'GET',
+async function fromBac() {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 7000);
+  try {
+    const r = await fetch('https://www.sucursalelectronica.com/ebac/common/GetExchangeRateInfo.go', {
       headers: {
         'User-Agent': UA,
-        'Accept': 'application/json, text/html;q=0.9, */*;q=0.8',
-        'Accept-Language': 'es-HN,es;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate',
-        'Cookie': cookies,
+        'Accept': 'application/json, */*',
+        'Accept-Language': 'es-HN,es;q=0.9',
         'Referer': 'https://www.sucursalelectronica.com/redir/showLogin.go',
       },
-      timeout: 9000,
-    }, (res) => {
-      const sc = res.headers['set-cookie'] || [];
-      const newCookies = sc.map((c) => c.split(';')[0]).join('; ');
-      const chunks = [];
-      res.on('data', (c) => chunks.push(c));
-      res.on('end', () => {
-        let buf = Buffer.concat(chunks);
-        try {
-          if (res.headers['content-encoding'] === 'gzip') buf = zlib.gunzipSync(buf);
-          else if (res.headers['content-encoding'] === 'deflate') buf = zlib.inflateSync(buf);
-        } catch {}
-        resolve({ status: res.statusCode, cookies: newCookies, body: buf.toString('utf8') });
-      });
+      signal: ctrl.signal,
     });
-    req.on('error', reject);
-    req.on('timeout', () => req.destroy(new Error('timeout')));
-    req.end();
-  });
+    if (!r.ok) throw new Error('status ' + r.status);
+    const data = await r.json();
+    const hn = (data.USD || []).find((x) => x.country_code === 'HN');
+    if (!hn) throw new Error('HN/USD no encontrado');
+    return { source: 'BAC', sell: Number(hn.sell), buy: Number(hn.buy) };
+  } finally {
+    clearTimeout(t);
+  }
 }
 
-async function getBacRate() {
-  // El endpoint responde sin sesión — el header "Tipo de Cambio" del login
-  // de BAC lo consume directo sin cookies. Probado: ~300ms.
-  const r = await fetchUrl('https://www.sucursalelectronica.com/ebac/common/GetExchangeRateInfo.go');
-  if (r.status !== 200) throw new Error('BAC endpoint status ' + r.status);
-  const data = JSON.parse(r.body);
-  const hn = (data.USD || []).find((x) => x.country_code === 'HN');
-  if (!hn) throw new Error('No se encontró el registro HN/USD');
-  return { buy: Number(hn.buy), sell: Number(hn.sell) };
-}
-
-export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
+async function fromForex() {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 7000);
   try {
-    const rate = await getBacRate();
+    const r = await fetch('https://open.er-api.com/v6/latest/USD', { signal: ctrl.signal });
+    if (!r.ok) throw new Error('status ' + r.status);
+    const data = await r.json();
+    const hnl = data?.rates?.HNL;
+    if (!hnl) throw new Error('HNL rate no encontrado');
+    return { source: 'open.er-api', sell: Number(hnl), buy: Number(hnl) };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function getRate() {
+  const errors = [];
+  for (const fn of [fromBac, fromForex]) {
+    try { return await fn(); } catch (e) { errors.push(fn.name + ': ' + (e.message || e)); }
+  }
+  throw new Error('Todas las fuentes fallaron — ' + errors.join(' | '));
+}
+
+export default async function handler(req) {
+  const url = new URL(req.url);
+  const dryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true';
+  const today = new Date().toISOString().slice(0, 10);
+
+  try {
+    const rate = await getRate();
     const sell = Math.round(rate.sell * 10000) / 10000;
     const buy = Math.round(rate.buy * 10000) / 10000;
-    const today = new Date().toISOString().slice(0, 10);
-    const dryRun = req.query?.dryRun === '1' || req.query?.dryRun === 'true';
 
     if (dryRun) {
-      return res.status(200).json({ ok: true, source: 'BAC', sell, buy, fecha: today, persisted: false });
+      return new Response(JSON.stringify({ ok: true, source: rate.source, sell, buy, fecha: today, persisted: false }), {
+        status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+      });
     }
 
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new Error('Faltan env vars SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
+    const supaUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+    const supaKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supaUrl || !supaKey) throw new Error('Faltan env vars SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
 
-    const supabase = createClient(url, key, { auth: { persistSession: false } });
+    const supabase = createClient(supaUrl, supaKey, { auth: { persistSession: false } });
 
     const { data: row, error: getErr } = await supabase
-      .from('kv_store')
-      .select('value')
-      .eq('key', 'config-and-locales')
-      .maybeSingle();
+      .from('kv_store').select('value').eq('key', 'config-and-locales').maybeSingle();
     if (getErr) throw getErr;
 
     const current = row?.value
       ? (typeof row.value === 'string' ? JSON.parse(row.value) : row.value)
       : { config: {}, locales: [] };
-
     const newConfig = {
       ...(current.config || {}),
-      tasaCambio: sell,
-      tasaFechaActualizada: today,
-      tasaFuente: 'BAC',
+      tasaCambio: sell, tasaFechaActualizada: today, tasaFuente: rate.source,
     };
     const next = { ...current, config: newConfig };
 
-    const { error: setErr } = await supabase
-      .from('kv_store')
-      .upsert(
-        { key: 'config-and-locales', value: next, updated_at: new Date().toISOString() },
-        { onConflict: 'key' }
-      );
+    const { error: setErr } = await supabase.from('kv_store').upsert(
+      { key: 'config-and-locales', value: next, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
     if (setErr) throw setErr;
 
-    return res.status(200).json({ ok: true, source: 'BAC', sell, buy, fecha: today, persisted: true });
+    return new Response(JSON.stringify({ ok: true, source: rate.source, sell, buy, fecha: today, persisted: true }), {
+      status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: e.message || String(e) });
+    return new Response(JSON.stringify({ ok: false, error: e.message || String(e) }), {
+      status: 500, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
   }
 }
