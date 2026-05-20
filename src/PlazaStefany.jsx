@@ -1167,10 +1167,7 @@ function DashboardView({
         />
       )}
 
-      <div className="ps-chart-grid">
-        <YearlyChart data={yearChart} year={year} total={yearTotal} filtro={chartFiltro} onFiltroChange={setChartFiltro} />
-        <LocalBreakdown perLocal={perLocal} />
-      </div>
+      <YearlyChart data={yearChart} year={year} total={yearTotal} filtro={chartFiltro} onFiltroChange={setChartFiltro} />
 
       {/* ── ALERTAS DE ACTIVIDAD DE INQUILINOS ── */}
       <ActividadInquilinos pagos={pagos} locales={locales} monthIdx={monthIdx} year={year} />
@@ -2142,46 +2139,6 @@ function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
       </div>
     </div>
   )
-}
-
-function LocalBreakdown({ perLocal }) {
-  const max = Math.max(...perLocal.map((l) => l.total), 1);
-  return (
-    <div className="ps-card" style={{ padding: '1.25rem' }}>
-      <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}><Activity size={10} /> POR LOCAL</div>
-      <div style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '1rem' }}>Cobranza del mes</div>
-
-      <div style={{ display: 'grid', gap: '.85rem' }}>
-        {perLocal.map((l) => {
-          const pctTotal = (l.total / max) * 100;
-          const pctCobrado = l.total > 0 ? (l.cobrado / l.total) * 100 : 0;
-          return (
-            <div key={l.id}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.3rem', fontSize: '.78rem' }}>
-                <span style={{ fontWeight: 500 }}>
-                  {l.numero} <span style={{ color: '#6E6E78' }}>· {l.inquilino || 'Sin asignar'}</span>
-                </span>
-                <span className="ps-mono" style={{ color: l.cobrado >= l.total && l.total > 0 ? '#6366F1' : '#1C1C1E' }}>
-                  L {fmt(l.cobrado)}<span style={{ color: '#6E6E78' }}> / {fmt(l.total)}</span>
-                </span>
-              </div>
-              <div style={{
-                position: 'relative', height: 8, background: 'rgba(255,255,255,0.75)', borderRadius: 4, overflow: 'hidden',
-                width: `${pctTotal}%`, minWidth: 4,
-              }}>
-                <div style={{
-                  position: 'absolute', inset: 0, width: `${pctCobrado}%`,
-                  background: pctCobrado >= 100 ? '#6366F1' : 'linear-gradient(90deg, #1D4ED8, #7C3AED)',
-                  transition: 'width .6s cubic-bezier(0.16, 1, 0.3, 1)',
-                  boxShadow: pctCobrado >= 100 ? '0 0 8px rgba(132, 248, 65, 0.5)' : 'none',
-                }} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick, i, onToggleRenta, onToggleLuz }) {
