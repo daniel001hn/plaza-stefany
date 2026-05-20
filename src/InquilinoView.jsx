@@ -189,6 +189,19 @@ export default function InquilinoView({ session, onLogout }) {
   const [loading, setLoading] = useState(true)
   const today = new Date()
 
+  // Ventana de recibos en la web: del día 1 al 7 del mes. Fuera de esa ventana,
+  // los inquilinos deben usar la app móvil (que jala la tasa BAC en vivo) o
+  // pedir el recibo por WhatsApp al admin. Si estamos corriendo dentro de
+  // Capacitor (la futura app nativa), no hay límite.
+  const DIA_LIMITE_WEB = 7
+  const esAppNativa = typeof window !== 'undefined' && (window.Capacitor?.isNativePlatform?.() || !!window.cordova)
+  const dentroVentanaWeb = esAppNativa || today.getDate() <= DIA_LIMITE_WEB
+  const TEL_ADMIN_WSP = '50494628618'
+  const wspText = (asunto) => encodeURIComponent(
+    `Hola William, soy ${session?.nombre || local?.inquilino || 'inquilino'} del local ${local?.numero || ''}. Necesito mi ${asunto} de ${MESES[today.getMonth()]} ${today.getFullYear()}.`
+  )
+  const wspUrl = (asunto = 'recibo') => `https://wa.me/${TEL_ADMIN_WSP}?text=${wspText(asunto)}`
+
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -305,6 +318,12 @@ export default function InquilinoView({ session, onLogout }) {
   }
 
   const generarRenta = (mes) => {
+    if (!dentroVentanaWeb) {
+      if (confirm(`Los recibos en la web solo están disponibles del 1 al ${DIA_LIMITE_WEB} de cada mes.\n\n¿Querés solicitarlo por WhatsApp al admin?`)) {
+        window.open(wspUrl('recibo de renta'), '_blank')
+      }
+      return
+    }
     registrarActividad(mes, 'Renta')
     // Usar tasa congelada del día que el admin marcó como pagado, si existe
     const tasaUsada = mes.data.tasaCambioCongelado || config.tasaCambio || 25
@@ -334,6 +353,12 @@ export default function InquilinoView({ session, onLogout }) {
 
   // calc = { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza } ya computado en el render
   const generarLuz = (mes, calc) => {
+    if (!dentroVentanaWeb) {
+      if (confirm(`Los recibos en la web solo están disponibles del 1 al ${DIA_LIMITE_WEB} de cada mes.\n\n¿Querés solicitarlo por WhatsApp al admin?`)) {
+        window.open(wspUrl('recibo de luz'), '_blank')
+      }
+      return
+    }
     registrarActividad(mes, 'Luz')
     generarReciboLuzPdf({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-L${String(local?.numero).padStart(2,'0')}`,
@@ -378,6 +403,16 @@ export default function InquilinoView({ session, onLogout }) {
           <div style={{fontSize:'2rem',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>L {fmt(renta)}</div>
           <div style={{fontSize:'.75rem',color:'#888',marginTop:'.2rem'}}>{local?.m2} m² × ${config.rentPerM2USD||29} × L {config.tasaCambio||25} + ISV {((config.isv||0.15)*100).toFixed(0)}%</div>
         </div>
+
+        {!dentroVentanaWeb && (
+          <div className="glass" style={{padding:'1rem 1.2rem',marginBottom:'1rem',background:'rgba(255,193,7,0.10)',border:'1px solid rgba(255,193,7,0.40)'}}>
+            <div style={{fontSize:'.68rem',fontWeight:700,color:'#B86E00',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'.35rem'}}>⚠️ Recibos fuera de ventana web</div>
+            <div style={{fontSize:'.8rem',color:'#5C4400',lineHeight:1.45,marginBottom:'.6rem'}}>
+              En la web, los recibos solo se descargan del día <b>1 al {DIA_LIMITE_WEB}</b> de cada mes. Para descargarlos en cualquier momento, usá la <b>app móvil</b> o solicitalos por WhatsApp.
+            </div>
+            <a href={wspUrl('recibo')} target="_blank" rel="noopener noreferrer" className="btn-r" style={{textDecoration:'none',display:'inline-block'}}>📱 Solicitar por WhatsApp</a>
+          </div>
+        )}
 
         <div style={{fontSize:'.67rem',fontWeight:600,color:'rgba(60,60,70,.55)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.6rem',paddingLeft:'.2rem'}}>Historial de pagos</div>
 
