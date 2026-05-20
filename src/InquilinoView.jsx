@@ -189,13 +189,15 @@ export default function InquilinoView({ session, onLogout }) {
   const [loading, setLoading] = useState(true)
   const today = new Date()
 
-  // Ventana de recibos en la web: del día 1 al 7 del mes. Fuera de esa ventana,
-  // los inquilinos deben usar la app móvil (que jala la tasa BAC en vivo) o
-  // pedir el recibo por WhatsApp al admin. Si estamos corriendo dentro de
-  // Capacitor (la futura app nativa), no hay límite.
-  const DIA_LIMITE_WEB = 7
+  // Recibos en la web: el cron de Vercel actualiza la tasa de cambio cada día,
+  // así que normalmente están siempre disponibles. SOLO bloqueamos cuando la
+  // tasa no se actualizó hoy (cron falló, o problema con la fuente). En ese
+  // caso, el inquilino usa la app nativa (que fetchea la tasa en vivo desde el
+  // celular, sin depender del cron) o solicita el recibo por WhatsApp.
   const esAppNativa = typeof window !== 'undefined' && (window.Capacitor?.isNativePlatform?.() || !!window.cordova)
-  const dentroVentanaWeb = esAppNativa || today.getDate() <= DIA_LIMITE_WEB
+  const hoyISO = today.toISOString().slice(0, 10)
+  const tasaFreshHoy = config?.tasaFechaActualizada === hoyISO
+  const dentroVentanaWeb = esAppNativa || tasaFreshHoy
   const TEL_ADMIN_WSP = '50494628618'
   const wspText = (asunto) => encodeURIComponent(
     `Hola William, soy ${session?.nombre || local?.inquilino || 'inquilino'} del local ${local?.numero || ''}. Necesito mi ${asunto} de ${MESES[today.getMonth()]} ${today.getFullYear()}.`
@@ -319,7 +321,7 @@ export default function InquilinoView({ session, onLogout }) {
 
   const generarRenta = (mes) => {
     if (!dentroVentanaWeb) {
-      if (confirm(`Los recibos en la web solo están disponibles del 1 al ${DIA_LIMITE_WEB} de cada mes.\n\n¿Querés solicitarlo por WhatsApp al admin?`)) {
+      if (confirm('Recibo no disponible en la web — la tasa de cambio del día todavía no se actualizó.\n\nDescargá la app móvil o solicitalo por WhatsApp al admin.\n\n¿Abrir WhatsApp ahora?')) {
         window.open(wspUrl('recibo de renta'), '_blank')
       }
       return
@@ -354,7 +356,7 @@ export default function InquilinoView({ session, onLogout }) {
   // calc = { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza } ya computado en el render
   const generarLuz = (mes, calc) => {
     if (!dentroVentanaWeb) {
-      if (confirm(`Los recibos en la web solo están disponibles del 1 al ${DIA_LIMITE_WEB} de cada mes.\n\n¿Querés solicitarlo por WhatsApp al admin?`)) {
+      if (confirm('Recibo no disponible en la web — la tasa de cambio del día todavía no se actualizó.\n\nDescargá la app móvil o solicitalo por WhatsApp al admin.\n\n¿Abrir WhatsApp ahora?')) {
         window.open(wspUrl('recibo de luz'), '_blank')
       }
       return
@@ -406,9 +408,9 @@ export default function InquilinoView({ session, onLogout }) {
 
         {!dentroVentanaWeb && (
           <div className="glass" style={{padding:'1rem 1.2rem',marginBottom:'1rem',background:'rgba(255,193,7,0.10)',border:'1px solid rgba(255,193,7,0.40)'}}>
-            <div style={{fontSize:'.68rem',fontWeight:700,color:'#B86E00',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'.35rem'}}>⚠️ Recibos fuera de ventana web</div>
-            <div style={{fontSize:'.8rem',color:'#5C4400',lineHeight:1.45,marginBottom:'.6rem'}}>
-              En la web, los recibos solo se descargan del día <b>1 al {DIA_LIMITE_WEB}</b> de cada mes. Para descargarlos en cualquier momento, usá la <b>app móvil</b> o solicitalos por WhatsApp.
+            <div style={{fontSize:'.68rem',fontWeight:700,color:'#B86E00',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:'.35rem'}}>⚠️ Recibo no disponible en la web</div>
+            <div style={{fontSize:'.8rem',color:'#5C4400',lineHeight:1.45,marginBottom:'.7rem'}}>
+              La tasa de cambio del día todavía no fue actualizada. Descargá la <b>app móvil</b> (siempre disponible) o solicitá tu recibo por WhatsApp al admin.
             </div>
             <a href={wspUrl('recibo')} target="_blank" rel="noopener noreferrer" className="btn-r" style={{textDecoration:'none',display:'inline-block'}}>📱 Solicitar por WhatsApp</a>
           </div>
