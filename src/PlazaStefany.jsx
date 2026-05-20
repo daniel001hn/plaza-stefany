@@ -935,7 +935,7 @@ export default function App({ supabase, onLogout }) {
       )}
 
       {editingFactura && (
-        <FacturaModal factura={factura} prevFactura={prevFactura} monthIdx={monthIdx} year={year} config={config}
+        <FacturaModal factura={factura} prevFactura={prevFactura} monthIdx={monthIdx} year={year} config={config} locales={locales} pagos={pagos} prevPagos={prevPagos}
           onClose={() => setEditingFactura(false)} onSave={updateFactura}
         />
       )}
@@ -2065,7 +2065,7 @@ function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick
 // =================================================================
 // FACTURA MODAL
 // =================================================================
-function FacturaModal({ factura, prevFactura, monthIdx, year, config, onClose, onSave }) {
+function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, pagos, prevPagos, onClose, onSave }) {
   const [form, setForm] = useState({
     montoTotal: factura.montoTotal ?? '',
     lecturaPrincipal: factura.lecturaPrincipal ?? '',
@@ -2083,10 +2083,12 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, onClose, o
   const consumo = (form.lecturaPrincipal !== '' && lecturaAnt != null && !isNaN(Number(lecturaAnt)))
     ? Number(form.lecturaPrincipal) - Number(lecturaAnt) : null;
   const cargosFijosTotal = (Number(form.cargoComercializacion) || 0) + (Number(form.cargoRegulacion) || 0) + (Number(form.alumbradoPublico) || 0);
-  // Validación: no permitir guardar sin monto, sin cargos fijos completos, ni lectura
+  // Auditoría: comparar consumo del medidor principal vs suma de submedidores
+  const sumSubmedidores = calcTotalKwhSubmedidores(locales || [], pagos || {}, prevPagos || {});
+  const diff = (consumo != null) ? consumo - sumSubmedidores : null;
+  // Validación: el monto y los cargos fijos son obligatorios. La lectura principal es opcional (solo auditoría).
   const camposObligatorios = (
     form.montoTotal !== '' && Number(form.montoTotal) > 0 &&
-    form.lecturaPrincipal !== '' &&
     form.cargoComercializacion !== '' && form.cargoRegulacion !== '' && form.alumbradoPublico !== ''
   );
 
@@ -2137,29 +2139,44 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, onClose, o
             onChange={(e) => set('montoTotal', e.target.value)} placeholder="11602.05" />
         </div>
 
-        <div style={{
-          background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.65rem .85rem',
-          borderRadius: 8, marginBottom: '.85rem', fontSize: '.78rem', color: '#8E8E96',
-          display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.4rem',
-        }}>
-          <span>Lectura anterior del medidor principal:</span>
-          <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>
-            {lecturaAnt != null ? lecturaAnt : '— sin registro previo'}
-          </span>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginBottom: '.85rem' }}>
-          <div>
-            <div className="ps-label" style={{ marginBottom: '.3rem' }}>Lectura actual</div>
-            <input type="number" className="ps-input ps-mono" value={form.lecturaPrincipal}
-              onChange={(e) => set('lecturaPrincipal', e.target.value)} placeholder="13057" />
+        <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '.9rem', marginBottom: '.85rem' }}>
+          <div className="ps-label" style={{ marginBottom: '.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Medidor principal del edificio (opcional, solo para auditoría)</span>
+            {consumo != null && (
+              <span style={{ color: '#8E8E96', fontWeight: 500, fontSize: '.7rem' }}>
+                Consumo edificio: <b style={{ color: consumo < 0 ? '#FF5C5C' : '#1C1C1E' }}>{consumo} kWh</b>
+              </span>
+            )}
           </div>
-          <div>
-            <div className="ps-label" style={{ marginBottom: '.3rem' }}>Consumo</div>
-            <div className="ps-input ps-mono" style={{ background: 'rgba(255,255,255,0.75)', color: consumo < 0 ? '#FF5C5C' : '#6366F1', fontWeight: 600 }}>
-              {consumo != null ? `${consumo} kWh` : '—'}
+          <div style={{
+            background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.55rem .85rem',
+            borderRadius: 8, marginBottom: '.5rem', fontSize: '.74rem', color: '#8E8E96',
+            display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.4rem',
+          }}>
+            <span>Lectura anterior del medidor principal:</span>
+            <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>
+              {lecturaAnt != null ? lecturaAnt : '— sin registro previo'}
+            </span>
+          </div>
+          <input type="number" className="ps-input ps-mono" value={form.lecturaPrincipal}
+            onChange={(e) => set('lecturaPrincipal', e.target.value)} placeholder="Lectura actual (ej. 13057)" />
+          {consumo != null && sumSubmedidores > 0 && (
+            <div style={{
+              marginTop: '.5rem', padding: '.55rem .8rem', borderRadius: 8, fontSize: '.74rem',
+              background: Math.abs(diff) < 50 ? 'rgba(52,199,89,0.10)' : 'rgba(255,193,7,0.10)',
+              border: '1px solid ' + (Math.abs(diff) < 50 ? 'rgba(52,199,89,0.35)' : 'rgba(255,193,7,0.35)'),
+              color: Math.abs(diff) < 50 ? '#1A7F35' : '#8B5A00',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Consumo edificio (medidor principal):</span><b className="ps-mono">{consumo} kWh</b></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Suma de submedidores de locales:</span><b className="ps-mono">{sumSubmedidores} kWh</b></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid currentColor', paddingTop: '.25rem', marginTop: '.25rem', opacity: .85 }}>
+                <span>Áreas comunes / no medido:</span><b className="ps-mono">{diff} kWh</b>
+              </div>
+              {Math.abs(diff) >= 50 && (
+                <div style={{ marginTop: '.3rem', fontSize: '.7rem' }}>⚠️ Diferencia alta. Revisá lecturas de submedidores o si hay consumo no medido (pasillos, bomba, etc.)</div>
+              )}
             </div>
-          </div>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginBottom: '.85rem' }}>
