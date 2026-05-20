@@ -204,23 +204,23 @@ const STYLES = `
   background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.9) 40%, rgba(255,255,255,0.9) 60%, transparent 100%);
 }
 
-/* ── GLASS CARD ELEVATED (dark, for modals/toolbars) ── */
+/* ── GLASS CARD ELEVATED (light, mas opaco que ps-card para destacar) ── */
 .ps-card-elevated {
-  background: rgba(28, 28, 32, 0.72);
+  background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 18px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.08);
-  color: #F2F2F7;
+  box-shadow: 0 12px 36px rgba(99, 102, 241, 0.10), 0 2px 8px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,1);
+  color: #1C1C1E;
 }
 .ps-card-elevated::before {
   content: '';
   position: absolute;
   top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,1), transparent);
 }
 
 /* ── HOVER CARDS ── */
