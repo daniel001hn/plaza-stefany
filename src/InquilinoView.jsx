@@ -181,12 +181,12 @@ body{margin:0;font-family:'Geist',-apple-system,sans-serif;-webkit-font-smoothin
   radial-gradient(ellipse 50% 60% at 70% 85%,rgba(20,184,166,.2) 0%,transparent 55%),#EEF0F8;
   background-attachment:fixed;min-height:100vh}
 .glass{background:rgba(255,255,255,.55);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid rgba(255,255,255,.65);border-radius:18px;box-shadow:0 2px 20px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.8)}
-.pill-g{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600;background:rgba(52,199,89,.15);color:#1A7F35;border:1px solid rgba(52,199,89,.3)}
-.pill-o{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600;background:rgba(255,159,10,.15);color:#B25800;border:1px solid rgba(255,159,10,.3)}
-.pill-x{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600;background:rgba(120,120,130,.1);color:#666;border:1px solid rgba(120,120,130,.2)}
+.pill-g{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600;background:rgba(52,199,89,.18);color:#1A7F35;border:1px solid rgba(52,199,89,.38)}
+.pill-o{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600;background:rgba(255,159,10,.18);color:#B25800;border:1px solid rgba(255,159,10,.38)}
+.pill-x{display:inline-flex;align-items:center;gap:.3rem;padding:.2rem .55rem;border-radius:999px;font-size:.72rem;font-weight:600;background:rgba(110,110,120,.15);color:#5A5A64;border:1px solid rgba(110,110,120,.28)}
 .dg{width:6px;height:6px;border-radius:50%;background:#34C759;box-shadow:0 0 6px #34C759}
 .do{width:6px;height:6px;border-radius:50%;background:#FF9F0A;box-shadow:0 0 6px #FF9F0A}
-.dx{width:6px;height:6px;border-radius:50%;background:#999}
+.dx{width:6px;height:6px;border-radius:50%;background:#8E8E96}
 .btn-r{background:linear-gradient(135deg,#6366F1,#8B5CF6);color:white;border:none;border-radius:10px;padding:.55rem 1rem;font-weight:600;font-size:.8rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:.35rem;box-shadow:0 4px 14px rgba(99,102,241,.35);transition:all .15s}
 .btn-r:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(99,102,241,.45)}
 .btn-l{background:linear-gradient(135deg,#0EA5E9,#6366F1);color:white;border:none;border-radius:10px;padding:.55rem 1rem;font-weight:600;font-size:.8rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:.35rem;box-shadow:0 4px 14px rgba(14,165,233,.35);transition:all .15s}
@@ -415,7 +415,7 @@ export default function InquilinoView({ session, onLogout }) {
           <div>
             <div style={{fontSize:'.67rem',fontWeight:600,color:'#6366F1',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.2rem'}}>🏢 Plaza Stefany</div>
             <div style={{fontSize:'1.05rem',fontWeight:700,lineHeight:1.2}}>{session.nombre || local?.inquilino}</div>
-            <div style={{fontSize:'.78rem',color:'#666',marginTop:'.22rem'}}>Local {local?.numero} · {local?.m2} m²</div>
+            <div style={{fontSize:'.78rem',color:'#6E6E78',marginTop:'.22rem'}}>Local {local?.numero} · {local?.m2} m²</div>
           </div>
           <button className="btn-g" onClick={onLogout} style={{fontSize:'.78rem'}}>Salir</button>
         </div>
@@ -423,7 +423,7 @@ export default function InquilinoView({ session, onLogout }) {
         <div className="glass" style={{padding:'1.2rem 1.5rem',marginBottom:'1rem'}}>
           <div style={{fontSize:'.65rem',fontWeight:600,color:'#6366F1',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.5rem'}}>Renta mensual</div>
           <div style={{fontSize:'2rem',fontWeight:700,fontVariantNumeric:'tabular-nums'}}>L {fmt(renta)}</div>
-          <div style={{fontSize:'.75rem',color:'#888',marginTop:'.2rem'}}>{local?.m2} m² × ${config.rentPerM2USD||29} × L {config.tasaCambio||25} + ISV {((config.isv||0.15)*100).toFixed(0)}%</div>
+          <div style={{fontSize:'.75rem',color:'#6E6E78',marginTop:'.2rem'}}>{local?.m2} m² × ${config.rentPerM2USD||29} × L {config.tasaCambio||25} + ISV {((config.isv||0.15)*100).toFixed(0)}%</div>
         </div>
 
         {!dentroVentanaWeb && (
@@ -482,20 +482,20 @@ export default function InquilinoView({ session, onLogout }) {
                   {luzNueva && <span className="badge-luz">⚡ Factura luz disponible</span>}
                 </div>
                 <div style={{textAlign:'right',flexShrink:0,marginLeft:'1rem'}}>
-                  <div style={{fontSize:'.67rem',color:'#888'}}>Renta · {MESES[mes.monthIdx]}</div>
+                  <div style={{fontSize:'.67rem',color:'#6E6E78'}}>Renta · {MESES[mes.monthIdx]}</div>
                   <div style={{fontWeight:600,fontSize:'.88rem',fontVariantNumeric:'tabular-nums'}}>L {fmt(rentaMes)}</div>
-                  {luzAplica && <><div style={{fontSize:'.67rem',color:'#888',marginTop:'.2rem'}}>Luz · {luzLabel || '—'}</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#bbb',fontVariantNumeric:'tabular-nums'}}>{tieneLuz ? `L ${fmt(montoLuz)}` : '—'}</div></>}
+                  {luzAplica && <><div style={{fontSize:'.67rem',color:'#6E6E78',marginTop:'.2rem'}}>Luz · {luzLabel || '—'}</div><div style={{fontWeight:600,fontSize:'.88rem',color: tieneLuz ? '#0EA5E9' : '#bbb',fontVariantNumeric:'tabular-nums'}}>{tieneLuz ? `L ${fmt(montoLuz)}` : '—'}</div></>}
                 </div>
               </div>
 
               <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap',marginBottom:'.65rem',alignItems:'center'}}>
-                <span style={{fontSize:'.67rem',color:'#888'}}>Renta {MESES[mes.monthIdx]}</span>
+                <span style={{fontSize:'.67rem',color:'#6E6E78'}}>Renta {MESES[mes.monthIdx]}</span>
                 {rentaPagada ? <span className="pill-g"><span className="dg"/>Pagada</span> : <span className="pill-o"><span className="do"/>Pendiente</span>}
-                {luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz {luzLabel || ''}</span>
+                {luzAplica && <><span style={{fontSize:'.67rem',color:'#6E6E78',marginLeft:'.2rem'}}>Luz {luzLabel || ''}</span>
                   {!tieneLuz ? <span className="pill-x"><span className="dx"/>No disponible</span>
                     : luzPagada ? <span className="pill-g"><span className="dg"/>Pagada</span>
                     : <span className="pill-o"><span className="do"/>Pendiente</span>}</>}
-                {!luzAplica && <><span style={{fontSize:'.67rem',color:'#888',marginLeft:'.2rem'}}>Luz</span><span className="pill-x"><span className="dx"/>Incluida</span></>}
+                {!luzAplica && <><span style={{fontSize:'.67rem',color:'#6E6E78',marginLeft:'.2rem'}}>Luz</span><span className="pill-x"><span className="dx"/>Incluida</span></>}
               </div>
 
               <div style={{borderTop:'1px solid rgba(255,255,255,.5)',paddingTop:'.75rem',display:'flex',flexDirection:'column',gap:'.55rem'}}>
@@ -509,7 +509,7 @@ export default function InquilinoView({ session, onLogout }) {
                     <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
                       background: mes.data.comprobanteRenta ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
                       border: mes.data.comprobanteRenta ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
-                      color: mes.data.comprobanteRenta ? '#1A7F35' : '#666',
+                      color: mes.data.comprobanteRenta ? '#1A7F35' : '#6E6E78',
                       backdropFilter:'blur(8px)',
                     }}>
                       <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
@@ -534,7 +534,7 @@ export default function InquilinoView({ session, onLogout }) {
                       <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
                         background: luzData.comprobanteLuz ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
                         border: luzData.comprobanteLuz ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
-                        color: luzData.comprobanteLuz ? '#1A7F35' : '#666',
+                        color: luzData.comprobanteLuz ? '#1A7F35' : '#6E6E78',
                         backdropFilter:'blur(8px)',
                       }}>
                         <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
