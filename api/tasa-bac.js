@@ -56,12 +56,11 @@ function fetchUrl(url, cookies = '') {
 }
 
 async function getBacRate() {
-  const r1 = await fetchUrl('https://www.sucursalelectronica.com/redir/showLogin.go');
-  const r2 = await fetchUrl('https://www.sucursalelectronica.com/redir/showLogin.go', r1.cookies);
-  const cookies = r1.cookies + (r2.cookies ? '; ' + r2.cookies : '');
-  const r3 = await fetchUrl('https://www.sucursalelectronica.com/ebac/common/GetExchangeRateInfo.go', cookies);
-  if (r3.status !== 200) throw new Error('BAC endpoint status ' + r3.status);
-  const data = JSON.parse(r3.body);
+  // El endpoint responde sin sesión — el header "Tipo de Cambio" del login
+  // de BAC lo consume directo sin cookies. Probado: ~300ms.
+  const r = await fetchUrl('https://www.sucursalelectronica.com/ebac/common/GetExchangeRateInfo.go');
+  if (r.status !== 200) throw new Error('BAC endpoint status ' + r.status);
+  const data = JSON.parse(r.body);
   const hn = (data.USD || []).find((x) => x.country_code === 'HN');
   if (!hn) throw new Error('No se encontró el registro HN/USD');
   return { buy: Number(hn.buy), sell: Number(hn.sell) };
