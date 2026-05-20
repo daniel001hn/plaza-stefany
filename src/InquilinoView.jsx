@@ -204,6 +204,8 @@ export default function InquilinoView({ session, onLogout }) {
   const [config, setConfig]   = useState({})
   const [meses, setMeses]     = useState([])
   const [loading, setLoading] = useState(true)
+  const [filtroAno, setFiltroAno] = useState('')
+  const [filtroMes, setFiltroMes] = useState('')
   const today = new Date()
 
   // Recibos en la web: el cron de Vercel actualiza la tasa de cambio cada día,
@@ -436,9 +438,47 @@ export default function InquilinoView({ session, onLogout }) {
           </div>
         )}
 
-        <div style={{fontSize:'.67rem',fontWeight:600,color:'rgba(60,60,70,.55)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.6rem',paddingLeft:'.2rem'}}>Historial de pagos</div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.6rem',paddingLeft:'.2rem',gap:'.4rem',flexWrap:'wrap'}}>
+          <div style={{fontSize:'.67rem',fontWeight:600,color:'rgba(60,60,70,.6)',letterSpacing:'.1em',textTransform:'uppercase'}}>Historial de pagos</div>
+          <div style={{display:'flex',gap:'.35rem',alignItems:'center'}}>
+            <select value={filtroAno} onChange={e => setFiltroAno(e.target.value)}
+              style={{padding:'.32rem .5rem',fontSize:'.72rem',background:'rgba(255,255,255,.85)',border:'1px solid rgba(0,0,0,.08)',borderRadius:6,fontFamily:'inherit',color:'#1C1C1E',cursor:'pointer'}}>
+              <option value="">Todos los años</option>
+              {[...new Set(meses.map(m => m.year))].sort((a,b)=>b-a).map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)}
+              style={{padding:'.32rem .5rem',fontSize:'.72rem',background:'rgba(255,255,255,.85)',border:'1px solid rgba(0,0,0,.08)',borderRadius:6,fontFamily:'inherit',color:'#1C1C1E',cursor:'pointer'}}>
+              <option value="">Todos los meses</option>
+              {MESES.map((nombre, i) => <option key={i} value={i}>{nombre}</option>)}
+            </select>
+            {(filtroAno || filtroMes !== '') && (
+              <button onClick={() => { setFiltroAno(''); setFiltroMes('') }}
+                style={{padding:'.32rem .5rem',fontSize:'.7rem',background:'transparent',border:'1px solid rgba(0,0,0,.12)',borderRadius:6,fontFamily:'inherit',color:'#6E6E78',cursor:'pointer'}}>
+                Limpiar
+              </button>
+            )}
+          </div>
+        </div>
 
-        {meses.map((mes, idx) => {
+        {(() => {
+          const mesesFiltrados = meses.filter(m => {
+            if (filtroAno && String(m.year) !== filtroAno) return false
+            if (filtroMes !== '' && m.monthIdx !== Number(filtroMes)) return false
+            return true
+          })
+          if (mesesFiltrados.length === 0) {
+            return <div className="glass" style={{padding:'1.5rem 1.2rem',marginBottom:'1rem',textAlign:'center',color:'#6E6E78',fontSize:'.85rem'}}>No hay meses con esos filtros.</div>
+          }
+          return null
+        })()}
+
+        {meses.filter(m => {
+          if (filtroAno && String(m.year) !== filtroAno) return false
+          if (filtroMes !== '' && m.monthIdx !== Number(filtroMes)) return false
+          return true
+        }).map((mes) => {
+          // Para el lookup de luzMes (mes anterior), usar el indice del array ORIGINAL no del filtrado
+          const idx = meses.findIndex(m => m.year === mes.year && m.monthIdx === mes.monthIdx)
           const { data } = mes
           const rentaPagada = !!data.rentaPagada
           const tipoLuz     = local?.tipoLuz || 'incluido'

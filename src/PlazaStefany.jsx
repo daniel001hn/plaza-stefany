@@ -355,13 +355,13 @@ const STYLES = `
 
 /* ── PILLS ── */
 .ps-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .22rem .55rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.01em; font-family: 'JetBrains Mono', monospace; }
-.ps-pill-paid { background: rgba(52,199,89,0.15); color: #1A7F35; border: 1px solid rgba(52,199,89,0.3); backdrop-filter: blur(8px); }
-.ps-pill-pending { background: rgba(255,159,10,0.15); color: #B25800; border: 1px solid rgba(255,159,10,0.3); backdrop-filter: blur(8px); }
-.ps-pill-na { background: rgba(120,120,130,0.1); color: rgba(60,60,70,0.5); border: 1px solid rgba(120,120,130,0.2); }
+.ps-pill-paid { background: rgba(52,199,89,0.18); color: #1A7F35; border: 1px solid rgba(52,199,89,0.38); backdrop-filter: blur(8px); }
+.ps-pill-pending { background: rgba(255,159,10,0.18); color: #B25800; border: 1px solid rgba(255,159,10,0.38); backdrop-filter: blur(8px); }
+.ps-pill-na { background: rgba(110,110,120,0.15); color: #5A5A64; border: 1px solid rgba(110,110,120,0.28); }
 .ps-pill-dot { width: 6px; height: 6px; border-radius: 50%; }
 .ps-pill-paid .ps-pill-dot { background: #34C759; box-shadow: 0 0 6px #34C759; }
 .ps-pill-pending .ps-pill-dot { background: #FF9F0A; box-shadow: 0 0 6px #FF9F0A; }
-.ps-pill-na .ps-pill-dot { background: rgba(120,120,130,0.5); }
+.ps-pill-na .ps-pill-dot { background: #8E8E96; }
 
 /* ── MODAL ── */
 .ps-modal-backdrop {
@@ -2069,7 +2069,7 @@ function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
                 <span style={{ color: a.tipo === 'renta' ? '#6366F1' : '#0EA5E9' }}>Local {a.localNum}</span>
                 {' · '}{a.nombre}
               </div>
-              <div style={{ fontSize: '.74rem', color: '#888', marginTop: '.1rem' }}>
+              <div style={{ fontSize: '.74rem', color: '#6E6E78', marginTop: '.1rem' }}>
                 Generó recibo de <b>{a.tipo}</b> — {tiempoRelativo(a.ts)}
               </div>
             </div>
@@ -2578,7 +2578,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                     <div style={{ marginTop: '.5rem' }}>
                       <div className="ps-label" style={{ marginBottom: '.3rem', fontSize: '.7rem' }}>Lectura inicial del nuevo medidor</div>
                       <input type="number" className="ps-input ps-mono" value={form.lecturaInicialReseteo} onChange={(e) => set('lecturaInicialReseteo', e.target.value)} placeholder="0" style={{ fontSize: '.85rem' }} />
-                      <div style={{ fontSize: '.7rem', color: '#999', marginTop: '.3rem' }}>
+                      <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.3rem' }}>
                         El consumo de este mes se calcula desde esta lectura, no desde el mes anterior.
                       </div>
                     </div>
@@ -2631,9 +2631,9 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                   <img src={data.comprobanteRenta} alt="comp renta"
                     style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
                     onClick={() => window.open(data.comprobanteRenta, '_blank')} />
-                  <div style={{ fontSize: '.74rem', color: '#555' }}>
+                  <div style={{ fontSize: '.74rem', color: '#5A5A64' }}>
                     <div style={{ fontWeight: 600, color: '#1A7F35' }}>📄 Renta</div>
-                    {data.comprobanteRentaDate && <div style={{ color: '#888', marginTop: '.15rem' }}>{new Date(data.comprobanteRentaDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
+                    {data.comprobanteRentaDate && <div style={{ color: '#6E6E78', marginTop: '.15rem' }}>{new Date(data.comprobanteRentaDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
                   </div>
                 </div>
               )}
@@ -2642,9 +2642,9 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                   <img src={data.comprobanteLuz} alt="comp luz"
                     style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer' }}
                     onClick={() => window.open(data.comprobanteLuz, '_blank')} />
-                  <div style={{ fontSize: '.74rem', color: '#555' }}>
+                  <div style={{ fontSize: '.74rem', color: '#5A5A64' }}>
                     <div style={{ fontWeight: 600, color: '#0EA5E9' }}>⚡ Luz</div>
-                    {data.comprobanteLuzDate && <div style={{ color: '#888', marginTop: '.15rem' }}>{new Date(data.comprobanteLuzDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
+                    {data.comprobanteLuzDate && <div style={{ color: '#6E6E78', marginTop: '.15rem' }}>{new Date(data.comprobanteLuzDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
                   </div>
                 </div>
               )}
@@ -2907,7 +2907,7 @@ function ComprobantesInbox({ locales, pagos, monthIdx, year, onAprobar }) {
                   {item.tipo === 'renta' ? '🏠 Renta' : '⚡ Luz'}
                 </span>
               </div>
-              <div style={{ fontSize: '.7rem', color: '#888', marginTop: '.15rem' }}>
+              <div style={{ fontSize: '.7rem', color: '#6E6E78', marginTop: '.15rem' }}>
                 Subido {fechaFmt(item.fechaSubida)} · Click en imagen para ver
               </div>
             </div>
@@ -3012,7 +3012,7 @@ function AuditLogSection() {
       </div>
 
       {loading ? (
-        <div style={{ color: '#888', fontSize: '.85rem', padding: '.5rem 0' }}>Cargando…</div>
+        <div style={{ color: '#6E6E78', fontSize: '.85rem', padding: '.5rem 0' }}>Cargando…</div>
       ) : filtered.length === 0 ? (
         <div style={{ color: '#6E6E78', fontSize: '.85rem', padding: '.5rem 0' }}>
           {hayFiltros ? 'No hay actividad con esos filtros.' : 'Aún no hay actividad registrada.'}
@@ -3110,7 +3110,7 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
       </div>
 
       {usuarios.length === 0 && !showForm && (
-        <div style={{ color: '#888', fontSize: '.85rem', padding: '.5rem 0' }}>
+        <div style={{ color: '#6E6E78', fontSize: '.85rem', padding: '.5rem 0' }}>
           No hay usuarios creados. Los inquilinos podrán acceder al portal con sus credenciales.
         </div>
       )}
@@ -3122,7 +3122,7 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
             <span style={{ fontSize: '1.2rem' }}>👤</span>
             <div>
               <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{u.nombre || u.usuario}</div>
-              <div style={{ fontSize: '.75rem', color: '#888' }}>
+              <div style={{ fontSize: '.75rem', color: '#6E6E78' }}>
                 Usuario: <b>{u.usuario}</b> · Local {loc?.numero || '?'} — {loc?.inquilino || 'Sin asignar'}
               </div>
             </div>
