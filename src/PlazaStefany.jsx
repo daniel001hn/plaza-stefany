@@ -2783,7 +2783,8 @@ function ComprobantesInbox({ locales, pagos, monthIdx, year, onAprobar }) {
 
 function AuditLogSection() {
   const [log, setLog] = useState([]);
-  const [filtro, setFiltro] = useState('');
+  const [filtroMes, setFiltroMes] = useState('');
+  const [filtroLocal, setFiltroLocal] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
@@ -2800,14 +2801,32 @@ function AuditLogSection() {
     return () => { alive = false; clearInterval(interval); };
   }, []);
 
+  // Opciones de filtro derivadas de los datos reales (no se puede filtrar por algo que no existe)
+  const mesesDisponibles = useMemo(() => {
+    const set = new Set();
+    log.forEach(e => { if (e.mes) set.add(e.mes); });
+    return [...set].sort((a, b) => {
+      // Ordenar por año desc, luego por mes (asume formato "Mes YYYY")
+      const [, ya] = a.split(' '); const [, yb] = b.split(' ');
+      if (ya !== yb) return Number(yb) - Number(ya);
+      const orden = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      return orden.indexOf(b.split(' ')[0]) - orden.indexOf(a.split(' ')[0]);
+    });
+  }, [log]);
+  const localesDisponibles = useMemo(() => {
+    const set = new Set();
+    log.forEach(e => { if (e.local) set.add(e.local); });
+    return [...set].sort();
+  }, [log]);
+
   const filtered = log.filter(e => {
-    if (!filtro) return true;
-    const f = filtro.toLowerCase();
-    return (e.accion || '').toLowerCase().includes(f)
-      || (e.local || '').toLowerCase().includes(f)
-      || (e.mes || '').toLowerCase().includes(f);
+    if (filtroMes && e.mes !== filtroMes) return false;
+    if (filtroLocal && e.local !== filtroLocal) return false;
+    return true;
   });
   const visible = showAll ? filtered : filtered.slice(0, 20);
+  const limpiarFiltros = () => { setFiltroMes(''); setFiltroLocal(''); };
+  const hayFiltros = !!filtroMes || !!filtroLocal;
 
   const fechaFmt = (iso) => {
     try {
@@ -2826,18 +2845,30 @@ function AuditLogSection() {
           <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}>📋 ACTIVIDAD ADMIN</div>
           <div style={{ fontSize: '1rem', fontWeight: 600 }}>Registro de acciones</div>
         </div>
-        <input
-          type="text" placeholder="🔍 Filtrar..."
-          value={filtro} onChange={(e) => setFiltro(e.target.value)}
-          className="ps-input" style={{ maxWidth: 220, fontSize: '.8rem' }}
-        />
+        <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <select value={filtroMes} onChange={(e) => setFiltroMes(e.target.value)}
+            className="ps-input" style={{ fontSize: '.8rem', padding: '.4rem .55rem', minWidth: 140 }}>
+            <option value="">Todos los meses</option>
+            {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <select value={filtroLocal} onChange={(e) => setFiltroLocal(e.target.value)}
+            className="ps-input" style={{ fontSize: '.8rem', padding: '.4rem .55rem', minWidth: 140, maxWidth: 240 }}>
+            <option value="">Todos los locales</option>
+            {localesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+          {hayFiltros && (
+            <button onClick={limpiarFiltros} className="ps-btn-ghost" style={{ fontSize: '.75rem', padding: '.4rem .65rem' }}>
+              Limpiar
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
         <div style={{ color: '#888', fontSize: '.85rem', padding: '.5rem 0' }}>Cargando…</div>
       ) : filtered.length === 0 ? (
-        <div style={{ color: '#888', fontSize: '.85rem', padding: '.5rem 0' }}>
-          {filtro ? 'No hay coincidencias.' : 'Aún no hay actividad registrada.'}
+        <div style={{ color: '#6E6E78', fontSize: '.85rem', padding: '.5rem 0' }}>
+          {hayFiltros ? 'No hay actividad con esos filtros.' : 'Aún no hay actividad registrada.'}
         </div>
       ) : (
         <>
