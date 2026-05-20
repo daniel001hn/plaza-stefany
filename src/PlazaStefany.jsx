@@ -363,6 +363,19 @@ const STYLES = `
 .ps-pill-pending .ps-pill-dot { background: #FF9F0A; box-shadow: 0 0 6px #FF9F0A; }
 .ps-pill-na .ps-pill-dot { background: #8E8E96; }
 
+/* ── SELECTS / DROPDOWNS estilizados (overlay sobre .ps-input cuando es <select>) ── */
+select.ps-input {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%236E6E78' d='M3.5 5l2.5 3 2.5-3z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right .6rem center;
+  background-size: 10px;
+  padding-right: 1.7rem;
+  cursor: pointer;
+}
+
 /* ── MODAL ── */
 .ps-modal-backdrop {
   position: fixed;

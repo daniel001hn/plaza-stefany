@@ -187,6 +187,11 @@ body{margin:0;font-family:'Geist',-apple-system,sans-serif;-webkit-font-smoothin
 .dg{width:6px;height:6px;border-radius:50%;background:#34C759;box-shadow:0 0 6px #34C759}
 .do{width:6px;height:6px;border-radius:50%;background:#FF9F0A;box-shadow:0 0 6px #FF9F0A}
 .dx{width:6px;height:6px;border-radius:50%;background:#8E8E96}
+.iv-select{appearance:none;-webkit-appearance:none;-moz-appearance:none;background:rgba(255,255,255,.7) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path fill='%236E6E78' d='M3.5 5l2.5 3 2.5-3z'/></svg>") no-repeat right .55rem center/10px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.85);box-shadow:0 1px 6px rgba(0,0,0,.04),inset 0 1px 0 rgba(255,255,255,.6);border-radius:9px;padding:.42rem 1.4rem .42rem .65rem;font-size:.74rem;font-weight:500;font-family:inherit;color:#1C1C1E;cursor:pointer;outline:none;transition:all .15s}
+.iv-select:hover{background-color:rgba(255,255,255,.85);border-color:rgba(99,102,241,.35)}
+.iv-select:focus{border-color:#6366F1;box-shadow:0 0 0 3px rgba(99,102,241,.18)}
+.iv-chip{background:rgba(255,255,255,.55);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.7);border-radius:9px;padding:.42rem .7rem;font-size:.72rem;font-weight:500;font-family:inherit;color:#6E6E78;cursor:pointer;transition:all .15s}
+.iv-chip:hover{background:rgba(255,255,255,.8);color:#1C1C1E}
 .btn-r{background:linear-gradient(135deg,#6366F1,#8B5CF6);color:white;border:none;border-radius:10px;padding:.55rem 1rem;font-weight:600;font-size:.8rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:.35rem;box-shadow:0 4px 14px rgba(99,102,241,.35);transition:all .15s}
 .btn-r:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(99,102,241,.45)}
 .btn-l{background:linear-gradient(135deg,#0EA5E9,#6366F1);color:white;border:none;border-radius:10px;padding:.55rem 1rem;font-weight:600;font-size:.8rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:.35rem;box-shadow:0 4px 14px rgba(14,165,233,.35);transition:all .15s}
@@ -440,20 +445,17 @@ export default function InquilinoView({ session, onLogout }) {
 
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'.6rem',paddingLeft:'.2rem',gap:'.4rem',flexWrap:'wrap'}}>
           <div style={{fontSize:'.67rem',fontWeight:600,color:'rgba(60,60,70,.6)',letterSpacing:'.1em',textTransform:'uppercase'}}>Historial de pagos</div>
-          <div style={{display:'flex',gap:'.35rem',alignItems:'center'}}>
-            <select value={filtroAno} onChange={e => setFiltroAno(e.target.value)}
-              style={{padding:'.32rem .5rem',fontSize:'.72rem',background:'rgba(255,255,255,.85)',border:'1px solid rgba(0,0,0,.08)',borderRadius:6,fontFamily:'inherit',color:'#1C1C1E',cursor:'pointer'}}>
+          <div style={{display:'flex',gap:'.4rem',alignItems:'center'}}>
+            <select value={filtroAno} onChange={e => setFiltroAno(e.target.value)} className="iv-select">
               <option value="">Todos los años</option>
               {[...new Set(meses.map(m => m.year))].sort((a,b)=>b-a).map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-            <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)}
-              style={{padding:'.32rem .5rem',fontSize:'.72rem',background:'rgba(255,255,255,.85)',border:'1px solid rgba(0,0,0,.08)',borderRadius:6,fontFamily:'inherit',color:'#1C1C1E',cursor:'pointer'}}>
+            <select value={filtroMes} onChange={e => setFiltroMes(e.target.value)} className="iv-select">
               <option value="">Todos los meses</option>
               {MESES.map((nombre, i) => <option key={i} value={i}>{nombre}</option>)}
             </select>
             {(filtroAno || filtroMes !== '') && (
-              <button onClick={() => { setFiltroAno(''); setFiltroMes('') }}
-                style={{padding:'.32rem .5rem',fontSize:'.7rem',background:'transparent',border:'1px solid rgba(0,0,0,.12)',borderRadius:6,fontFamily:'inherit',color:'#6E6E78',cursor:'pointer'}}>
+              <button onClick={() => { setFiltroAno(''); setFiltroMes('') }} className="iv-chip">
                 Limpiar
               </button>
             )}
