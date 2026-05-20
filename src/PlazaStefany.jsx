@@ -1045,7 +1045,6 @@ function DashboardView({
   onOpenPayment, onEditFactura, onGoConfig, onTogglePago, onReporte,
 }) {
   const [detalle, setDetalle] = useState(null); // 'total' | 'renta' | 'luz' | 'pendientes'
-  const [chartFiltro, setChartFiltro] = useState('ambos'); // 'ambos' | 'renta' | 'luz'
   const consumoPrincipal = calcConsumoPrincipal(factura, prevFactura);
   const consumoSubmedidores = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
   const areasComunes = consumoPrincipal != null && consumoSubmedidores > 0
@@ -1073,34 +1072,6 @@ function DashboardView({
       totalEsperado: totalRenta + totalLuz,
     };
   }, [locales, pagos, prevPagos, tarifaEfectiva, config]);
-
-  const yearChart = useMemo(() => {
-    return MESES.map((m, idx) => {
-      const md = yearData[idx] || {};
-      const p = getPagos(md);
-      let renta = 0, luz = 0;
-      const prevMonth = idx === 0 ? (yearData['_prevDec'] || {}) : (yearData[idx - 1] || {});
-      const prevP = getPagos(prevMonth);
-      const fact = getFactura(md);
-      const tarifa = calcTarifaEfectiva(fact, locales, p, prevP, config);
-      const fijoLocal = calcPerLocalFijo(fact, config, locales);
-      locales.forEach((l) => {
-        const d = p[l.id] || {};
-        if (d.rentaPagada) renta += calcRenta(l.m2, year, idx);
-        if (d.luzPagada) {
-          const consumo = calcConsumoLocal(l, p, prevP);
-          if (l.tipoLuz === 'medidor' && consumo != null && tarifa) luz += consumo * tarifa + fijoLocal;
-          else if (l.tipoLuz === 'fijo') luz += (l.luzFija || 0);
-        }
-      });
-      return {
-        mes: m, renta: Math.round(renta), luz: Math.round(luz),
-        total: Math.round(renta + luz), active: idx === monthIdx,
-      };
-    });
-  }, [yearData, locales, config, monthIdx]);
-
-  const yearTotal = yearChart.reduce((s, x) => s + x.total, 0);
 
   const perLocal = useMemo(() => {
     return locales.map((l) => {
@@ -1152,9 +1123,9 @@ function DashboardView({
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-        <KPI label="Cobrado este mes" value={kpis.totalCobrado} target={kpis.totalEsperado} accent="#1D4ED8" icon={<Wallet size={14} />} big onClick={() => { setDetalle('total'); setChartFiltro('ambos'); }} />
-        <KPI label="Renta" value={kpis.cobradoRenta} target={kpis.totalRenta} accent="#6366F1" icon={<Receipt size={14} />} onClick={() => { setDetalle('renta'); setChartFiltro('renta'); }} />
-        <KPI label="Luz" value={kpis.cobradoLuz} target={kpis.totalLuz} accent="#0EA5E9" icon={<Zap size={14} />} onClick={() => { setDetalle('luz'); setChartFiltro('luz'); }} />
+        <KPI label="Cobrado este mes" value={kpis.totalCobrado} target={kpis.totalEsperado} accent="#1D4ED8" icon={<Wallet size={14} />} big onClick={() => setDetalle('total')} />
+        <KPI label="Renta" value={kpis.cobradoRenta} target={kpis.totalRenta} accent="#6366F1" icon={<Receipt size={14} />} onClick={() => setDetalle('renta')} />
+        <KPI label="Luz" value={kpis.cobradoLuz} target={kpis.totalLuz} accent="#0EA5E9" icon={<Zap size={14} />} onClick={() => setDetalle('luz')} />
         <KPIPending rentaPend={kpis.pendientesRenta} luzPend={kpis.pendientesLuz} onClick={() => setDetalle('pendientes')} />
       </div>
 
@@ -1166,8 +1137,6 @@ function DashboardView({
           onOpenPayment={(l) => { setDetalle(null); onOpenPayment(l); }}
         />
       )}
-
-      <YearlyChart data={yearChart} year={year} total={yearTotal} filtro={chartFiltro} onFiltroChange={setChartFiltro} />
 
       {/* ── ALERTAS DE ACTIVIDAD DE INQUILINOS ── */}
       <ActividadInquilinos pagos={pagos} locales={locales} monthIdx={monthIdx} year={year} />
@@ -2024,97 +1993,6 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
           <button onClick={onClose} className="ps-btn-ghost">Cerrar</button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function YearlyChart({ data, year, total, filtro = 'ambos', onFiltroChange }) {
-  const showRenta = filtro === 'ambos' || filtro === 'renta';
-  const showLuz = filtro === 'ambos' || filtro === 'luz';
-  const COL_RENTA = '#6366F1';
-  const COL_RENTA_DIM = 'rgba(99,102,241,0.35)';
-  const COL_LUZ = '#0EA5E9';
-  const COL_LUZ_DIM = 'rgba(14,165,233,0.35)';
-  const totalMostrado = filtro === 'renta'
-    ? data.reduce((s, d) => s + (d.renta || 0), 0)
-    : filtro === 'luz'
-    ? data.reduce((s, d) => s + (d.luz || 0), 0)
-    : total;
-  const tabBtn = (key, label) => (
-    <button
-      key={key}
-      onClick={() => onFiltroChange && onFiltroChange(key)}
-      style={{
-        padding: '.32rem .7rem', fontSize: '.72rem', fontWeight: 600,
-        background: filtro === key ? 'rgba(99,102,241,0.12)' : 'transparent',
-        color: filtro === key ? '#4F46E5' : '#6E6E78',
-        border: '1px solid', borderColor: filtro === key ? 'rgba(99,102,241,0.35)' : 'transparent',
-        borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
-        transition: 'all .12s',
-      }}
-    >{label}</button>
-  );
-  return (
-    <div className="ps-card" style={{ padding: '1.25rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '.8rem', gap: '.6rem', flexWrap: 'wrap' }}>
-        <div>
-          <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}><TrendingUp size={10} /> COBRANZA {year}</div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 600 }}>Evolución mensual</div>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-          <div className="ps-label">{filtro === 'ambos' ? 'Total año' : filtro === 'renta' ? 'Renta año' : 'Luz año'}</div>
-          <div className="ps-mono" style={{ fontSize: '1.4rem', fontWeight: 600, color: '#6366F1', letterSpacing: '-0.02em' }}>
-            L {fmt(totalMostrado)}
-          </div>
-        </div>
-      </div>
-
-      {onFiltroChange && (
-        <div style={{ display: 'inline-flex', gap: '.2rem', marginBottom: '.6rem', padding: '.18rem', background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(0,0,0,0.06)', borderRadius: 10 }}>
-          {tabBtn('ambos', 'Ambos')}
-          {tabBtn('renta', 'Renta')}
-          {tabBtn('luz', 'Luz')}
-        </div>
-      )}
-
-      <div style={{ height: 220, marginLeft: '-12px' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
-            <CartesianGrid stroke="rgba(0,0,0,0.06)" vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="mes" tick={{ fill: '#6E6E78', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={{ stroke: 'rgba(0,0,0,0.08)' }} tickLine={false} />
-            <YAxis tick={{ fill: '#6E6E78', fontSize: 11, fontFamily: 'JetBrains Mono' }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
-            <Tooltip
-              cursor={{ fill: 'rgba(99,102,241,0.06)' }}
-              contentStyle={{ background: 'rgba(255,255,255,0.96)', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, fontSize: '.78rem', fontFamily: 'JetBrains Mono, monospace', boxShadow: '0 8px 24px rgba(0,0,0,0.10)' }}
-              labelStyle={{ color: '#1C1C1E', fontWeight: 600 }}
-              formatter={(value, name) => [`L ${fmt(value)}`, name === 'renta' ? 'Renta' : 'Luz']}
-            />
-            {showRenta && (
-              <Bar dataKey="renta" stackId="a" fill={COL_RENTA} radius={showLuz ? 0 : [6, 6, 0, 0]}>
-                {data.map((entry, idx) => <Cell key={idx} fill={entry.active ? COL_RENTA : COL_RENTA_DIM} />)}
-              </Bar>
-            )}
-            {showLuz && (
-              <Bar dataKey="luz" stackId="a" fill={COL_LUZ} radius={[6, 6, 0, 0]}>
-                {data.map((entry, idx) => <Cell key={idx} fill={entry.active ? COL_LUZ : COL_LUZ_DIM} />)}
-              </Bar>
-            )}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div style={{ display: 'flex', gap: '1.25rem', marginTop: '.5rem', fontSize: '.75rem' }}>
-        {showRenta && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: '#6E6E78' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: COL_RENTA }} /> Renta
-          </div>
-        )}
-        {showLuz && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', color: '#6E6E78' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: COL_LUZ }} /> Luz
-          </div>
-        )}
       </div>
     </div>
   );
