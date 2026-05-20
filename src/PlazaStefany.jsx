@@ -22,6 +22,12 @@ const DEFAULT_CONFIG = {
   tasaCambio: 25,
   isv: 0.15,
   plazaNombre: 'Plaza Stefany',
+  // Cargos fijos de la factura ENEE (residencial). Se dividen en partes iguales
+  // entre TODOS los locales con submedidor — la parte de energía sí se prorratea
+  // por consumo. Cambian trimestralmente, el admin los ajusta en Configuración.
+  cargoComercializacion: 60,
+  cargoRegulacion: 30,
+  alumbradoPublico: 130,
 };
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -114,12 +120,39 @@ function calcTotalKwhSubmedidores(locales, pagos, prevPagos) {
   return total;
 }
 
-function calcTarifaEfectiva(factura, locales, pagos, prevPagos) {
+// Cargos fijos = comercialización + regulación + alumbrado público.
+// Se leen de la factura mensual primero (snapshot al guardar) y si no
+// existen, se usan los de config (compat con datos viejos).
+function calcCargosFijosTotal(factura, config) {
+  const f = factura || {};
+  const c = config || {};
+  const cc = (f.cargoComercializacion ?? c.cargoComercializacion ?? 0);
+  const cr = (f.cargoRegulacion ?? c.cargoRegulacion ?? 0);
+  const ap = (f.alumbradoPublico ?? c.alumbradoPublico ?? 0);
+  return Number(cc) + Number(cr) + Number(ap);
+}
+
+function calcLocalesConMedidor(locales) {
+  return (locales || []).filter(l => (l.tipoLuz || 'incluido') === 'medidor').length;
+}
+
+function calcPerLocalFijo(factura, config, locales) {
+  const n = calcLocalesConMedidor(locales);
+  if (n <= 0) return 0;
+  return calcCargosFijosTotal(factura, config) / n;
+}
+
+// Tarifa efectiva = (montoFactura - cargosFijos) / totalKwhSubmedidores.
+// Es la tarifa que solo aplica a la parte de energía. Los cargos fijos van
+// aparte, en partes iguales por local con medidor.
+function calcTarifaEfectiva(factura, locales, pagos, prevPagos, config) {
   const monto = Number(factura.montoTotal) || 0;
   if (monto <= 0) return null;
+  const cargosFijos = calcCargosFijosTotal(factura, config);
+  const energia = monto - cargosFijos;
   const totalKwh = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
   if (totalKwh <= 0) return null;
-  return monto / totalKwh;
+  return energia / totalKwh;
 }
 
 function calcConsumoPrincipal(factura, prevFactura) {
@@ -540,8 +573,12 @@ export default function App({ supabase, onLogout }) {
   const prevFactura = getFactura(prevMonthData);
 
   const tarifaEfectiva = useMemo(
-    () => calcTarifaEfectiva(factura, locales, pagos, prevPagos),
-    [factura, locales, pagos, prevPagos]
+    () => calcTarifaEfectiva(factura, locales, pagos, prevPagos, config),
+    [factura, locales, pagos, prevPagos, config]
+  );
+  const perLocalFijo = useMemo(
+    () => calcPerLocalFijo(factura, config, locales),
+    [factura, config, locales]
   );
 
   const updatePayment = async (localId, updates) => {
@@ -609,7 +646,14 @@ export default function App({ supabase, onLogout }) {
   };
 
   const updateFactura = async (updates) => {
-    const newFactura = { ...factura, ...updates };
+    // Snapshot de los cargos fijos vigentes al momento de guardar la factura,
+    // así un cambio futuro en Config no altera recibos históricos.
+    const snapshot = (factura.cargoComercializacion != null) ? {} : {
+      cargoComercializacion: config.cargoComercializacion ?? 0,
+      cargoRegulacion: config.cargoRegulacion ?? 0,
+      alumbradoPublico: config.alumbradoPublico ?? 0,
+    };
+    const newFactura = { ...factura, ...snapshot, ...updates };
     const next = { factura: newFactura, pagos };
     setYearData((y) => ({ ...y, [monthIdx]: next }));
     const ok = await saveMonth(year, monthIdx, next);
@@ -807,7 +851,11 @@ export default function App({ supabase, onLogout }) {
               const consumo = lecturaActual - lecturaAnterior;
               const tarifa = tarifaEfectiva || 0;
               const montoEnergia = consumo * tarifa;
-              const kWhPlaza = tarifa > 0 ? Math.round((factura?.montoTotal || 0) / tarifa) : 0;
+              const cargosFijos = calcCargosFijosTotal(factura, config);
+              const fijoLocal = calcPerLocalFijo(factura, config, locales);
+              const nLocales = calcLocalesConMedidor(locales);
+              const totalKwhPlaza = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
+              const total = montoEnergia + fijoLocal;
               await generarReciboLuzPdf({
                 reciboNum: `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(loc.numero || '').padStart(3, '0')}`,
                 inquilino: loc.inquilino || loc.nombre || 'N/A',
@@ -817,11 +865,14 @@ export default function App({ supabase, onLogout }) {
                 lecturaAnterior: fmt(lecturaAnterior),
                 lecturaActual: fmt(lecturaActual),
                 consumo: fmt(consumo),
-                kWhPlaza: fmt(kWhPlaza),
+                kWhPlaza: fmt(totalKwhPlaza),
                 facturaEnee: fmt2(factura?.montoTotal || 0),
                 tarifa: fmt2(tarifa),
                 montoEnergia: fmt2(montoEnergia),
-                total: fmt2(montoEnergia),
+                cargosFijos: fmt2(cargosFijos),
+                fijoLocal: fmt2(fijoLocal),
+                nLocales: String(nLocales),
+                total: fmt2(total),
               });
               setToast('Recibo de luz descargado — revisá tu carpeta Descargas');
               setTimeout(() => setToast(null), 4000);
@@ -1016,13 +1067,14 @@ function DashboardView({
       const prevMonth = idx === 0 ? (yearData['_prevDec'] || {}) : (yearData[idx - 1] || {});
       const prevP = getPagos(prevMonth);
       const fact = getFactura(md);
-      const tarifa = calcTarifaEfectiva(fact, locales, p, prevP);
+      const tarifa = calcTarifaEfectiva(fact, locales, p, prevP, config);
+      const fijoLocal = calcPerLocalFijo(fact, config, locales);
       locales.forEach((l) => {
         const d = p[l.id] || {};
         if (d.rentaPagada) renta += calcRenta(l.m2, year, idx);
         if (d.luzPagada) {
           const consumo = calcConsumoLocal(l, p, prevP);
-          if (l.tipoLuz === 'medidor' && consumo != null && tarifa) luz += consumo * tarifa;
+          if (l.tipoLuz === 'medidor' && consumo != null && tarifa) luz += consumo * tarifa + fijoLocal;
           else if (l.tipoLuz === 'fijo') luz += (l.luzFija || 0);
         }
       });
@@ -1141,7 +1193,8 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
       const prevMonth = idx === 0 ? (yearData['_prevDec'] || {}) : (yearData[idx - 1] || {});
       const prevP = getPagos(prevMonth);
       const prevFact = getFactura(prevMonth);
-      const tarifa = calcTarifaEfectiva(fact, locales, p, prevP);
+      const tarifa = calcTarifaEfectiva(fact, locales, p, prevP, config);
+      const fijoLocal = calcPerLocalFijo(fact, config, locales);
       const consumoPrincipal = calcConsumoPrincipal(fact, prevFact);
       const consumoSubmedidores = calcTotalKwhSubmedidores(locales, p, prevP);
       const areasComunes = consumoPrincipal != null && consumoSubmedidores > 0
@@ -1154,7 +1207,7 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         const renta = calcRenta(l.m2, year, idx);
         const consumo = calcConsumoLocal(l, p, prevP);
         const luz = (l.tipoLuz === 'medidor' && consumo != null && tarifa)
-          ? consumo * tarifa : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
+          ? consumo * tarifa + fijoLocal : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
         totalRenta += renta;
         totalLuz += luz;
         if (d.rentaPagada) cobradoRenta += renta;
@@ -2460,6 +2513,24 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
           </Field>
         </div>
 
+        <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '1.1rem', marginBottom: '1rem' }}>
+          <div className="ps-eyebrow" style={{ marginBottom: '.5rem' }}><Zap size={10} /> CARGOS FIJOS DE LA FACTURA ENEE</div>
+          <div style={{ fontSize: '.78rem', color: '#6E6E78', marginBottom: '.9rem', lineHeight: 1.45 }}>
+            Estos cargos se dividen en <b>partes iguales</b> entre los locales con submedidor. Solo la energía (kWh) se prorratea por consumo. ENEE los actualiza trimestralmente — revisalos cada vez que cambien.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '.85rem' }}>
+            <Field label="Cargo por comercialización (L)">
+              <input type="number" step="0.01" className="ps-input ps-mono" value={draft.cargoComercializacion ?? 60} onChange={(e) => setDraft({ ...draft, cargoComercializacion: Number(e.target.value) })} />
+            </Field>
+            <Field label="Cargo por regulación (L)">
+              <input type="number" step="0.01" className="ps-input ps-mono" value={draft.cargoRegulacion ?? 30} onChange={(e) => setDraft({ ...draft, cargoRegulacion: Number(e.target.value) })} />
+            </Field>
+            <Field label="Alumbrado público (L)">
+              <input type="number" step="0.01" className="ps-input ps-mono" value={draft.alumbradoPublico ?? 130} onChange={(e) => setDraft({ ...draft, alumbradoPublico: Number(e.target.value) })} />
+            </Field>
+          </div>
+        </div>
+
         <div style={{
           background: 'rgba(99,102,241, 0.06)', border: '1px solid rgba(99,102,241, 0.2)',
           padding: '.75rem .9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '.78rem',
@@ -2467,7 +2538,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
         }}>
           <Info size={14} color="#5AC8FA" style={{ flexShrink: 0, marginTop: '.1rem' }} />
           <div>
-            <strong style={{ color: '#1C1C1E' }}>La tarifa de luz no se configura aquí.</strong> Cada mes se calcula sola dividiendo el monto total de la factura ENEE entre los kWh consumidos por los submedidores. Así siempre cuadra exacto y se ajusta automático a los cambios trimestrales de ENEE.
+            <strong style={{ color: '#1C1C1E' }}>La tarifa de energía no se configura aquí.</strong> Cada mes se calcula sola: <code>(factura ENEE − cargos fijos) ÷ kWh totales</code>. Así siempre cuadra exacto y se ajusta a los cambios trimestrales de ENEE.
           </div>
         </div>
 

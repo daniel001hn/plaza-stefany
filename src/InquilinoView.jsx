@@ -30,12 +30,29 @@ function calcTotalKwhSubmedidores(locales, pagos, prevPagos) {
   }
   return total
 }
-function calcTarifaEfectiva(factura, locales, pagos, prevPagos) {
+function calcCargosFijosTotal(factura, config) {
+  const f = factura || {}; const c = config || {}
+  const cc = (f.cargoComercializacion ?? c.cargoComercializacion ?? 0)
+  const cr = (f.cargoRegulacion ?? c.cargoRegulacion ?? 0)
+  const ap = (f.alumbradoPublico ?? c.alumbradoPublico ?? 0)
+  return Number(cc) + Number(cr) + Number(ap)
+}
+function calcLocalesConMedidor(locales) {
+  return (locales || []).filter(l => (l.tipoLuz || 'incluido') === 'medidor').length
+}
+function calcPerLocalFijo(factura, config, locales) {
+  const n = calcLocalesConMedidor(locales)
+  if (n <= 0) return 0
+  return calcCargosFijosTotal(factura, config) / n
+}
+function calcTarifaEfectiva(factura, locales, pagos, prevPagos, config) {
   const monto = Number(factura?.montoTotal) || 0
   if (monto <= 0) return null
+  const cargosFijos = calcCargosFijosTotal(factura, config)
+  const energia = monto - cargosFijos
   const totalKwh = calcTotalKwhSubmedidores(locales, pagos, prevPagos)
   if (totalKwh <= 0) return null
-  return monto / totalKwh
+  return energia / totalKwh
 }
 
 async function loadCfg() {
@@ -353,7 +370,7 @@ export default function InquilinoView({ session, onLogout }) {
     })
   }
 
-  // calc = { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza } ya computado en el render
+  // calc = { lecturaAnt, lecturaAct, consumo, tarifaEf, montoEnergia, montoLuz, kWhPlaza, fijoLocal, cargosFijos, nLocalesMed }
   const generarLuz = (mes, calc) => {
     if (!dentroVentanaWeb) {
       if (confirm('Recibo no disponible en la web — la tasa de cambio del día todavía no se actualizó.\n\nDescargá la app móvil o solicitalo por WhatsApp al admin.\n\n¿Abrir WhatsApp ahora?')) {
@@ -374,7 +391,10 @@ export default function InquilinoView({ session, onLogout }) {
       kWhPlaza: fmt0(calc.kWhPlaza || 0),
       facturaEnee: fmt(mes.factura?.montoTotal || 0),
       tarifa: fmt(calc.tarifaEf || 0),
-      montoEnergia: fmt(calc.montoLuz || 0),
+      montoEnergia: fmt(calc.montoEnergia || 0),
+      cargosFijos: fmt(calc.cargosFijos || 0),
+      fijoLocal: fmt(calc.fijoLocal || 0),
+      nLocales: String(calc.nLocalesMed || 0),
       total: fmt(calc.montoLuz || 0),
     }).catch(e => {
       console.error('Error generando recibo de luz:', e)
@@ -431,13 +451,18 @@ export default function InquilinoView({ session, onLogout }) {
           const luzPagada   = !!luzData.luzPagada
           const luzPagosAll = luzMes?.pagosAll || {}
           const luzPrevPagosAll = meses[idx + 2]?.pagosAll || {}
-          const tarifaEf    = luzMes ? (calcTarifaEfectiva(luzMes.factura, locales, luzPagosAll, luzPrevPagosAll) || 0) : 0
+          const tarifaEf    = luzMes ? (calcTarifaEfectiva(luzMes.factura, locales, luzPagosAll, luzPrevPagosAll, config) || 0) : 0
+          const fijoLocal   = luzMes ? calcPerLocalFijo(luzMes.factura, config, locales) : 0
+          const cargosFijos = luzMes ? calcCargosFijosTotal(luzMes.factura, config) : 0
+          const nLocalesMed = calcLocalesConMedidor(locales)
           const consumo     = luzMes ? calcConsumoLocal(local, luzPagosAll, luzPrevPagosAll) : null
           const lecturaAct  = luzData.lecturaActual ?? null
           const lecturaAnt  = luzPrevPagosAll[session.localId]?.lecturaActual ?? local?.lecturaInicial ?? null
           const kWhPlaza    = luzMes ? calcTotalKwhSubmedidores(locales, luzPagosAll, luzPrevPagosAll) : 0
-          const montoLuz    = (consumo != null && consumo > 0 && tarifaEf > 0) ? consumo * tarifaEf : 0
-          const tieneLuz    = luzAplica && !!luzMes && montoLuz > 0
+          const montoEnergia = (consumo != null && consumo > 0 && tarifaEf > 0) ? consumo * tarifaEf : 0
+          const montoLuz    = montoEnergia + (luzMes ? fijoLocal : 0)
+          // Hay recibo si: hay factura del mes Y este local tiene medidor (aunque consumo=0, paga fijo)
+          const tieneLuz    = luzAplica && !!luzMes && !!luzMes.factura?.montoTotal && (local?.tipoLuz === 'medidor')
           const luzNueva    = tieneLuz && !luzPagada
           const luzLabel    = luzMes ? `${MESES[luzMes.monthIdx]} ${luzMes.year}` : null
           // El recibo de renta solo está disponible si ya fue registrado por el admin
@@ -503,7 +528,7 @@ export default function InquilinoView({ session, onLogout }) {
                 {luzAplica && luzMes && (
                   <div style={{display:'flex',alignItems:'center',gap:'.5rem',flexWrap:'wrap'}}>
                     {tieneLuz
-                      ? <button className="btn-l" onClick={() => generarLuz(luzMes, { lecturaAnt, lecturaAct, consumo, tarifaEf, montoLuz, kWhPlaza })}>⚡ Recibo de luz {luzLabel} — L {fmt(montoLuz)}</button>
+                      ? <button className="btn-l" onClick={() => generarLuz(luzMes, { lecturaAnt, lecturaAct, consumo, tarifaEf, montoEnergia, montoLuz, kWhPlaza, fijoLocal, cargosFijos, nLocalesMed })}>⚡ Recibo de luz {luzLabel} — L {fmt(montoLuz)}</button>
                       : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>}
                     {tieneLuz && (
                       <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,

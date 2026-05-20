@@ -130,7 +130,8 @@ const safe = (s) => String(s).replace(/[\/\\:*?"<>|]/g, '_').replace(/\s+/g, '-'
 
 // d = { reciboNum, inquilino, local, periodo, fechaEmision,
 //       lecturaAnterior, lecturaActual, consumo,
-//       kWhPlaza, facturaEnee, tarifa, montoEnergia, total }  (todo ya formateado)
+//       kWhPlaza, facturaEnee, tarifa, montoEnergia,
+//       cargosFijos, fijoLocal, nLocales, total }  (todo ya formateado)
 export async function generarReciboLuzPdf(d) {
   const { doc, y: y0 } = await nuevoDoc('RECIBO DE ENERGÍA ELÉCTRICA');
   let y = tablaIdentificacion(doc, d, y0);
@@ -150,21 +151,30 @@ export async function generarReciboLuzPdf(d) {
 
   sectionHead(doc, 'CÁLCULO DEL MONTO', y);
   y += 4;
+  const tieneFijos = d.cargosFijos && d.cargosFijos !== '0.00' && d.cargosFijos !== '0';
+  const body = [['Factura ENEE total (plaza)', d.kWhPlaza + ' kWh', d.facturaEnee]];
+  if (tieneFijos) {
+    body.push(['Cargos fijos del mes (comerc. + reg. + alumbrado)', 'div. entre ' + d.nLocales, d.cargosFijos]);
+  }
+  body.push(['Tarifa efectiva de energía', 'L/kWh', d.tarifa]);
+  body.push(['Su consumo de energía', d.consumo + ' × ' + d.tarifa, d.montoEnergia]);
+  if (tieneFijos) {
+    body.push(['Su parte de cargos fijos', d.cargosFijos + ' ÷ ' + d.nLocales, d.fijoLocal]);
+  }
   autoTable(doc, {
     startY: y,
     margin: { left: MARGIN, right: MARGIN },
     head: [['DETALLE', 'VALOR', 'MONTO (L)']],
-    body: [
-      ['Factura ENEE estimada (plaza)', d.kWhPlaza + ' kWh', d.facturaEnee],
-      ['Tarifa efectiva de energía', 'L/kWh', d.tarifa],
-      ['Energía consumida', d.consumo + ' × ' + d.tarifa, d.montoEnergia],
-    ],
+    body,
     foot: [[{ content: 'TOTAL A PAGAR', colSpan: 2 }, 'L  ' + d.total]],
     ...tablaCalc,
   });
   y = doc.lastAutoTable.finalY + 9;
 
-  noteBox(doc, 'Método de cálculo: El monto se obtiene prorrateando la factura ENEE de la plaza según el consumo real registrado en el submedidor de cada local. Este recibo no genera ISV.', y);
+  const nota = tieneFijos
+    ? 'Método de cálculo: la energía se prorratea según el consumo del submedidor (factura ENEE neta de cargos fijos ÷ kWh totales de la plaza). Los cargos fijos (comercialización, regulación y alumbrado público) se dividen en partes iguales entre todos los locales con submedidor. Este recibo no genera ISV.'
+    : 'Método de cálculo: El monto se obtiene prorrateando la factura ENEE de la plaza según el consumo real registrado en el submedidor de cada local. Este recibo no genera ISV.';
+  noteBox(doc, nota, y);
 
   drawFooter(doc);
   doc.save(`Recibo-Luz-Local-${safe(d.local)}-${safe(d.periodo)}.pdf`);
