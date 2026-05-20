@@ -2086,16 +2086,18 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, p
   // Auditoría: comparar consumo del medidor principal vs suma de submedidores
   const sumSubmedidores = calcTotalKwhSubmedidores(locales || [], pagos || {}, prevPagos || {});
   const diff = (consumo != null) ? consumo - sumSubmedidores : null;
-  // Validación: el monto y los cargos fijos son obligatorios. La lectura principal es opcional (solo auditoría).
-  const camposObligatorios = (
-    form.montoTotal !== '' && Number(form.montoTotal) > 0 &&
-    form.cargoComercializacion !== '' && form.cargoRegulacion !== '' && form.alumbradoPublico !== ''
-  );
+  // Guardado parcial habilitado: el admin puede registrar cargos fijos primero
+  // (cualquier día del mes) y completar monto + lectura después (día 1 del mes
+  // siguiente cuando llega la factura ENEE). Solo se exige que los 3 cargos
+  // fijos tengan valor. El recibo no se emite hasta que el monto esté lleno
+  // (lógica de tieneLuz en InquilinoView).
+  const cargosCompletos = form.cargoComercializacion !== '' && form.cargoRegulacion !== '' && form.alumbradoPublico !== '';
+  const facturaCompleta = cargosCompletos && form.montoTotal !== '' && Number(form.montoTotal) > 0;
 
   const handleSave = () => {
-    if (!camposObligatorios) return;
+    if (!cargosCompletos) return;
     onSave({
-      montoTotal: Number(form.montoTotal) || 0,
+      montoTotal: form.montoTotal === '' ? 0 : Number(form.montoTotal),
       lecturaPrincipal: form.lecturaPrincipal === '' ? null : Number(form.lecturaPrincipal),
       fechaEmision: form.fechaEmision,
       fechaPago: form.fechaPago,
@@ -2230,14 +2232,24 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, p
             onChange={(e) => set('notas', e.target.value)} placeholder="Observaciones..." />
         </div>
 
-        {!camposObligatorios && (
+        {!cargosCompletos && (
           <div style={{ background: 'rgba(255,193,7,0.10)', border: '1px solid rgba(255,193,7,0.35)', padding: '.55rem .8rem', borderRadius: 8, marginBottom: '.7rem', fontSize: '.75rem', color: '#8B5A00' }}>
-            ⚠️ Completá todos los campos (monto, lectura y los 3 cargos fijos) antes de guardar. Los recibos no se emiten si falta algún dato.
+            ⚠️ Necesitás los 3 cargos fijos para guardar.
+          </div>
+        )}
+        {cargosCompletos && !facturaCompleta && (
+          <div style={{ background: 'rgba(0,122,255,0.08)', border: '1px solid rgba(0,122,255,0.30)', padding: '.55rem .8rem', borderRadius: 8, marginBottom: '.7rem', fontSize: '.75rem', color: '#004B99' }}>
+            <b>📝 Factura parcial.</b> Vas a guardar solo los cargos fijos. Los recibos <b>no se emiten</b> hasta que metas el monto total ENEE (el día 1 del próximo mes cuando llegue la factura).
+          </div>
+        )}
+        {facturaCompleta && (
+          <div style={{ background: 'rgba(52,199,89,0.10)', border: '1px solid rgba(52,199,89,0.35)', padding: '.55rem .8rem', borderRadius: 8, marginBottom: '.7rem', fontSize: '.75rem', color: '#1A7F35' }}>
+            ✅ Factura completa. Al guardar, los recibos quedan disponibles.
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem' }}>
           <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
-          <button onClick={handleSave} className="ps-btn" disabled={!camposObligatorios}><Save size={14} strokeWidth={2.5} /> Guardar</button>
+          <button onClick={handleSave} className="ps-btn" disabled={!cargosCompletos}><Save size={14} strokeWidth={2.5} /> Guardar</button>
         </div>
       </div>
     </div>
