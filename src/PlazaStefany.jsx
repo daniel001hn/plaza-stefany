@@ -1561,6 +1561,7 @@ function HistorialENEE({ monthsData, year }) {
   const yearTotals = useMemo(() => {
     let monto = 0, kwhPrincipal = 0, kwhSubmedidores = 0, areasComunes = 0;
     let mesesConData = 0;
+    let totalLuzEsperado = 0, totalLuzCobrado = 0;
     monthsData.forEach((m) => {
       if (m.factura.montoTotal) {
         monto += Number(m.factura.montoTotal);
@@ -1569,8 +1570,10 @@ function HistorialENEE({ monthsData, year }) {
       if (m.consumoPrincipal) kwhPrincipal += m.consumoPrincipal;
       if (m.consumoSubmedidores) kwhSubmedidores += m.consumoSubmedidores;
       if (m.areasComunes) areasComunes += m.areasComunes;
+      totalLuzEsperado += m.totalLuz || 0;
+      totalLuzCobrado += m.cobradoLuz || 0;
     });
-    return { monto, kwhPrincipal, kwhSubmedidores, areasComunes, mesesConData };
+    return { monto, kwhPrincipal, kwhSubmedidores, areasComunes, mesesConData, totalLuzEsperado, totalLuzCobrado };
   }, [monthsData]);
 
   // Tarifa efectiva chart
@@ -1578,8 +1581,52 @@ function HistorialENEE({ monthsData, year }) {
     mes: m.mes, tarifa: Number(m.tarifa.toFixed(2)), kwh: m.consumoPrincipal || 0,
   }));
 
+  const diferencia = yearTotals.monto - yearTotals.totalLuzCobrado;
+  const pendiente = yearTotals.totalLuzEsperado - yearTotals.totalLuzCobrado;
+  const cuadra = Math.abs(diferencia) < 1; // tolerancia 1 lempira por redondeo
+
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
+      {/* CUADRATURA ANUAL — lo que pagó admin a ENEE vs lo que cobró a inquilinos */}
+      {yearTotals.mesesConData > 0 && (
+        <div className="ps-card-elevated" style={{ padding: '1.5rem' }}>
+          <div className="ps-eyebrow" style={{ color: cuadra ? '#1A7F35' : '#B25800', marginBottom: '.5rem' }}>
+            {cuadra ? '✅ CUADRATURA' : '⚠️ CUADRATURA'} · {year}
+          </div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: '1rem' }}>
+            ¿Lo que cobré a los inquilinos cubre lo que pagué a ENEE?
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '1rem' }}>
+            <div>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Pagado a ENEE</div>
+              <div className="ps-mono" style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1C1C1E' }}>L {fmt(yearTotals.monto)}</div>
+              <div className="ps-mono" style={{ fontSize: '.68rem', color: '#6E6E78', marginTop: '.15rem' }}>{yearTotals.mesesConData} {yearTotals.mesesConData === 1 ? 'mes' : 'meses'} facturados</div>
+            </div>
+            <div>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Cobrado a inquilinos</div>
+              <div className="ps-mono" style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1A7F35' }}>L {fmt(yearTotals.totalLuzCobrado)}</div>
+              <div className="ps-mono" style={{ fontSize: '.68rem', color: '#6E6E78', marginTop: '.15rem' }}>luz cobrada efectiva</div>
+            </div>
+            <div>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Diferencia</div>
+              <div className="ps-mono" style={{ fontSize: '1.3rem', fontWeight: 700, color: cuadra ? '#1A7F35' : '#B25800' }}>
+                L {fmt(diferencia)}
+              </div>
+              <div className="ps-mono" style={{ fontSize: '.68rem', color: '#6E6E78', marginTop: '.15rem' }}>
+                {cuadra ? 'cuadra perfecto' : 'aún sin cobrar'}
+              </div>
+            </div>
+            {pendiente > 0 && (
+              <div>
+                <div className="ps-label" style={{ marginBottom: '.3rem' }}>Pendiente de cobro</div>
+                <div className="ps-mono" style={{ fontSize: '1.3rem', fontWeight: 700, color: '#B25800' }}>L {fmt(pendiente)}</div>
+                <div className="ps-mono" style={{ fontSize: '.68rem', color: '#6E6E78', marginTop: '.15rem' }}>luz pendiente</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ENEE summary */}
       <div className="ps-card-elevated" style={{ padding: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1.5rem' }}>
         <div>
@@ -1646,6 +1693,7 @@ function HistorialENEE({ monthsData, year }) {
           <thead>
             <tr>
               <th>Mes</th>
+              <th>Período ENEE</th>
               <th className="num">Lectura</th>
               <th className="num">kWh principal</th>
               <th className="num">kWh submed.</th>
@@ -1658,6 +1706,11 @@ function HistorialENEE({ monthsData, year }) {
             {monthsData.map((m) => (
               <tr key={m.idx} className="ps-table-row" style={{ opacity: m.factura.montoTotal ? 1 : 0.35 }}>
                 <td style={{ fontWeight: 600 }}>{m.mes}</td>
+                <td style={{ fontSize: '.72rem', color: '#6E6E78', whiteSpace: 'nowrap' }}>
+                  {m.factura.periodoDesde && m.factura.periodoHasta
+                    ? `${m.factura.periodoDesde.slice(8)}/${m.factura.periodoDesde.slice(5,7)} → ${m.factura.periodoHasta.slice(8)}/${m.factura.periodoHasta.slice(5,7)}`
+                    : '—'}
+                </td>
                 <td className="num" style={{ color: '#8E8E96' }}>
                   {m.factura.lecturaPrincipal != null ? m.factura.lecturaPrincipal : '—'}
                 </td>
@@ -1678,6 +1731,7 @@ function HistorialENEE({ monthsData, year }) {
             ))}
             <tr style={{ background: '#E8E8ED' }}>
               <td style={{ fontWeight: 700 }}>TOTAL {year}</td>
+              <td></td>
               <td className="num"></td>
               <td className="num" style={{ fontWeight: 700 }}>{fmt(yearTotals.kwhPrincipal)}</td>
               <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>{fmt(yearTotals.kwhSubmedidores)}</td>
@@ -2225,6 +2279,10 @@ function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick
 // FACTURA MODAL
 // =================================================================
 function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, pagos, prevPagos, onClose, onSave }) {
+  // Default período ENEE: día 11 del mes anterior → día 11 del mes actual
+  const pad = (n) => String(n).padStart(2, '0');
+  const defPeriodoDesde = `${monthIdx === 0 ? year - 1 : year}-${pad(monthIdx === 0 ? 12 : monthIdx)}-11`;
+  const defPeriodoHasta = `${year}-${pad(monthIdx + 1)}-11`;
   const [form, setForm] = useState({
     montoTotal: factura.montoTotal ?? '',
     lecturaPrincipal: factura.lecturaPrincipal ?? '',
@@ -2236,6 +2294,9 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, p
     cargoComercializacion: factura.cargoComercializacion ?? config?.cargoComercializacion ?? 60,
     cargoRegulacion: factura.cargoRegulacion ?? config?.cargoRegulacion ?? 30,
     alumbradoPublico: factura.alumbradoPublico ?? config?.alumbradoPublico ?? 130,
+    // Período real que ENEE factura (default 11 → 11, ajustable)
+    periodoDesde: factura.periodoDesde || defPeriodoDesde,
+    periodoHasta: factura.periodoHasta || defPeriodoHasta,
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const lecturaAnt = prevFactura.lecturaPrincipal;
@@ -2265,6 +2326,8 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, p
       cargoComercializacion: Number(form.cargoComercializacion) || 0,
       cargoRegulacion: Number(form.cargoRegulacion) || 0,
       alumbradoPublico: Number(form.alumbradoPublico) || 0,
+      periodoDesde: form.periodoDesde || null,
+      periodoHasta: form.periodoHasta || null,
     });
   };
 
@@ -2291,6 +2354,25 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, p
           <Info size={14} color="#5AC8FA" style={{ flexShrink: 0, marginTop: '.1rem' }} />
           <div>
             Metés el <strong style={{ color: '#1C1C1E' }}>monto total</strong> que ENEE te cobró y la <strong style={{ color: '#1C1C1E' }}>lectura del medidor principal</strong>. Con eso la app calcula sola la tarifa efectiva del mes y reparte entre los locales.
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '.85rem' }}>
+          <div className="ps-label" style={{ marginBottom: '.3rem' }}>Período real de ENEE</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem' }}>
+            <div>
+              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Desde</div>
+              <input type="date" className="ps-input" value={form.periodoDesde}
+                onChange={(e) => set('periodoDesde', e.target.value)} />
+            </div>
+            <div>
+              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Hasta</div>
+              <input type="date" className="ps-input" value={form.periodoHasta}
+                onChange={(e) => set('periodoHasta', e.target.value)} />
+            </div>
+          </div>
+          <div style={{ fontSize: '.7rem', color: '#6E6E78', marginTop: '.3rem' }}>
+            Solo informativo (qué período te factura ENEE). No afecta el cálculo de los inquilinos.
           </div>
         </div>
 
