@@ -470,18 +470,19 @@ export default function App({ supabase, onLogout }) {
       setLocales(cl.locales || []);
       setLoading(false);
 
-      // Auto-jalar tasa BCH al abrir la app (1 vez al día como mucho)
+      // Tasa de cambio BAC: el cron de Vercel la actualiza 1×/día. Como
+      // fallback (si el cron no corrió o estamos en preview), si la fecha
+      // guardada no es la de hoy, disparamos el endpoint nosotros mismos
+      // y refrescamos el config local con lo que devuelva.
       try {
         const hoy = new Date().toISOString().slice(0, 10);
         if (cl.config?.tasaFechaActualizada !== hoy) {
-          const res = await fetch('https://open.er-api.com/v6/latest/USD');
+          const res = await fetch('/api/tasa-bac');
           const data = await res.json();
-          if (data?.rates?.HNL) {
-            const tasa = Math.round(data.rates.HNL * 10000) / 10000;
-            const newConfig = { ...DEFAULT_CONFIG, ...cl.config, tasaCambio: tasa, tasaFechaActualizada: hoy };
+          if (data?.ok && data.sell) {
+            const newConfig = { ...DEFAULT_CONFIG, ...cl.config, tasaCambio: data.sell, tasaFechaActualizada: data.fecha, tasaFuente: 'BAC' };
             setConfig(newConfig);
-            await saveCfg({ config: newConfig, locales: cl.locales || [] });
-            setToast(`Tasa BCH actualizada: L ${tasa.toFixed(4)}/$`);
+            setToast(`Tasa BAC: L ${Number(data.sell).toFixed(4)}/$`);
             setTimeout(() => setToast(null), 2800);
           }
         }
@@ -2407,17 +2408,18 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
     setFetchingTasa(true);
     setTasaMsg('');
     try {
-      const res = await fetch('https://open.er-api.com/v6/latest/USD');
+      // dryRun=1: solo previsualiza la tasa en el input. El usuario decide si
+      // hace Guardar. (El cron diario ya la persiste sin que toques nada.)
+      const res = await fetch('/api/tasa-bac?dryRun=1');
       const data = await res.json();
-      if (data && data.rates && data.rates.HNL) {
-        const tasa = Math.round(data.rates.HNL * 10000) / 10000;
-        setDraft(d => ({ ...d, tasaCambio: tasa }));
-        setTasaMsg(`✓ Tasa BCH: L ${tasa.toFixed(4)}/$`);
+      if (data?.ok && data.sell) {
+        setDraft(d => ({ ...d, tasaCambio: data.sell }));
+        setTasaMsg(`✓ Tasa BAC venta: L ${Number(data.sell).toFixed(4)}/$ — clic Guardar para fijarla`);
       } else {
-        setTasaMsg('No se pudo obtener la tasa.');
+        setTasaMsg(`No se pudo obtener la tasa de BAC${data?.error ? ': ' + data.error : ''}`);
       }
     } catch (e) {
-      setTasaMsg('Error de conexión.');
+      setTasaMsg('Error de conexión con /api/tasa-bac');
     }
     setFetchingTasa(false);
   };
@@ -2442,11 +2444,16 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
           <Field label="Tipo de cambio (HNL/$)">
             <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
               <input type="number" step="0.01" className="ps-input ps-mono" style={{ flex: 1 }} value={draft.tasaCambio ?? 25} onChange={(e) => setDraft({ ...draft, tasaCambio: Number(e.target.value) })} />
-              <button onClick={fetchTasaBac} disabled={fetchingTasa} title="Obtener tasa de referencia BCH" style={{ padding: '0 .65rem', height: '38px', background: fetchingTasa ? '#e5e5ea' : '#6366F1', color: '#fff', border: 'none', borderRadius: 8, fontSize: '.75rem', fontWeight: 600, cursor: fetchingTasa ? 'default' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-                {fetchingTasa ? '...' : '🔄 BCH'}
+              <button onClick={fetchTasaBac} disabled={fetchingTasa} title="Traer la tasa de venta publicada por BAC Honduras (banca en línea pública)" style={{ padding: '0 .65rem', height: '38px', background: fetchingTasa ? '#e5e5ea' : '#6366F1', color: '#fff', border: 'none', borderRadius: 8, fontSize: '.75rem', fontWeight: 600, cursor: fetchingTasa ? 'default' : 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                {fetchingTasa ? '...' : '🔄 BAC'}
               </button>
             </div>
-            {tasaMsg && <div style={{ fontSize: '.72rem', marginTop: '.3rem', color: tasaMsg.startsWith('✓') ? '#34C759' : '#FF3B30' }}>{tasaMsg} — ajustá al precio venta BAC si difiere</div>}
+            {tasaMsg && <div style={{ fontSize: '.72rem', marginTop: '.3rem', color: tasaMsg.startsWith('✓') ? '#34C759' : '#FF3B30' }}>{tasaMsg}</div>}
+            {draft.tasaFechaActualizada && (
+              <div style={{ fontSize: '.7rem', marginTop: '.25rem', color: '#8E8E96' }}>
+                Última actualización auto ({draft.tasaFuente || 'BAC'}): {draft.tasaFechaActualizada}
+              </div>
+            )}
           </Field>
           <Field label="ISV (%)">
             <input type="number" step="0.01" className="ps-input ps-mono" value={(draft.isv * 100).toFixed(2)} onChange={(e) => setDraft({ ...draft, isv: Number(e.target.value) / 100 })} />
