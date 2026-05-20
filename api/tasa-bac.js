@@ -1,12 +1,14 @@
 // Vercel Edge Function: obtiene la tasa de cambio USD/HNL (venta).
 //
-// Fuente principal: BAC Honduras (banca en línea, header público "Tipo de Cambio")
-//   GET https://www.sucursalelectronica.com/ebac/common/GetExchangeRateInfo.go
-// Fallback: open.er-api.com (forex genérico, ~0.3% off del oficial)
-//   GET https://open.er-api.com/v6/latest/USD
+// Fuentes en orden de preferencia (todas publican la misma tasa oficial — los
+// bancos hondureños la coordinan diariamente):
+//   1. Ficohsa  — homepage tiene la tasa en HTML con clase CSS limpia.
+//                 Sin Akamai → funciona desde Vercel.
+//   2. BAC      — endpoint JSON del header de banca en línea pública.
+//                 Akamai bloquea IPs de data center → solo funciona local/móvil.
+//   3. open.er-api.com — forex genérico, ~0.6% off del oficial. Último recurso.
 //
-// Corre como Edge Function (no Node) — distinto egress, fetch nativo, evita
-// el bloqueo de Akamai sobre IPs de data centers tradicionales de Vercel.
+// Corre como Edge Function (fetch nativo, distinto egress que Node).
 //
 // Env vars (en Vercel):
 //   SUPABASE_URL  (o VITE_SUPABASE_URL)
@@ -19,6 +21,33 @@ import { createClient } from '@supabase/supabase-js';
 export const config = { runtime: 'edge' };
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+async function fromFicohsa() {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 7000);
+  try {
+    const r = await fetch('https://www.ficohsa.com/hn/', {
+      headers: { 'User-Agent': UA, 'Accept': 'text/html,*/*', 'Accept-Language': 'es-HN,es;q=0.9' },
+      signal: ctrl.signal,
+    });
+    if (!r.ok) throw new Error('status ' + r.status);
+    const html = await r.text();
+    // Las clases del widget de divisas:
+    //   gff-indicadores-divisas-v1__buys  → "Compra L 26.6282"
+    //   gff-indicadores-divisas-v1__sale  → "Venta  L 26.7613"
+    // El primer match de cada uno es USD (el segundo es EUR).
+    const sellMatch = html.match(/gff-indicadores-divisas-v1__sale[\s\S]{0,400}?L\s*(\d{1,3}\.\d{2,6})/);
+    const buyMatch = html.match(/gff-indicadores-divisas-v1__buys[\s\S]{0,400}?L\s*(\d{1,3}\.\d{2,6})/);
+    if (!sellMatch) throw new Error('No encontré tasa de venta');
+    return {
+      source: 'Ficohsa',
+      sell: Number(sellMatch[1]),
+      buy: buyMatch ? Number(buyMatch[1]) : Number(sellMatch[1]),
+    };
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 async function fromBac() {
   const ctrl = new AbortController();
@@ -60,7 +89,7 @@ async function fromForex() {
 
 async function getRate() {
   const errors = [];
-  for (const fn of [fromBac, fromForex]) {
+  for (const fn of [fromFicohsa, fromBac, fromForex]) {
     try { return await fn(); } catch (e) { errors.push(fn.name + ': ' + (e.message || e)); }
   }
   throw new Error('Todas las fuentes fallaron — ' + errors.join(' | '));
