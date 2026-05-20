@@ -2844,22 +2844,22 @@ function AuditLogSection() {
           <div style={{ display: 'grid', gap: '.4rem' }}>
             {visible.map((e, i) => (
               <div key={i} style={{
-                display: 'grid', gridTemplateColumns: '140px 1fr', gap: '.7rem',
-                alignItems: 'baseline', padding: '.5rem .75rem',
-                background: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.6)',
-                borderRadius: 8, fontSize: '.8rem',
+                padding: '.6rem .8rem',
+                background: 'rgba(255,255,255,0.85)',
+                border: '1px solid rgba(0,0,0,0.06)',
+                borderRadius: 8, fontSize: '.82rem',
               }}>
-                <span style={{ color: '#888', fontSize: '.72rem', whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace' }}>
-                  {fechaFmt(e.fecha)}
-                </span>
-                <div>
-                  <div style={{ fontWeight: 500, color: '#1c1c1e' }}>{e.accion}</div>
-                  {(e.local || e.mes) && (
-                    <div style={{ fontSize: '.7rem', color: '#888', marginTop: '.15rem' }}>
-                      {e.local}{e.local && e.mes ? ' · ' : ''}{e.mes}
-                    </div>
-                  )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '.6rem', marginBottom: '.2rem', flexWrap: 'wrap' }}>
+                  <div style={{ fontWeight: 600, color: '#1C1C1E', lineHeight: 1.3 }}>{e.accion}</div>
+                  <div style={{ color: '#6E6E78', fontSize: '.7rem', whiteSpace: 'nowrap', fontFamily: 'JetBrains Mono, monospace', flexShrink: 0 }}>
+                    {fechaFmt(e.fecha)}
+                  </div>
                 </div>
+                {(e.local || e.mes) && (
+                  <div style={{ fontSize: '.72rem', color: '#6E6E78' }}>
+                    {e.local}{e.local && e.mes ? ' · ' : ''}{e.mes}
+                  </div>
+                )}
               </div>
             ))}
           </div>
