@@ -935,7 +935,7 @@ export default function App({ supabase, onLogout }) {
       )}
 
       {editingFactura && (
-        <FacturaModal factura={factura} prevFactura={prevFactura} monthIdx={monthIdx} year={year}
+        <FacturaModal factura={factura} prevFactura={prevFactura} monthIdx={monthIdx} year={year} config={config}
           onClose={() => setEditingFactura(false)} onSave={updateFactura}
         />
       )}
@@ -2065,7 +2065,7 @@ function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick
 // =================================================================
 // FACTURA MODAL
 // =================================================================
-function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave }) {
+function FacturaModal({ factura, prevFactura, monthIdx, year, config, onClose, onSave }) {
   const [form, setForm] = useState({
     montoTotal: factura.montoTotal ?? '',
     lecturaPrincipal: factura.lecturaPrincipal ?? '',
@@ -2073,13 +2073,25 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
     fechaPago: factura.fechaPago || '',
     pagada: !!factura.pagada,
     notas: factura.notas || '',
+    // Cargos fijos: del snapshot si existe; si no, del config actual.
+    cargoComercializacion: factura.cargoComercializacion ?? config?.cargoComercializacion ?? 60,
+    cargoRegulacion: factura.cargoRegulacion ?? config?.cargoRegulacion ?? 30,
+    alumbradoPublico: factura.alumbradoPublico ?? config?.alumbradoPublico ?? 130,
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const lecturaAnt = prevFactura.lecturaPrincipal;
   const consumo = (form.lecturaPrincipal !== '' && lecturaAnt != null && !isNaN(Number(lecturaAnt)))
     ? Number(form.lecturaPrincipal) - Number(lecturaAnt) : null;
+  const cargosFijosTotal = (Number(form.cargoComercializacion) || 0) + (Number(form.cargoRegulacion) || 0) + (Number(form.alumbradoPublico) || 0);
+  // Validación: no permitir guardar sin monto, sin cargos fijos completos, ni lectura
+  const camposObligatorios = (
+    form.montoTotal !== '' && Number(form.montoTotal) > 0 &&
+    form.lecturaPrincipal !== '' &&
+    form.cargoComercializacion !== '' && form.cargoRegulacion !== '' && form.alumbradoPublico !== ''
+  );
 
   const handleSave = () => {
+    if (!camposObligatorios) return;
     onSave({
       montoTotal: Number(form.montoTotal) || 0,
       lecturaPrincipal: form.lecturaPrincipal === '' ? null : Number(form.lecturaPrincipal),
@@ -2087,6 +2099,9 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
       fechaPago: form.fechaPago,
       pagada: form.pagada,
       notas: form.notas,
+      cargoComercializacion: Number(form.cargoComercializacion) || 0,
+      cargoRegulacion: Number(form.cargoRegulacion) || 0,
+      alumbradoPublico: Number(form.alumbradoPublico) || 0,
     });
   };
 
@@ -2160,6 +2175,33 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
           </div>
         </div>
 
+        <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '.9rem', marginBottom: '.85rem' }}>
+          <div className="ps-label" style={{ marginBottom: '.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Cargos fijos de esta factura (se dividen en partes iguales entre los locales)</span>
+            <span style={{ color: '#6366F1', fontWeight: 700 }}>Total: L {cargosFijosTotal.toFixed(2)}</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.5rem' }}>
+            <div>
+              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Comercialización</div>
+              <input type="number" step="0.01" className="ps-input ps-mono" value={form.cargoComercializacion}
+                onChange={(e) => set('cargoComercializacion', e.target.value)} placeholder="60" />
+            </div>
+            <div>
+              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Regulación</div>
+              <input type="number" step="0.01" className="ps-input ps-mono" value={form.cargoRegulacion}
+                onChange={(e) => set('cargoRegulacion', e.target.value)} placeholder="30" />
+            </div>
+            <div>
+              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Alumbrado público</div>
+              <input type="number" step="0.01" className="ps-input ps-mono" value={form.alumbradoPublico}
+                onChange={(e) => set('alumbradoPublico', e.target.value)} placeholder="130" />
+            </div>
+          </div>
+          <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.35rem' }}>
+            Confirmá estos valores con tu factura ENEE del mes — se quedan congelados acá y los recibos los usan tal cual.
+          </div>
+        </div>
+
         <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.4rem 0', marginBottom: '.85rem' }}>
           <input type="checkbox" className="ps-checkbox" checked={form.pagada} onChange={(e) => set('pagada', e.target.checked)} />
           <span style={{ fontSize: '.92rem', fontWeight: 500 }}>Ya pagué la factura ENEE</span>
@@ -2171,9 +2213,14 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, onClose, onSave })
             onChange={(e) => set('notas', e.target.value)} placeholder="Observaciones..." />
         </div>
 
+        {!camposObligatorios && (
+          <div style={{ background: 'rgba(255,193,7,0.10)', border: '1px solid rgba(255,193,7,0.35)', padding: '.55rem .8rem', borderRadius: 8, marginBottom: '.7rem', fontSize: '.75rem', color: '#8B5A00' }}>
+            ⚠️ Completá todos los campos (monto, lectura y los 3 cargos fijos) antes de guardar. Los recibos no se emiten si falta algún dato.
+          </div>
+        )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem' }}>
           <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
-          <button onClick={handleSave} className="ps-btn"><Save size={14} strokeWidth={2.5} /> Guardar</button>
+          <button onClick={handleSave} className="ps-btn" disabled={!camposObligatorios}><Save size={14} strokeWidth={2.5} /> Guardar</button>
         </div>
       </div>
     </div>
