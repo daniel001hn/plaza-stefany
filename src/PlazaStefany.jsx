@@ -2002,6 +2002,7 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
 // ACTIVIDAD INQUILINOS — alertas cuando generan recibos
 // =================================================================
 function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
+  const [abierto, setAbierto] = useState(false)
   const tiempoRelativo = (iso) => {
     if (!iso) return null
     const diff = Math.floor((Date.now() - new Date(iso)) / 1000)
@@ -2033,42 +2034,46 @@ function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
   if (alertas.length === 0) return null
 
   return (
-    <div className="ps-card" style={{ padding: '1.25rem', borderLeft: '3px solid #F59E0B' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.85rem' }}>
+    <div className="ps-card" style={{ padding: abierto ? '1.25rem' : '.8rem 1.25rem', borderLeft: '3px solid #F59E0B' }}>
+      <button onClick={() => setAbierto(a => !a)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '.5rem', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: 'inherit', textAlign: 'left' }}>
         <AlertCircle size={15} style={{ color: '#F59E0B' }} />
         <div className="ps-eyebrow" style={{ color: '#F59E0B' }}>ACTIVIDAD DE INQUILINOS</div>
-        <span style={{ marginLeft: 'auto', background: '#F59E0B', color: 'white', borderRadius: 999, fontSize: '.65rem', fontWeight: 700, padding: '.1rem .5rem' }}>{alertas.length}</span>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-        {alertas.map(a => (
-          <div key={a.id} style={{
-            display: 'flex', alignItems: 'center', gap: '.75rem',
-            background: a.tipo === 'renta' ? 'rgba(99,102,241,0.07)' : 'rgba(14,165,233,0.07)',
-            border: `1px solid ${a.tipo === 'renta' ? 'rgba(99,102,241,0.2)' : 'rgba(14,165,233,0.2)'}`,
-            borderRadius: 10, padding: '.65rem .9rem',
-          }}>
-            <span style={{ fontSize: '1.1rem' }}>{a.tipo === 'renta' ? '📄' : '⚡'}</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '.88rem', fontWeight: 600 }}>
-                <span style={{ color: a.tipo === 'renta' ? '#6366F1' : '#0EA5E9' }}>Local {a.localNum}</span>
-                {' · '}{a.nombre}
-              </div>
-              <div style={{ fontSize: '.74rem', color: '#6E6E78', marginTop: '.1rem' }}>
-                Generó recibo de <b>{a.tipo}</b> — {tiempoRelativo(a.ts)}
-              </div>
-            </div>
-            {a.comprobante
-              ? <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                  <img src={a.comprobante} alt="comprobante"
-                    style={{ width: 40, height: 32, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
-                    onClick={() => window.open(a.comprobante, '_blank')} />
-                  <span style={{ fontSize: '.7rem', color: '#1A7F35', fontWeight: 600 }}>✅ Pagado</span>
+        <span style={{ background: '#F59E0B', color: 'white', borderRadius: 999, fontSize: '.65rem', fontWeight: 700, padding: '.1rem .5rem' }}>{alertas.length}</span>
+        <span style={{ marginLeft: 'auto', fontSize: '.85rem', color: '#6E6E78', transition: 'transform .2s', transform: abierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+      </button>
+      {abierto && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', marginTop: '.85rem' }}>
+          {alertas.map(a => (
+            <div key={a.id} style={{
+              display: 'flex', alignItems: 'center', gap: '.75rem',
+              background: a.tipo === 'renta' ? 'rgba(99,102,241,0.07)' : 'rgba(14,165,233,0.07)',
+              border: `1px solid ${a.tipo === 'renta' ? 'rgba(99,102,241,0.2)' : 'rgba(14,165,233,0.2)'}`,
+              borderRadius: 10, padding: '.65rem .9rem',
+            }}>
+              <span style={{ fontSize: '1.1rem' }}>{a.tipo === 'renta' ? '📄' : '⚡'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '.88rem', fontWeight: 600 }}>
+                  <span style={{ color: a.tipo === 'renta' ? '#6366F1' : '#0EA5E9' }}>Local {a.localNum}</span>
+                  {' · '}{a.nombre}
                 </div>
-              : <span style={{ fontSize: '.7rem', color: '#F59E0B', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '.15rem .45rem', borderRadius: 6, border: '1px solid rgba(245,158,11,0.3)' }}>⏳ Sin comprobante</span>
-            }
-          </div>
-        ))}
-      </div>
+                <div style={{ fontSize: '.74rem', color: '#6E6E78', marginTop: '.1rem' }}>
+                  Generó recibo de <b>{a.tipo}</b> — {tiempoRelativo(a.ts)}
+                </div>
+              </div>
+              {a.comprobante
+                ? <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                    <img src={a.comprobante} alt="comprobante"
+                      style={{ width: 40, height: 32, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
+                      onClick={() => window.open(a.comprobante, '_blank')} />
+                    <span style={{ fontSize: '.7rem', color: '#1A7F35', fontWeight: 600 }}>✅ Pagado</span>
+                  </div>
+                : <span style={{ fontSize: '.7rem', color: '#F59E0B', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '.15rem .45rem', borderRadius: 6, border: '1px solid rgba(245,158,11,0.3)' }}>⏳ Sin comprobante</span>
+              }
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2906,6 +2911,7 @@ function AuditLogSection() {
   const [filtroLocal, setFiltroLocal] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [abierto, setAbierto] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -2958,32 +2964,38 @@ function AuditLogSection() {
   };
 
   return (
-    <div className="ps-card" style={{ padding: '1.4rem 1.5rem', marginTop: '1rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
-        <div>
-          <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}>📋 ACTIVIDAD ADMIN</div>
-          <div style={{ fontSize: '1rem', fontWeight: 600 }}>Registro de acciones</div>
-        </div>
-        <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <select value={filtroMes} onChange={(e) => setFiltroMes(e.target.value)}
-            className="ps-input" style={{ fontSize: '.8rem', padding: '.4rem .55rem', minWidth: 140 }}>
-            <option value="">Todos los meses</option>
-            {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
-          </select>
-          <select value={filtroLocal} onChange={(e) => setFiltroLocal(e.target.value)}
-            className="ps-input" style={{ fontSize: '.8rem', padding: '.4rem .55rem', minWidth: 140, maxWidth: 240 }}>
-            <option value="">Todos los locales</option>
-            {localesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
-          </select>
-          {hayFiltros && (
-            <button onClick={limpiarFiltros} className="ps-btn-ghost" style={{ fontSize: '.75rem', padding: '.4rem .65rem' }}>
-              Limpiar
-            </button>
-          )}
-        </div>
+    <div className="ps-card" style={{ padding: abierto ? '1.4rem 1.5rem' : '.9rem 1.5rem', marginTop: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.5rem' }}>
+        <button onClick={() => setAbierto(a => !a)}
+          style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: '.6rem', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', color: 'inherit', textAlign: 'left' }}>
+          <div>
+            <div className="ps-eyebrow" style={{ marginBottom: abierto ? '.25rem' : 0 }}>📋 ACTIVIDAD ADMIN {!abierto && log.length > 0 && <span style={{ color: '#6E6E78', marginLeft: '.4rem' }}>· {log.length} acciones</span>}</div>
+            {abierto && <div style={{ fontSize: '1rem', fontWeight: 600 }}>Registro de acciones</div>}
+          </div>
+          <span style={{ marginLeft: 'auto', fontSize: '.85rem', color: '#6E6E78', transition: 'transform .2s', transform: abierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+        </button>
+        {abierto && (
+          <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <select value={filtroMes} onChange={(e) => setFiltroMes(e.target.value)}
+              className="ps-input" style={{ fontSize: '.8rem', padding: '.4rem .55rem', minWidth: 140 }}>
+              <option value="">Todos los meses</option>
+              {mesesDisponibles.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select value={filtroLocal} onChange={(e) => setFiltroLocal(e.target.value)}
+              className="ps-input" style={{ fontSize: '.8rem', padding: '.4rem .55rem', minWidth: 140, maxWidth: 240 }}>
+              <option value="">Todos los locales</option>
+              {localesDisponibles.map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+            {hayFiltros && (
+              <button onClick={limpiarFiltros} className="ps-btn-ghost" style={{ fontSize: '.75rem', padding: '.4rem .65rem' }}>
+                Limpiar
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {loading ? (
+      {!abierto ? null : loading ? (
         <div style={{ color: '#6E6E78', fontSize: '.85rem', padding: '.5rem 0' }}>Cargando…</div>
       ) : filtered.length === 0 ? (
         <div style={{ color: '#6E6E78', fontSize: '.85rem', padding: '.5rem 0' }}>
