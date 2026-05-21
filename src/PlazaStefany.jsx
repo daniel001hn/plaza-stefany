@@ -850,7 +850,7 @@ export default function App({ supabase, onLogout }) {
       {paymentLocal && (
         <PaymentModal local={paymentLocal} monthIdx={monthIdx} year={year}
           data={pagos[paymentLocal.id] || {}} prevData={prevPagos[paymentLocal.id] || {}}
-          factura={factura} tarifaEfectiva={tarifaEfectiva} config={config} calcRenta={calcRenta}
+          factura={factura} tarifaEfectiva={tarifaEfectiva} fijoLocal={perLocalFijo} config={config} calcRenta={calcRenta}
           onClose={() => setPaymentLocal(null)}
           onSave={async (updates) => { await updatePayment(paymentLocal.id, updates); setPaymentLocal(null); }}
           onGenerateRecibo={async () => {
@@ -1050,6 +1050,11 @@ function DashboardView({
   const areasComunes = consumoPrincipal != null && consumoSubmedidores > 0
     ? consumoPrincipal - consumoSubmedidores : null;
 
+  const fijoLocalActual = useMemo(
+    () => calcPerLocalFijo(factura, config, locales),
+    [factura, config, locales]
+  );
+
   const kpis = useMemo(() => {
     const totalRenta = locales.reduce((s, l) => s + calcRenta(l.m2), 0);
     let totalLuz = 0, cobradoRenta = 0, cobradoLuz = 0;
@@ -1057,8 +1062,10 @@ function DashboardView({
     locales.forEach((l) => {
       const d = pagos[l.id] || {};
       const consumo = calcConsumoLocal(l, pagos, prevPagos);
-      const montoLuz = (l.tipoLuz === 'medidor' && consumo != null && tarifaEfectiva)
-        ? consumo * tarifaEfectiva : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
+      // luz = consumo × tarifa + parte del cargo fijo (Fenix consumo 0 sigue pagando fijo)
+      const montoLuz = l.tipoLuz === 'medidor'
+        ? ((consumo != null && tarifaEfectiva) ? consumo * tarifaEfectiva : 0) + fijoLocalActual
+        : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
       totalLuz += montoLuz;
       if (d.rentaPagada) cobradoRenta += calcRenta(l.m2); else pendientesRenta++;
       if (l.tipoLuz !== 'incluido' && montoLuz > 0) {
@@ -1071,19 +1078,20 @@ function DashboardView({
       totalCobrado: cobradoRenta + cobradoLuz,
       totalEsperado: totalRenta + totalLuz,
     };
-  }, [locales, pagos, prevPagos, tarifaEfectiva, config]);
+  }, [locales, pagos, prevPagos, tarifaEfectiva, fijoLocalActual, config]);
 
   const perLocal = useMemo(() => {
     return locales.map((l) => {
       const d = pagos[l.id] || {};
       const renta = calcRenta(l.m2);
       const consumo = calcConsumoLocal(l, pagos, prevPagos);
-      const luz = (l.tipoLuz === 'medidor' && consumo != null && tarifaEfectiva)
-        ? consumo * tarifaEfectiva : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
+      const luz = l.tipoLuz === 'medidor'
+        ? ((consumo != null && tarifaEfectiva) ? consumo * tarifaEfectiva : 0) + fijoLocalActual
+        : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
       const cobrado = (d.rentaPagada ? renta : 0) + (d.luzPagada ? luz : 0);
       return { ...l, renta, luz, total: renta + luz, cobrado, consumo };
     });
-  }, [locales, pagos, prevPagos, tarifaEfectiva, config]);
+  }, [locales, pagos, prevPagos, tarifaEfectiva, fijoLocalActual, config]);
 
   if (locales.length === 0) {
     return (
@@ -2380,7 +2388,7 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, p
   );
 }
 
-function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEfectiva, config, calcRenta, onClose, onSave, onGenerateRecibo, onGenerateReciboRenta }) {
+function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEfectiva, fijoLocal = 0, config, calcRenta, onClose, onSave, onGenerateRecibo, onGenerateReciboRenta }) {
   const [form, setForm] = useState({
     rentaPagada: !!data.rentaPagada,
     fechaRenta: data.fechaRenta || '',
@@ -2404,8 +2412,12 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
         : (lecturaAnterior != null ? Number(form.lecturaActual) - Number(lecturaAnterior) : null))
     : null;
 
-  const montoLuzCalc = tipoLuz === 'medidor' && consumo != null && tarifaEfectiva
-    ? consumo * tarifaEfectiva : (tipoLuz === 'fijo' ? (local.luzFija || 0) : 0);
+  // luz = consumo × tarifa + parte del cargo fijo. Si consumo=0/null, igual paga el fijo.
+  const montoEnergiaCalc = tipoLuz === 'medidor' && consumo != null && tarifaEfectiva
+    ? consumo * tarifaEfectiva : 0;
+  const montoLuzCalc = tipoLuz === 'medidor'
+    ? montoEnergiaCalc + fijoLocal
+    : (tipoLuz === 'fijo' ? (local.luzFija || 0) : 0);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const todayStr = () => new Date().toISOString().slice(0, 10);

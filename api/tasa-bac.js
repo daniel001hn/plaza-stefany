@@ -100,6 +100,26 @@ export default async function handler(req) {
   const dryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true';
   const today = new Date().toISOString().slice(0, 10);
 
+  // Para writes (persistir en DB), exigir uno de:
+  //   - Header Authorization: Bearer <CRON_SECRET>  (Vercel Cron lo manda automático)
+  //   - Header x-cron-key: <CRON_SECRET>            (admin manual)
+  //   - Origen del propio dominio (request del front autenticado)
+  // dryRun siempre está abierto: solo lee fuentes públicas, no toca DB.
+  const cronSecret = process.env.CRON_SECRET;
+  if (!dryRun && cronSecret) {
+    const auth = req.headers.get('authorization') || '';
+    const cronKey = req.headers.get('x-cron-key') || '';
+    const fromCron = auth === `Bearer ${cronSecret}` || cronKey === cronSecret;
+    const referer = req.headers.get('referer') || '';
+    const host = req.headers.get('host') || '';
+    const fromSameOrigin = host && referer.includes(host);
+    if (!fromCron && !fromSameOrigin) {
+      return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), {
+        status: 401, headers: { 'content-type': 'application/json' },
+      });
+    }
+  }
+
   try {
     const rate = await getRate();
     const sell = Math.round(rate.sell * 10000) / 10000;

@@ -4,7 +4,10 @@ import PlazaStefany from './PlazaStefany'
 import InquilinoView from './InquilinoView'
 import './storageAdapter'
 
-const ADMIN_PASSWORD = import.meta.env.VITE_APP_PASSWORD || 'STEFANYPLAZA100280'
+// La contraseña del admin SOLO viene de la env var. NO hay fallback hardcoded:
+// un fallback queda en el JS bundle del cliente y cualquiera con DevTools lo ve.
+// Si la env var no está seteada (deploy mal configurado), el login admin falla.
+const ADMIN_PASSWORD = import.meta.env.VITE_APP_PASSWORD
 const SESSION_KEY = 'plaza_session'
 
 const css = `
@@ -31,22 +34,57 @@ function LoginScreen({ onLogin }) {
     setLoading(true)
     setError('')
 
-    await new Promise(r => setTimeout(r, 600))
+    await new Promise(r => setTimeout(r, 400))
 
-    // Admin login (sin usuario o usuario vacío)
-    if (!usuario.trim() && password === ADMIN_PASSWORD) {
+    // Convertir usuario+password → email+password para Supabase Auth.
+    // Admin: usuario vacío → admin@plaza-stefany.local
+    // Inquilino: tatys → tatys@plaza-stefany.local
+    const usuarioStr = usuario.trim().toLowerCase()
+    const email = usuarioStr ? `${usuarioStr}@plaza-stefany.local` : 'admin@plaza-stefany.local'
+
+    // PASO 1: intentar Supabase Auth (modo nuevo, exige RLS activado)
+    try {
+      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+      if (!authErr && data?.user) {
+        const meta = data.user.user_metadata || {}
+        const isAdmin = meta.role === 'admin' || email === 'admin@plaza-stefany.local'
+        if (isAdmin) {
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role: 'admin' }))
+          onLogin({ role: 'admin' })
+          return
+        }
+        // Inquilino: lookup localId/nombre del config
+        try {
+          const raw = await window.storage.get('config-and-locales')
+          const cfg = raw ? JSON.parse(raw) : {}
+          const usuarios = cfg.config?.usuarios || cfg.usuarios || []
+          const match = usuarios.find(u => u.usuario.toLowerCase() === usuarioStr)
+          if (match) {
+            const session = { role: 'inquilino', localId: match.localId, nombre: match.nombre }
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+            onLogin(session)
+            return
+          }
+        } catch(e) {}
+      }
+    } catch(e) {
+      // Supabase Auth no responde — caer al modo legacy
+    }
+
+    // PASO 2: fallback legacy (mientras la migración no esté completa).
+    // Una vez RLS esté activo, este path falla porque no hay JWT y la DB
+    // bloquea todo. Sirve solo durante el periodo de transición.
+    if (!usuarioStr && ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
       sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role: 'admin' }))
       onLogin({ role: 'admin' })
       return
     }
-
-    // Inquilino login — buscar en config
     try {
       const raw = await window.storage.get('config-and-locales')
       const data = raw ? JSON.parse(raw) : {}
       const usuarios = data.config?.usuarios || data.usuarios || []
       const match = usuarios.find(u =>
-        u.usuario.toLowerCase() === usuario.trim().toLowerCase() &&
+        u.usuario.toLowerCase() === usuarioStr &&
         u.password === password
       )
       if (match) {
@@ -96,8 +134,9 @@ function App() {
     setChecking(false)
   }, [])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     sessionStorage.removeItem(SESSION_KEY)
+    try { await supabase.auth.signOut() } catch (e) {}
     setSession(null)
   }
 
