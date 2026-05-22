@@ -129,9 +129,37 @@ function App() {
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    const s = sessionStorage.getItem(SESSION_KEY)
-    if (s) { try { setSession(JSON.parse(s)) } catch(e) {} }
-    setChecking(false)
+    let cancelled = false
+    ;(async () => {
+      // Validar que la sesión en sessionStorage TIENE un JWT vivo en Supabase.
+      // Si no, la app va a fallar todas las queries por RLS. Mejor borrar
+      // sessionStorage y forzar re-login.
+      const s = sessionStorage.getItem(SESSION_KEY)
+      if (!s) { if (!cancelled) setChecking(false); return }
+      let parsed
+      try { parsed = JSON.parse(s) } catch(e) { sessionStorage.removeItem(SESSION_KEY); if (!cancelled) setChecking(false); return }
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (data?.session?.access_token) {
+          if (!cancelled) { setSession(parsed); setChecking(false) }
+        } else {
+          // Hay sessionStorage pero no JWT — sesión legacy o expirada
+          sessionStorage.removeItem(SESSION_KEY)
+          if (!cancelled) setChecking(false)
+        }
+      } catch (e) {
+        sessionStorage.removeItem(SESSION_KEY)
+        if (!cancelled) setChecking(false)
+      }
+    })()
+    // Escuchar cambios de auth (token refresh, logout en otra pestaña)
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        sessionStorage.removeItem(SESSION_KEY)
+        if (!cancelled) setSession(null)
+      }
+    })
+    return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
   }, [])
 
   const handleLogout = async () => {
