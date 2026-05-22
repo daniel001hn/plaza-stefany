@@ -124,39 +124,60 @@ function LoginScreen({ onLogin }) {
   )
 }
 
+// Deriva el "session" local (role + localId + nombre) desde la auth de Supabase.
+// Para tenants necesita buscar localId/nombre en config-and-locales.usuarios.
+async function deriveSession(user) {
+  if (!user) return null
+  const email = (user.email || '').toLowerCase()
+  const meta = user.user_metadata || {}
+  const isAdmin = meta.role === 'admin' || email === 'admin@plaza-stefany.local'
+  if (isAdmin) return { role: 'admin' }
+  // Inquilino: lookup localId por usuario (parte antes del @)
+  const usuarioStr = email.split('@')[0]
+  try {
+    const raw = await window.storage.get('config-and-locales')
+    const cfg = raw ? JSON.parse(raw) : {}
+    const usuarios = cfg.config?.usuarios || cfg.usuarios || []
+    const match = usuarios.find(u => u.usuario.toLowerCase() === usuarioStr)
+    if (match) return { role: 'inquilino', localId: match.localId, nombre: match.nombre }
+  } catch(e) {}
+  return null
+}
+
 function App() {
   const [session, setSession] = useState(null)
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
     let cancelled = false
+    // Fuente de verdad: supabase.auth.getSession(). sessionStorage se usa solo
+    // como cache temporal del role/localId derivado.
     ;(async () => {
-      // Validar que la sesión en sessionStorage TIENE un JWT vivo en Supabase.
-      // Si no, la app va a fallar todas las queries por RLS. Mejor borrar
-      // sessionStorage y forzar re-login.
-      const s = sessionStorage.getItem(SESSION_KEY)
-      if (!s) { if (!cancelled) setChecking(false); return }
-      let parsed
-      try { parsed = JSON.parse(s) } catch(e) { sessionStorage.removeItem(SESSION_KEY); if (!cancelled) setChecking(false); return }
-      try {
-        const { data } = await supabase.auth.getSession()
-        if (data?.session?.access_token) {
-          if (!cancelled) { setSession(parsed); setChecking(false) }
-        } else {
-          // Hay sessionStorage pero no JWT — sesión legacy o expirada
-          sessionStorage.removeItem(SESSION_KEY)
-          if (!cancelled) setChecking(false)
+      const { data } = await supabase.auth.getSession()
+      if (data?.session?.user) {
+        const derived = await deriveSession(data.session.user)
+        if (!cancelled && derived) {
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
+          setSession(derived)
         }
-      } catch (e) {
+      } else {
         sessionStorage.removeItem(SESSION_KEY)
-        if (!cancelled) setChecking(false)
       }
+      if (!cancelled) setChecking(false)
     })()
-    // Escuchar cambios de auth (token refresh, logout en otra pestaña)
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    // Reaccionar a cambios de auth (login, logout, token refresh)
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, supSession) => {
       if (event === 'SIGNED_OUT') {
         sessionStorage.removeItem(SESSION_KEY)
         if (!cancelled) setSession(null)
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (supSession?.user) {
+          const derived = await deriveSession(supSession.user)
+          if (!cancelled && derived) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
+            setSession(derived)
+          }
+        }
       }
     })
     return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
