@@ -5,6 +5,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 // Uso la storageKey default de supabase-js (sb-<ref>-auth-token) para
 // que sesiones previas de la app no se rompan al cambiar de configuración.
+// Build trigger: 2026-05-24
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
