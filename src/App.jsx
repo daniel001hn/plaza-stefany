@@ -9,6 +9,8 @@ import './storageAdapter'
 // Si la env var no está seteada (deploy mal configurado), el login admin falla.
 const ADMIN_PASSWORD = import.meta.env.VITE_APP_PASSWORD
 const SESSION_KEY = 'plaza_session'
+const BUILD_VERSION = '2026-05-24-auth-v2'
+if (typeof window !== 'undefined') window.__BUILD_VERSION__ = BUILD_VERSION
 
 const css = `
   @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
