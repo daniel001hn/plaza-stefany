@@ -219,7 +219,7 @@ export default function InquilinoView({ session, onLogout }) {
   // caso, el inquilino usa la app nativa (que fetchea la tasa en vivo desde el
   // celular, sin depender del cron) o solicita el recibo por WhatsApp.
   const esAppNativa = typeof window !== 'undefined' && (window.Capacitor?.isNativePlatform?.() || !!window.cordova)
-  const hoyISO = today.toISOString().slice(0, 10)
+  const hoyISO = today.toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' })
   const tasaFreshHoy = config?.tasaFechaActualizada === hoyISO
   const dentroVentanaWeb = esAppNativa || tasaFreshHoy
   const TEL_ADMIN_WSP = '50494628618'

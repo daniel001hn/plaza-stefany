@@ -521,7 +521,7 @@ export default function App({ supabase, onLogout }) {
       // guardada no es la de hoy, disparamos el endpoint nosotros mismos
       // y refrescamos el config local con lo que devuelva.
       try {
-        const hoy = new Date().toISOString().slice(0, 10);
+        const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
         if (cl.config?.tasaFechaActualizada !== hoy) {
           const res = await fetch('/api/tasa-bac');
           const data = await res.json();
@@ -683,7 +683,7 @@ export default function App({ supabase, onLogout }) {
       const inquilinoAssigned = !!locale.inquilino;
       let updatedLocale = locale;
       if (inquilinoChanged && inquilinoAssigned) {
-        updatedLocale = { ...locale, contratoDesde: new Date().toISOString().slice(0, 10) };
+        updatedLocale = { ...locale, contratoDesde: new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' }) };
         logEntry = {
           actor: 'admin',
           accion: prev.inquilino
@@ -703,7 +703,7 @@ export default function App({ supabase, onLogout }) {
       next = locales.map((l) => (l.id === locale.id ? updatedLocale : l));
     } else {
       const id = `loc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      const contratoDesde = locale.inquilino ? new Date().toISOString().slice(0, 10) : null;
+      const contratoDesde = locale.inquilino ? new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' }) : null;
       next = [...locales, { ...locale, id, contratoDesde }];
       logEntry = {
         actor: 'admin',
@@ -2420,7 +2420,7 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
     : (tipoLuz === 'fijo' ? (local.luzFija || 0) : 0);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  const todayStr = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
 
   const handleSave = () => {
     const out = {

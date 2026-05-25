@@ -98,7 +98,8 @@ async function getRate() {
 export default async function handler(req) {
   const url = new URL(req.url);
   const dryRun = url.searchParams.get('dryRun') === '1' || url.searchParams.get('dryRun') === 'true';
-  const today = new Date().toISOString().slice(0, 10);
+  // Fecha local de Honduras (UTC-6). Usar UTC genera off-by-one entre 18:00 y 24:00 hora local.
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
 
   // Para writes (persistir en DB), exigir uno de:
   //   - Header Authorization: Bearer <CRON_SECRET>  (Vercel Cron lo manda automático)
