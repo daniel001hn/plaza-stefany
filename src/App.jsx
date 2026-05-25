@@ -4,10 +4,6 @@ import PlazaStefany from './PlazaStefany'
 import InquilinoView from './InquilinoView'
 import './storageAdapter'
 
-// La contraseña del admin SOLO viene de la env var. NO hay fallback hardcoded:
-// un fallback queda en el JS bundle del cliente y cualquiera con DevTools lo ve.
-// Si la env var no está seteada (deploy mal configurado), el login admin falla.
-const ADMIN_PASSWORD = import.meta.env.VITE_APP_PASSWORD
 const SESSION_KEY = 'plaza_session'
 const BUILD_VERSION = '2026-05-24-auth-v2'
 if (typeof window !== 'undefined') window.__BUILD_VERSION__ = BUILD_VERSION
@@ -44,7 +40,6 @@ function LoginScreen({ onLogin }) {
     const usuarioStr = usuario.trim().toLowerCase()
     const email = usuarioStr ? `${usuarioStr}@plaza-stefany.local` : 'admin@plaza-stefany.local'
 
-    // PASO 1: intentar Supabase Auth (modo nuevo, exige RLS activado)
     try {
       const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
       if (!authErr && data?.user) {
@@ -55,45 +50,16 @@ function LoginScreen({ onLogin }) {
           onLogin({ role: 'admin' })
           return
         }
-        // Inquilino: lookup localId/nombre del config
-        try {
-          const raw = await window.storage.get('config-and-locales')
-          const cfg = raw ? JSON.parse(raw) : {}
-          const usuarios = cfg.config?.usuarios || cfg.usuarios || []
-          const match = usuarios.find(u => u.usuario.toLowerCase() === usuarioStr)
-          if (match) {
-            const session = { role: 'inquilino', localId: match.localId, nombre: match.nombre }
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
-            onLogin(session)
-            return
-          }
-        } catch(e) {}
-      }
-    } catch(e) {
-      // Supabase Auth no responde — caer al modo legacy
-    }
-
-    // PASO 2: fallback legacy (mientras la migración no esté completa).
-    // Una vez RLS esté activo, este path falla porque no hay JWT y la DB
-    // bloquea todo. Sirve solo durante el periodo de transición.
-    if (!usuarioStr && ADMIN_PASSWORD && password === ADMIN_PASSWORD) {
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify({ role: 'admin' }))
-      onLogin({ role: 'admin' })
-      return
-    }
-    try {
-      const raw = await window.storage.get('config-and-locales')
-      const data = raw ? JSON.parse(raw) : {}
-      const usuarios = data.config?.usuarios || data.usuarios || []
-      const match = usuarios.find(u =>
-        u.usuario.toLowerCase() === usuarioStr &&
-        u.password === password
-      )
-      if (match) {
-        const session = { role: 'inquilino', localId: match.localId, nombre: match.nombre }
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
-        onLogin(session)
-        return
+        const raw = await window.storage.get('config-and-locales')
+        const cfg = raw ? JSON.parse(raw) : {}
+        const usuarios = cfg.config?.usuarios || cfg.usuarios || []
+        const match = usuarios.find(u => u.usuario.toLowerCase() === usuarioStr)
+        if (match) {
+          const session = { role: 'inquilino', localId: match.localId, nombre: match.nombre }
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
+          onLogin(session)
+          return
+        }
       }
     } catch(e) {}
 
