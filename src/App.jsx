@@ -165,10 +165,13 @@ function App() {
     return () => { cancelled = true; sub?.subscription?.unsubscribe?.() }
   }, [])
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    // Actualizar UI inmediatamente — no esperar a signOut, que a veces se cuelga
+    // por timeouts del WebSocket de Supabase. Si signOut falla, el self-heal del
+    // próximo load limpia el JWT residual.
     sessionStorage.removeItem(SESSION_KEY)
-    try { await supabase.auth.signOut() } catch (e) {}
     setSession(null)
+    supabase.auth.signOut().catch(() => {})
   }
 
   if (checking) return null
