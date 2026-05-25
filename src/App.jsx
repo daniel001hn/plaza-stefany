@@ -132,19 +132,24 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
-    // Fuente de verdad: supabase.auth.getSession(). sessionStorage se usa solo
-    // como cache temporal del role/localId derivado.
+    // Watchdog: si getSession se cuelga (locks internos de supabase-js, network
+    // muerto), igual sacamos checking=false después de 2s para no quedar en
+    // blanco. En el peor caso muestra LoginScreen y el usuario re-loguea.
+    const watchdog = setTimeout(() => { if (!cancelled) setChecking(false) }, 2000)
     ;(async () => {
-      const { data } = await supabase.auth.getSession()
-      if (data?.session?.user) {
-        const derived = await deriveSession(data.session.user)
-        if (!cancelled && derived) {
-          sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
-          setSession(derived)
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (data?.session?.user) {
+          const derived = await deriveSession(data.session.user)
+          if (!cancelled && derived) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
+            setSession(derived)
+          }
+        } else {
+          sessionStorage.removeItem(SESSION_KEY)
         }
-      } else {
-        sessionStorage.removeItem(SESSION_KEY)
-      }
+      } catch (e) {}
+      clearTimeout(watchdog)
       if (!cancelled) setChecking(false)
     })()
     // Reaccionar a cambios de auth (login, logout, token refresh)
