@@ -5,8 +5,22 @@ import InquilinoView from './InquilinoView'
 import './storageAdapter'
 
 const SESSION_KEY = 'plaza_session'
-const BUILD_VERSION = '2026-05-24-auth-v2'
-if (typeof window !== 'undefined') window.__BUILD_VERSION__ = BUILD_VERSION
+const BUILD_VERSION = '2026-05-24-auth-v3'
+const BUILD_KEY = 'plaza_build_version'
+
+// Self-heal: cuando se deploya un build nuevo, limpiar cualquier estado stale
+// de bundles previos (JWT roto en localStorage, sessionStorage con role pero
+// sin JWT real, etc). Corre 1 sola vez por cambio de BUILD_VERSION.
+if (typeof window !== 'undefined') {
+  window.__BUILD_VERSION__ = BUILD_VERSION
+  try {
+    if (localStorage.getItem(BUILD_KEY) !== BUILD_VERSION) {
+      Object.keys(localStorage).filter(k => k.startsWith('sb-')).forEach(k => localStorage.removeItem(k))
+      sessionStorage.removeItem(SESSION_KEY)
+      localStorage.setItem(BUILD_KEY, BUILD_VERSION)
+    }
+  } catch (e) {}
+}
 
 const css = `
   @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
