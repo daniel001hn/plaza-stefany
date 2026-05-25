@@ -403,6 +403,8 @@ export default function InquilinoView({ session, onLogout }) {
       fijoLocal: fmt(calc.fijoLocal || 0),
       nLocales: String(calc.nLocalesMed || 0),
       total: fmt(calc.montoLuz || 0),
+      fotoMedidorAnterior: mes.data?.fotoMedidorAnterior || null,
+      fotoMedidorActual: mes.data?.fotoMedidorActual || null,
     }).catch(e => {
       console.error('Error generando recibo de luz:', e)
       alert('No se pudo generar el recibo de luz. Reintentá o avisá al admin.')

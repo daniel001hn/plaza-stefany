@@ -886,6 +886,8 @@ export default function App({ supabase, onLogout }) {
                 fijoLocal: fmt2(fijoLocal),
                 nLocales: String(nLocales),
                 total: fmt2(total),
+                fotoMedidorAnterior: dd.fotoMedidorAnterior || null,
+                fotoMedidorActual: dd.fotoMedidorActual || null,
               });
               setToast('Recibo de luz descargado — revisá tu carpeta Descargas');
               setTimeout(() => setToast(null), 4000);
@@ -2388,6 +2390,30 @@ function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, p
   );
 }
 
+// Comprime imagen a base64 (max 1200px, calidad 0.7) para usar en recibos.
+// 1200px da buena resolución para que se lea el medidor en el PDF.
+function comprimirFotoMedidor(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      const max = 1200
+      let w = img.width, h = img.height
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max }
+        else { w = Math.round(w * max / h); h = max }
+      }
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.7))
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEfectiva, fijoLocal = 0, config, calcRenta, onClose, onSave, onGenerateRecibo, onGenerateReciboRenta }) {
   const [form, setForm] = useState({
     rentaPagada: !!data.rentaPagada,
@@ -2400,7 +2426,23 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
     medidorReemplazado: !!data.medidorReemplazado,
     lecturaInicialReseteo: data.lecturaInicialReseteo ?? '',
     notas: data.notas || '',
+    fotoMedidorAnterior: data.fotoMedidorAnterior || '',
+    fotoMedidorActual: data.fotoMedidorActual || '',
   });
+  const [fotoLoading, setFotoLoading] = useState({ anterior: false, actual: false });
+
+  const handleFotoChange = async (tipo, file) => {
+    if (!file) return
+    setFotoLoading(s => ({ ...s, [tipo]: true }))
+    try {
+      const b64 = await comprimirFotoMedidor(file)
+      setForm(f => ({ ...f, [`fotoMedidor${tipo === 'anterior' ? 'Anterior' : 'Actual'}`]: b64 }))
+    } catch (e) {
+      alert('No se pudo procesar la foto. Probá con otra.')
+    } finally {
+      setFotoLoading(s => ({ ...s, [tipo]: false }))
+    }
+  };
   const tipoLuz = local.tipoLuz || 'incluido';
   const renta = calcRenta(local.m2);
   const lecturaAnterior = prevData.lecturaActual ?? local.lecturaInicial ?? null;
@@ -2435,6 +2477,8 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
         out.medidorReemplazado = !!form.medidorReemplazado;
         out.lecturaInicialReseteo = form.medidorReemplazado && form.lecturaInicialReseteo !== ''
           ? Number(form.lecturaInicialReseteo) : null;
+        out.fotoMedidorAnterior = form.fotoMedidorAnterior || null;
+        out.fotoMedidorActual = form.fotoMedidorActual || null;
       }
       out.montoLuz = montoLuzCalc;
     }
@@ -2572,6 +2616,42 @@ function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEf
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* Fotos del medidor — van como segunda página del recibo */}
+                <div style={{ marginBottom: '.85rem', padding: '.7rem .85rem', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8 }}>
+                  <div className="ps-label" style={{ marginBottom: '.5rem', fontSize: '.72rem', color: '#6366F1' }}>
+                    📸 FOTOS DEL CONTADOR (opcional — van como página 2 del recibo)
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem' }}>
+                    {['anterior', 'actual'].map((tipo) => {
+                      const key = tipo === 'anterior' ? 'fotoMedidorAnterior' : 'fotoMedidorActual';
+                      const url = form[key];
+                      const labelTxt = tipo === 'anterior' ? `Anterior (${lecturaAnterior ?? '—'})` : `Actual (${form.lecturaActual || '—'})`;
+                      return (
+                        <div key={tipo}>
+                          <div style={{ fontSize: '.7rem', color: '#5A5A64', marginBottom: '.3rem', fontWeight: 500 }}>{labelTxt}</div>
+                          {url ? (
+                            <div style={{ position: 'relative' }}>
+                              <img src={url} alt={`medidor ${tipo}`}
+                                onClick={() => window.open(url, '_blank')}
+                                style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer' }} />
+                              <button onClick={(e) => { e.preventDefault(); set(key, '') }}
+                                style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: '.7rem', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
+                            </div>
+                          ) : (
+                            <label style={{ display: 'block', cursor: 'pointer' }}>
+                              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                                onChange={(e) => handleFotoChange(tipo, e.target.files?.[0])} />
+                              <div style={{ height: 90, display: 'grid', placeItems: 'center', border: '1px dashed rgba(99,102,241,0.4)', borderRadius: 6, background: 'rgba(255,255,255,0.5)', color: '#6366F1', fontSize: '.78rem', textAlign: 'center', padding: '.5rem' }}>
+                                {fotoLoading[tipo] ? '⏳ Procesando...' : '📷 Tomar / Subir'}
+                              </div>
+                            </label>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </>
             )}

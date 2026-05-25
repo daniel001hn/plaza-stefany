@@ -128,10 +128,75 @@ const tablaCalc = {
 
 const safe = (s) => String(s).replace(/[\/\\:*?"<>|]/g, '_').replace(/\s+/g, '-');
 
+// Agrega página 2 al PDF con las 2 fotos del submedidor (si están presentes).
+// fotoAnterior/fotoActual son data URLs base64 (image/jpeg) generadas en
+// PaymentModal con compresión a 1200px. Si alguna falta, no se agrega la página.
+async function agregarPaginaFotos(doc, d) {
+  if (!d.fotoMedidorAnterior && !d.fotoMedidorActual) return;
+  doc.addPage();
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+  const img = await loadHeaderImg();
+  const imgH = pw * HEADER_RATIO;
+  doc.addImage(img, 'PNG', 0, 0, pw, imgH, undefined, 'SLOW');
+
+  let y = imgH + 13;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(16);
+  doc.setTextColor(...C.text);
+  doc.text('FOTOS DEL SUBMEDIDOR', pw / 2, y, { align: 'center', charSpace: 0.5 });
+  y += 5;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(...C.light);
+  doc.text(`Local ${d.local} · ${d.periodo}`, pw / 2, y, { align: 'center' });
+  y += 8;
+
+  // Cada foto ocupa ~ mitad disponible del ancho útil, max altura tal que entren las 2 + footer
+  const usable = pw - 2 * MARGIN;
+  const fotoW = usable;
+  const labelH = 7;
+  const footerSpace = 22; // espacio para footer + nota
+  const availH = ph - y - footerSpace;
+  const fotoH = Math.min((availH - 2 * labelH - 6) / 2, 95);
+
+  const dibujarFoto = (dataUrl, label, lectura, top) => {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...C.teal);
+    doc.text(label, MARGIN, top);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...C.text);
+    if (lectura != null && lectura !== '') {
+      doc.text('Lectura: ' + lectura + ' kWh', pw - MARGIN, top, { align: 'right' });
+    }
+    if (dataUrl) {
+      try {
+        doc.addImage(dataUrl, 'JPEG', MARGIN, top + 2, fotoW, fotoH, undefined, 'SLOW');
+      } catch (e) {
+        doc.setTextColor(...C.light);
+        doc.text('(foto no disponible)', pw / 2, top + fotoH / 2, { align: 'center' });
+      }
+    } else {
+      doc.setFillColor(245, 245, 247);
+      doc.rect(MARGIN, top + 2, fotoW, fotoH, 'F');
+      doc.setTextColor(...C.light);
+      doc.text('(sin foto)', pw / 2, top + fotoH / 2 + 2, { align: 'center' });
+    }
+  };
+
+  dibujarFoto(d.fotoMedidorAnterior, 'LECTURA ANTERIOR', d.lecturaAnterior, y);
+  dibujarFoto(d.fotoMedidorActual, 'LECTURA ACTUAL', d.lecturaActual, y + fotoH + labelH + 4);
+
+  drawFooter(doc);
+}
+
 // d = { reciboNum, inquilino, local, periodo, fechaEmision,
 //       lecturaAnterior, lecturaActual, consumo,
 //       kWhPlaza, facturaEnee, tarifa, montoEnergia,
-//       cargosFijos, fijoLocal, nLocales, total }  (todo ya formateado)
+//       cargosFijos, fijoLocal, nLocales, total,
+//       fotoMedidorAnterior?, fotoMedidorActual? }  (todo ya formateado)
 export async function generarReciboLuzPdf(d) {
   const { doc, y: y0 } = await nuevoDoc('RECIBO DE ENERGÍA ELÉCTRICA');
   let y = tablaIdentificacion(doc, d, y0);
@@ -177,6 +242,9 @@ export async function generarReciboLuzPdf(d) {
   noteBox(doc, nota, y);
 
   drawFooter(doc);
+
+  await agregarPaginaFotos(doc, d);
+
   doc.save(`Recibo-Luz-Local-${safe(d.local)}-${safe(d.periodo)}.pdf`);
 }
 
