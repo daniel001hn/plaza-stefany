@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { monthKey } from './keys'
 import { MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete'
 import { generarReciboLuzPdf, generarReciboRentaPdf } from './generarReciboPdf'
+import { supabase } from './supabaseClient'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -306,26 +307,41 @@ export default function InquilinoView({ session, onLogout }) {
     img.src = url
   })
 
+  // Inquilinos NO pueden escribir kv_store directamente (RLS bloquea).
+  // El comprobante se sube vía /api/inquilino-comprobante que valida JWT
+  // + verifica que el localId del inquilino matchea, y luego escribe con
+  // service_role server-side.
   const subirComprobante = async (mes, tipo, file) => {
     if (!file) return
     try {
       const b64 = await comprimirImagen(file)
-      const key = monthKey(mes.year, mes.monthIdx)
-      const r = await window.storage.get(key)
-      const data = r ? JSON.parse(r) : { pagos: {}, factura: {} }
-      data.pagos = data.pagos || {}
-      data.pagos[session.localId] = {
-        ...(data.pagos[session.localId] || {}),
-        [`comprobante${tipo}`]: b64,
-        [`comprobante${tipo}Date`]: new Date().toISOString(),
-      }
-      await window.storage.set(key, JSON.stringify(data))
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess?.session?.access_token
+      if (!token) throw new Error('no auth session')
+      const res = await fetch('/api/inquilino-comprobante', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          year: mes.year,
+          monthIdx: mes.monthIdx,
+          tipo,
+          comprobanteB64: b64,
+        }),
+      })
+      const result = await res.json()
+      if (!res.ok || !result.ok) throw new Error(result?.error || 'upload failed')
       setMeses(prev => prev.map(m =>
         m.year === mes.year && m.monthIdx === mes.monthIdx
-          ? { ...m, data: { ...m.data, [`comprobante${tipo}`]: b64 } }
+          ? { ...m, data: { ...m.data, [`comprobante${tipo}`]: b64, [`comprobante${tipo}Date`]: new Date().toISOString() } }
           : m
       ))
-    } catch(e) { alert('Error al subir la imagen. Intentá de nuevo.') }
+    } catch(e) {
+      console.error('subirComprobante:', e)
+      alert('Error al subir la imagen: ' + (e?.message || 'reintentá'))
+    }
   }
 
   const registrarActividad = async (mes, tipo) => {
