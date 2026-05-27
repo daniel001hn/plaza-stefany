@@ -53,25 +53,56 @@ function addFooter(doc, n, total) {
   doc.text(`${n} / ${total}`, pw - MARGIN, ph - 9, { align: 'right' })
 }
 
-// Dibuja un phone frame con la screenshot dentro. Devuelve dims para anotar.
+// Phone moderno estilo iPhone con bezels finos + pantalla con esquinas redondeadas
+// que respetan el corner radius del marco. Sombra suave realista.
 function bigPhone(doc, dataUrl, cx, top, height) {
   const ratio = 844 / 390
   const h = height
   const w = h / ratio
   const x = cx - w / 2
   const y = top
-  // Sombra suave
+
+  const bezel = 0.8        // bezel ultra-fino
+  const frameRadius = 9    // esquinas del marco
+  const screenRadius = 7.5 // esquinas de la pantalla (ligeramente menor)
+
+  // Sombra suave (3 capas con opacidad decreciente)
   if (doc.GState) {
-    doc.setGState(new doc.GState({ opacity: 0.08 }))
-    doc.setFillColor(0, 0, 0)
-    doc.roundedRect(x + 1.5, y + 2, w, h, 5, 5, 'F')
+    const shadows = [{ ox: 0, oy: 1, a: 0.06 }, { ox: 0, oy: 3, a: 0.05 }, { ox: 0, oy: 6, a: 0.04 }]
+    shadows.forEach(s => {
+      doc.setGState(new doc.GState({ opacity: s.a }))
+      doc.setFillColor(0, 0, 0)
+      doc.roundedRect(x - bezel + s.ox, y - bezel + s.oy, w + 2 * bezel, h + 2 * bezel, frameRadius, frameRadius, 'F')
+    })
     doc.setGState(new doc.GState({ opacity: 1 }))
   }
-  // Frame negro
-  doc.setFillColor(20, 20, 24)
-  doc.roundedRect(x - 1.8, y - 1.8, w + 3.6, h + 3.6, 6, 6, 'F')
-  // Pantalla
+
+  // Frame silver/aluminio (estilo iPhone color natural) — funciona con
+  // screenshots claras y oscuras sin fundirse con el contenido.
+  // Capa de borde exterior gris oscuro fino (depth)
+  doc.setFillColor(190, 192, 198)
+  doc.roundedRect(x - bezel, y - bezel, w + 2 * bezel, h + 2 * bezel, frameRadius, frameRadius, 'F')
+  // Capa interior un tono más oscuro entre el silver exterior y la pantalla
+  doc.setFillColor(155, 158, 165)
+  doc.roundedRect(x - bezel * 0.6, y - bezel * 0.6, w + bezel * 1.2, h + bezel * 1.2, frameRadius - 0.5, frameRadius - 0.5, 'F')
+
+  // Highlight superior (efecto reflejo de luz)
+  if (doc.GState) {
+    doc.setGState(new doc.GState({ opacity: 0.35 }))
+    doc.setFillColor(255, 255, 255)
+    doc.roundedRect(x - bezel, y - bezel, w + 2 * bezel, 1.2, frameRadius, frameRadius, 'F')
+    doc.setGState(new doc.GState({ opacity: 1 }))
+  }
+
+  // Pantalla — addImage + clip rectángulo redondeado
+  // jsPDF: usar saveGraphicsState + clip path
+  doc.saveGraphicsState()
+  doc.roundedRect(x, y, w, h, screenRadius, screenRadius, null)
+  doc.clip()
+  doc.discardPath()
   doc.addImage(dataUrl, 'PNG', x, y, w, h, undefined, 'FAST')
+  doc.restoreGraphicsState()
+
   return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 }
 }
 
@@ -84,17 +115,18 @@ function cssToPdf(phone, cssX, cssY) {
   }
 }
 
-// Círculo rojo grueso alrededor de un rectángulo CSS (con padding extra)
-function circleAround(doc, phone, box, pad = 2) {
+// Círculo rojo fino y amplio alrededor de un elemento (estilo highlight a mano)
+function circleAround(doc, phone, box, pad = 5) {
   if (!box) return
-  const p1 = cssToPdf(phone, box.x - pad, box.y - pad)
-  const p2 = cssToPdf(phone, box.x + box.width + pad, box.y + box.height + pad)
+  const p1 = cssToPdf(phone, box.x - pad, box.y - pad - 1)
+  const p2 = cssToPdf(phone, box.x + box.width + pad, box.y + box.height + pad + 1)
   const cx = (p1.x + p2.x) / 2
   const cy = (p1.y + p2.y) / 2
-  const rx = (p2.x - p1.x) / 2
-  const ry = (p2.y - p1.y) / 2
+  // Radio mínimo para que no quede pegado al elemento
+  const rx = Math.max((p2.x - p1.x) / 2, 8)
+  const ry = Math.max((p2.y - p1.y) / 2, 5)
   doc.setDrawColor(...C.highlight)
-  doc.setLineWidth(1.4)
+  doc.setLineWidth(0.6)
   doc.ellipse(cx, cy, rx, ry, 'S')
   return { cx, cy, rx, ry }
 }
@@ -119,13 +151,13 @@ function arrowLabel(doc, txt, labelX, labelY, target, opts = {}) {
     const toX = target.cx + (opts.arrowFrom === 'left' ? target.rx : -target.rx) * 0.95
     const toY = target.cy
     doc.setDrawColor(...color)
-    doc.setLineWidth(0.9)
+    doc.setLineWidth(0.55)
     // Línea principal
     doc.line(fromX, fromY, toX, toY)
     // Cabeza de flecha (2 líneas pequeñas)
     const angle = Math.atan2(toY - fromY, toX - fromX)
-    const headLen = 2.5
-    const headAngle = 0.45
+    const headLen = 2.8
+    const headAngle = 0.42
     doc.line(toX, toY, toX - headLen * Math.cos(angle - headAngle), toY - headLen * Math.sin(angle - headAngle))
     doc.line(toX, toY, toX - headLen * Math.cos(angle + headAngle), toY - headLen * Math.sin(angle + headAngle))
   }
