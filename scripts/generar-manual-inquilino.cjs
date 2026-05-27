@@ -7,6 +7,7 @@ const fs = require('fs')
 const path = require('path')
 
 const MARGIN = 14
+const FONT = 'Arial'  // cargado desde C:/Windows/Fonts
 
 const C = {
   text: [28, 28, 30],
@@ -40,13 +41,36 @@ const doc = new jsPDF({ unit: 'mm', format: 'letter' })
 const pw = doc.internal.pageSize.getWidth()
 const ph = doc.internal.pageSize.getHeight()
 
+// Cargar Arial (regular + bold) desde Windows. Si falla, jsPDF cae a Helvetica
+// (que es métricamente equivalente a Arial, así que no se ve raro).
+try {
+  const arialRegular = fs.readFileSync('C:/Windows/Fonts/arial.ttf').toString('base64')
+  const arialBold = fs.readFileSync('C:/Windows/Fonts/arialbd.ttf').toString('base64')
+  doc.addFileToVFS('Arial.ttf', arialRegular)
+  doc.addFileToVFS('Arial-Bold.ttf', arialBold)
+  doc.addFont('Arial.ttf', 'Arial', 'normal')
+  doc.addFont('Arial-Bold.ttf', 'Arial', 'bold')
+  console.log('✓ Arial cargada desde Windows')
+} catch (e) {
+  console.log('⚠ No se pudo cargar Arial, usando Helvetica:', e.message)
+}
+
+// Centra texto vertical+horizontal en un punto (cx, cy). Calcula el baseline
+// correcto para que el texto quede óptico-centrado dentro de un círculo o pill.
+function centerText(doc, txt, cx, cy, fontSize) {
+  // fontSize en pt, conversión a mm: pt × 0.3528
+  // baseline correction para Arial/Helvetica: ~ 0.35 × fontSize_mm
+  const baselineOffset = fontSize * 0.3528 * 0.35
+  doc.text(txt, cx, cy + baselineOffset, { align: 'center' })
+}
+
 // ─── Helpers ───
 
 function addFooter(doc, n, total) {
   doc.setDrawColor(...C.border)
   doc.setLineWidth(0.2)
   doc.line(MARGIN, ph - 14, pw - MARGIN, ph - 14)
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('Arial', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(...C.textSec)
   doc.text('Plaza Stefany · D&L Soluciones', MARGIN, ph - 9)
@@ -134,15 +158,15 @@ function circleAround(doc, phone, box, pad = 5) {
 // Etiqueta colorida con texto, con flecha apuntando al círculo
 function arrowLabel(doc, txt, labelX, labelY, target, opts = {}) {
   const color = opts.color || C.highlight
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Arial', 'bold')
   doc.setFontSize(opts.size || 12)
   const tw = doc.getTextWidth(txt) + 8
   const th = (opts.size || 12) * 0.45 + 4
-  // Pill
+  // Pill (centro vertical de la pill = labelY - th/2 + 1.5)
   doc.setFillColor(...color)
   doc.roundedRect(labelX, labelY - th + 1.5, tw, th, 2, 2, 'F')
   doc.setTextColor(...C.white)
-  doc.text(txt, labelX + tw / 2, labelY + 0.5, { align: 'center' })
+  centerText(doc, txt, labelX + tw / 2, labelY - th / 2 + 1.5, opts.size || 12)
 
   // Flecha curva del centro de la pill al circle target
   if (target) {
@@ -165,15 +189,15 @@ function arrowLabel(doc, txt, labelX, labelY, target, opts = {}) {
 }
 
 function bigStepTitle(doc, num, title, y) {
-  // Círculo grande con número
+  // Círculo grande con número (centro del círculo en (MARGIN+8, y-1), radio 7)
   doc.setFillColor(...C.highlight)
   doc.circle(MARGIN + 8, y - 1, 7, 'F')
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Arial', 'bold')
   doc.setFontSize(16)
   doc.setTextColor(...C.white)
-  doc.text(String(num), MARGIN + 8, y + 3, { align: 'center' })
+  centerText(doc, String(num), MARGIN + 8, y - 1, 16)
   // Título grande al lado
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Arial', 'bold')
   doc.setFontSize(22)
   doc.setTextColor(...C.text)
   doc.text(title, MARGIN + 19, y + 3)
@@ -189,7 +213,7 @@ const memH = pw * (300 / 1800) * 0.85
 doc.addImage(membrete, 'PNG', pw / 2 - (pw * 0.8) / 2, 18, pw * 0.8, memH, undefined, 'SLOW')
 
 let y = memH + 38
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(42)
 doc.setTextColor(...C.text)
 doc.text('Guía rápida', pw / 2, y, { align: 'center' })
@@ -206,34 +230,34 @@ doc.setDrawColor(...C.brand)
 doc.setLineWidth(0.4)
 doc.roundedRect(MARGIN + 5, boxY, pw - 2 * MARGIN - 10, 50, 4, 4, 'S')
 
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(13)
 doc.setTextColor(...C.brand)
 doc.text('Para entrar a la app:', pw / 2, boxY + 14, { align: 'center' })
 
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(22)
 doc.setTextColor(...C.text)
 doc.text('plaza-stefany.vercel.app', pw / 2, boxY + 30, { align: 'center' })
 
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(11)
 doc.setTextColor(...C.textSec)
 doc.text('Tu usuario y contraseña te los mandó William por WhatsApp', pw / 2, boxY + 42, { align: 'center' })
 
 // Footer simple en portada
 const fy = ph - 60
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(14)
 doc.setTextColor(...C.text)
 doc.text('¿Necesitás ayuda?', pw / 2, fy, { align: 'center' })
 
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(13)
 doc.setTextColor(...C.brand)
 doc.text('Mandale WhatsApp a William', pw / 2, fy + 8, { align: 'center' })
 
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(18)
 doc.setTextColor(...C.text)
 doc.text('+504 9462-8618', pw / 2, fy + 18, { align: 'center' })
@@ -244,12 +268,12 @@ doc.text('+504 9462-8618', pw / 2, fy + 18, { align: 'center' })
 doc.addPage()
 y = bigStepTitle(doc, 1, 'Abrí la app y entrá', 22)
 
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(12)
 doc.setTextColor(...C.text)
 doc.text('En tu celular o computadora, abrí el navegador (Safari, Chrome) y entrá a:', MARGIN, y + 2)
 y += 9
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(14)
 doc.setTextColor(...C.brand)
 doc.text('plaza-stefany.vercel.app', MARGIN, y + 2)
@@ -275,7 +299,7 @@ addFooter(doc, 2, 6)
 doc.addPage()
 y = bigStepTitle(doc, 2, 'Lo primero que vas a ver', 22)
 
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(12)
 doc.setTextColor(...C.text)
 doc.text('Apenas entrás, te aparece tu información. Lo más importante:', MARGIN, y + 2)
@@ -299,7 +323,7 @@ addFooter(doc, 3, 6)
 doc.addPage()
 y = bigStepTitle(doc, 3, 'Descargar tu recibo', 22)
 
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(12)
 doc.setTextColor(...C.text)
 doc.text('Para bajar tu recibo de renta o luz, tocá los botones de colores:', MARGIN, y + 2)
@@ -320,7 +344,7 @@ doc.roundedRect(MARGIN, noteY, pw - 2 * MARGIN, 18, 2, 2, 'F')
 doc.setDrawColor(...C.success)
 doc.setLineWidth(0.4)
 doc.line(MARGIN, noteY, MARGIN, noteY + 18)
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(11)
 doc.setTextColor(...C.success)
 doc.text('Se baja como PDF a tu celular. Lo podés guardar o mandarlo por WhatsApp.', MARGIN + 4, noteY + 11)
@@ -333,7 +357,7 @@ addFooter(doc, 4, 6)
 doc.addPage()
 y = bigStepTitle(doc, 4, 'Subir tu comprobante de pago', 22)
 
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(12)
 doc.setTextColor(...C.text)
 const p4Lines = [
@@ -356,11 +380,11 @@ doc.roundedRect(MARGIN, note4Y, pw - 2 * MARGIN, 22, 2, 2, 'F')
 doc.setDrawColor(...C.brand)
 doc.setLineWidth(0.4)
 doc.line(MARGIN, note4Y, MARGIN, note4Y + 22)
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(11)
 doc.setTextColor(...C.brand)
 doc.text('¿Qué pasa después?', MARGIN + 4, note4Y + 8)
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(10)
 doc.setTextColor(...C.text)
 doc.text('William ve tu comprobante al toque. Confirma tu pago y la app lo marca como "Pagada".', MARGIN + 4, note4Y + 16)
@@ -381,15 +405,15 @@ doc.setDrawColor(...C.success)
 doc.setLineWidth(0.5)
 doc.roundedRect(MARGIN, waY, pw - 2 * MARGIN, 50, 4, 4, 'S')
 
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(14)
 doc.setTextColor(...C.success)
 doc.text('Mandale WhatsApp a William', pw / 2, waY + 16, { align: 'center' })
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(26)
 doc.setTextColor(...C.text)
 doc.text('+504 9462-8618', pw / 2, waY + 32, { align: 'center' })
-doc.setFont('helvetica', 'normal')
+doc.setFont('Arial', 'normal')
 doc.setFontSize(11)
 doc.setTextColor(...C.textSec)
 doc.text('Cualquier duda, problema o si olvidaste la contraseña', pw / 2, waY + 43, { align: 'center' })
@@ -397,7 +421,7 @@ doc.text('Cualquier duda, problema o si olvidaste la contraseña', pw / 2, waY +
 y = waY + 65
 
 // Sección "Si la app no carga"
-doc.setFont('helvetica', 'bold')
+doc.setFont('Arial', 'bold')
 doc.setFontSize(16)
 doc.setTextColor(...C.text)
 doc.text('Trucos si algo no anda', MARGIN, y)
@@ -411,11 +435,11 @@ const tips = [
 tips.forEach(([title, body]) => {
   doc.setFillColor(...C.bgSoft)
   doc.roundedRect(MARGIN, y, pw - 2 * MARGIN, 18, 2, 2, 'F')
-  doc.setFont('helvetica', 'bold')
+  doc.setFont('Arial', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(...C.text)
   doc.text(title, MARGIN + 4, y + 7)
-  doc.setFont('helvetica', 'normal')
+  doc.setFont('Arial', 'normal')
   doc.setFontSize(10)
   doc.setTextColor(...C.textSec)
   doc.text(body, MARGIN + 4, y + 14)
