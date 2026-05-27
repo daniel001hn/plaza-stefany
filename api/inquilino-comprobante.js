@@ -61,21 +61,44 @@ export default async function handler(req) {
   const localId = u.localId
 
   const key = `pagos:${year}-${String(monthIdx + 1).padStart(2, '0')}`
-  const { data: row } = await sbAdmin.from('kv_store').select('value').eq('key', key).maybeSingle()
-  const data = row?.value || { pagos: {}, factura: {} }
-  data.pagos = data.pagos || {}
-  data.pagos[localId] = {
-    ...(data.pagos[localId] || {}),
-    [`comprobante${tipo}`]: comprobanteB64,
-    [`comprobante${tipo}Date`]: new Date().toISOString(),
+  // Concurrency: read-modify-write con UPDATE condicional en updated_at.
+  // Si admin guarda entre nuestro read y write, el WHERE no matchea y reintentamos.
+  // 3 intentos suficiente para race conditions reales en este nivel de tráfico.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: row, error: rdErr } = await sbAdmin.from('kv_store')
+      .select('value,updated_at').eq('key', key).maybeSingle()
+    if (rdErr) return json({ error: 'read error: ' + rdErr.message }, 500)
+
+    const data = row?.value || { pagos: {}, factura: {} }
+    data.pagos = data.pagos || {}
+    data.pagos[localId] = {
+      ...(data.pagos[localId] || {}),
+      [`comprobante${tipo}`]: comprobanteB64,
+      [`comprobante${tipo}Date`]: new Date().toISOString(),
+    }
+    const newUpdatedAt = new Date().toISOString()
+
+    if (row) {
+      // UPDATE condicional: solo si nadie tocó la fila desde nuestro read
+      const { data: updated, error: upErr } = await sbAdmin.from('kv_store')
+        .update({ value: data, updated_at: newUpdatedAt })
+        .eq('key', key).eq('updated_at', row.updated_at)
+        .select('key')
+      if (upErr) return json({ error: 'write error: ' + upErr.message }, 500)
+      if (updated && updated.length === 1) return json({ ok: true, localId, attempt: attempt + 1 })
+      // 0 rows = conflicto, alguien más escribió. Retry con fresh read.
+      continue
+    } else {
+      // No existía la fila — INSERT (sin conflict porque key es unique)
+      const { error: insErr } = await sbAdmin.from('kv_store')
+        .insert({ key, value: data, updated_at: newUpdatedAt })
+      if (insErr) {
+        // Si alguien más insertó la misma key en paralelo, reintenta como update
+        if (insErr.code === '23505') continue
+        return json({ error: 'insert error: ' + insErr.message }, 500)
+      }
+      return json({ ok: true, localId, attempt: attempt + 1 })
+    }
   }
-
-  const { error: upErr } = await sbAdmin.from('kv_store').upsert({
-    key,
-    value: data,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'key' })
-  if (upErr) return json({ error: upErr.message }, 500)
-
-  return json({ ok: true, localId })
+  return json({ error: 'conflict: 3 reintentos fallidos, intentá de nuevo' }, 409)
 }

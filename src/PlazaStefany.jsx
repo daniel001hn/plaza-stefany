@@ -628,8 +628,13 @@ export default function App({ supabase, onLogout }) {
       updates.fechaRentaPagada = null;
     }
 
-    const newPagos = { ...pagos, [localId]: { ...prevPago, ...updates } };
-    const next = { factura, pagos: newPagos };
+    // Concurrency: re-leer fresh antes de escribir. Si un inquilino subió un
+    // comprobante mientras admin tenía el modal abierto, esto lo preserva.
+    const fresh = await loadMonth(year, monthIdx);
+    const freshPagos = fresh.pagos || {};
+    const freshLocalPago = freshPagos[localId] || prevPago;
+    const newPagos = { ...freshPagos, [localId]: { ...freshLocalPago, ...updates } };
+    const next = { factura: fresh.factura || factura, pagos: newPagos };
     setYearData((y) => ({ ...y, [monthIdx]: next }));
     const ok = await saveMonth(year, monthIdx, next);
 
@@ -666,8 +671,11 @@ export default function App({ supabase, onLogout }) {
       cargoRegulacion: config.cargoRegulacion ?? 0,
       alumbradoPublico: config.alumbradoPublico ?? 0,
     };
-    const newFactura = { ...factura, ...snapshot, ...updates };
-    const next = { factura: newFactura, pagos };
+    // Concurrency: re-leer pagos fresh, así no perdemos comprobantes que un
+    // inquilino haya subido mientras el modal de Factura estaba abierto.
+    const fresh = await loadMonth(year, monthIdx);
+    const newFactura = { ...(fresh.factura || factura), ...snapshot, ...updates };
+    const next = { factura: newFactura, pagos: fresh.pagos || pagos };
     setYearData((y) => ({ ...y, [monthIdx]: next }));
     const ok = await saveMonth(year, monthIdx, next);
     if (ok) showToast('Factura ENEE guardada');
