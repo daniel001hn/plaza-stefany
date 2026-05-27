@@ -47,9 +47,12 @@ export default async function handler(req) {
   if (comprobanteB64.length > 400000) return json({ error: 'image too large (max ~300KB)' }, 413)
 
   // Resolver localId del inquilino vía config-and-locales
+  if (!URL_BASE) return json({ error: 'SUPABASE_URL no configurado en Vercel' }, 500)
+  if (!SERVICE_KEY) return json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurado en Vercel' }, 500)
   const sbAdmin = createClient(URL_BASE, SERVICE_KEY)
   const { data: cfgRow, error: cfgErr } = await sbAdmin.from('kv_store').select('value').eq('key', 'config-and-locales').maybeSingle()
-  if (cfgErr || !cfgRow) return json({ error: 'no config row' }, 500)
+  if (cfgErr) return json({ error: 'config query error: ' + cfgErr.message, code: cfgErr.code }, 500)
+  if (!cfgRow) return json({ error: 'config-and-locales row not found' }, 500)
 
   const usuarios = cfgRow.value?.config?.usuarios || cfgRow.value?.usuarios || []
   const usuarioStr = email.split('@')[0]
