@@ -1,6 +1,7 @@
-// Toma screenshots reales de la app para el manual del inquilino.
+// Captura screenshots reales de la app + detecta coordenadas de botones clave
+// para poder anotar el PDF con flechas/círculos justo en los puntos correctos.
 // Uso: node scripts/capturar-screenshots.cjs
-// Output: scripts/screenshots/*.png
+// Output: scripts/screenshots/*.png + scripts/screenshots/coords.json
 
 const { chromium } = require('playwright')
 const fs = require('fs')
@@ -10,59 +11,82 @@ const URL = 'https://plaza-stefany.vercel.app'
 const TENANT_EMAIL = 'tatys@plaza-stefany.local'
 const TENANT_PWD = 'tatys2026.'
 const OUT_DIR = path.join(__dirname, 'screenshots')
-
 if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true })
 
 ;(async () => {
   const browser = await chromium.launch()
-  // Viewport tipo celular vertical para que las screenshots se vean parecido a
-  // como un inquilino las verá en su teléfono. iPhone 13 size.
   const ctx = await browser.newContext({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
   })
   const page = await ctx.newPage()
+  const coords = {}
 
-  // ───── Captura 1: Login screen ─────
-  console.log('1/5 → Login screen...')
+  // ─── 1. Login screen vacío ───
+  console.log('1/6 → Login vacío')
   await page.goto(URL, { waitUntil: 'networkidle' })
-  await page.waitForSelector('input[type="text"]', { timeout: 5000 })
-  await page.screenshot({ path: path.join(OUT_DIR, '1-login.png'), fullPage: false })
+  await page.waitForSelector('input[type="text"]', { timeout: 10000 })
+  await page.screenshot({ path: path.join(OUT_DIR, '1-login.png') })
 
-  // ───── Captura 2: Login con campos llenos (sin mostrar contraseña real) ─────
-  console.log('2/5 → Login con campos llenos...')
+  // Detectar posiciones de campos para anotar
+  const userBox = await page.locator('input[type="text"]').boundingBox()
+  const passBox = await page.locator('input[type="password"]').boundingBox()
+  const btnBox = await page.locator('button[type="submit"]').boundingBox()
+  coords.login = { user: userBox, pass: passBox, btn: btnBox }
+
+  // ─── 2. Login con campos llenos ───
+  console.log('2/6 → Login con campos llenos')
   await page.fill('input[type="text"]', 'tatys')
   await page.fill('input[type="password"]', '••••••••••')
-  await page.screenshot({ path: path.join(OUT_DIR, '2-login-filled.png'), fullPage: false })
+  await page.screenshot({ path: path.join(OUT_DIR, '2-login-filled.png') })
 
-  // ───── Loguear con credenciales reales para los siguientes screenshots ─────
+  // ─── Loguear de verdad para los próximos screenshots ───
   await page.fill('input[type="password"]', TENANT_PWD)
   await page.click('button[type="submit"]')
-  await page.waitForLoadState('networkidle')
-
-  // Esperar a que aparezca el dashboard real (busca textos que solo existen post-load).
-  // "RENTA MENSUAL" es un eyebrow que aparece en el header del inquilino.
   await page.waitForSelector('text=Salir', { timeout: 30000 })
-  await page.waitForTimeout(2000) // settle visual
+  await page.waitForTimeout(2500)
 
-  // ───── Captura 3: Dashboard del inquilino ─────
-  console.log('3/5 → Dashboard inquilino (parte de arriba)...')
-  await page.screenshot({ path: path.join(OUT_DIR, '3-dashboard-top.png'), fullPage: false })
+  // ─── 3. Dashboard top (renta) ───
+  console.log('3/6 → Dashboard top (renta visible)')
+  await page.screenshot({ path: path.join(OUT_DIR, '3-dashboard-top.png') })
 
-  // ───── Captura 4: Dashboard completo (full page) ─────
-  console.log('4/5 → Dashboard completo (toda la página)...')
-  await page.screenshot({ path: path.join(OUT_DIR, '4-dashboard-full.png'), fullPage: true })
+  // Detectar posiciones de elementos clave del dashboard
+  try {
+    const nameBox = await page.locator('text=Tatys').first().boundingBox()
+    const rentBox = await page.locator('text=/L\\s*[\\d,.]+/').first().boundingBox()
+    const exitBox = await page.locator('text=Salir').boundingBox()
+    coords.dashboard = { name: nameBox, rent: rentBox, exit: exitBox }
+  } catch (e) { console.log('  (no se pudo detectar todos los elementos)') }
 
-  // ───── Captura 5: Historial / pagos anteriores ─────
-  console.log('5/5 → Historial de meses...')
-  // Scroll hasta abajo para que se vean los meses
+  // ─── 4. Dashboard scroll medio (botones de recibos visibles) ───
+  console.log('4/6 → Dashboard con botones de recibos')
+  await page.evaluate(() => window.scrollTo(0, 350))
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: path.join(OUT_DIR, '4-dashboard-botones.png') })
+
+  try {
+    const reciboBox = await page.locator('text=/Recibo de renta/i').first().boundingBox()
+    const luzBox = await page.locator('text=/Recibo de luz/i').first().boundingBox()
+    const subirBox = await page.locator('text=/Subir comprobante/i').first().boundingBox()
+    coords.botones = { recibo: reciboBox, luz: luzBox, subir: subirBox, scrollY: 350 }
+  } catch (e) { console.log('  (no se pudo detectar botones)') }
+
+  // ─── 5. Historial (meses anteriores visibles) ───
+  console.log('5/6 → Historial de meses')
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
-  await page.waitForTimeout(1500)
-  await page.screenshot({ path: path.join(OUT_DIR, '5-historial.png'), fullPage: false })
+  await page.waitForTimeout(800)
+  await page.screenshot({ path: path.join(OUT_DIR, '5-historial.png') })
+
+  // ─── 6. Vuelta al top para captura final clean ───
+  console.log('6/6 → Dashboard full (toda la página)')
+  await page.evaluate(() => window.scrollTo(0, 0))
+  await page.waitForTimeout(500)
+  await page.screenshot({ path: path.join(OUT_DIR, '6-dashboard-full.png'), fullPage: true })
+
+  fs.writeFileSync(path.join(OUT_DIR, 'coords.json'), JSON.stringify(coords, null, 2))
 
   await browser.close()
-
-  console.log('\n✅ Screenshots guardados en:', OUT_DIR)
+  console.log('\n✅ Screenshots + coords guardados en', OUT_DIR)
   fs.readdirSync(OUT_DIR).forEach(f => {
     const stats = fs.statSync(path.join(OUT_DIR, f))
     console.log(`   ${f}: ${(stats.size / 1024).toFixed(0)} KB`)

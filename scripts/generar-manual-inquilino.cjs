@@ -1,509 +1,402 @@
-// Genera el Manual del Inquilino en PDF con screenshots reales + diseño aesthetic.
-// Uso: node scripts/generar-manual-inquilino.cjs
-// Pre-req: node scripts/capturar-screenshots.cjs (genera los PNG)
-// Output: Manual-Inquilino-Plaza-Stefany.pdf
+// Manual del Inquilino — estilo "para abuelos":
+// 1 página = 1 acción. Pantalla grande del teléfono con círculo rojo + flecha
+// señalando exactamente dónde tocar. Texto mínimo y claro.
 
 const { jsPDF } = require('jspdf')
 const fs = require('fs')
 const path = require('path')
 
-const MARGIN = 14  // mm
-const HEADER_RATIO = 300 / 1800
+const MARGIN = 14
 
-// Paleta Apple-HIG style
 const C = {
-  text: [28, 28, 30],         // near-black
-  textSec: [110, 110, 120],   // gray-2
-  textTer: [142, 142, 150],   // gray-3
+  text: [28, 28, 30],
+  textSec: [110, 110, 120],
   white: [255, 255, 255],
   bgSoft: [248, 249, 251],
-  bgCard: [255, 255, 255],
   border: [229, 229, 234],
-  // Brand
-  brand: [99, 102, 241],      // indigo-500
-  brandDark: [79, 70, 229],   // indigo-600
+  brand: [99, 102, 241],
   brandSoft: [238, 240, 255],
-  // Semantic
+  // Color de las anotaciones (BRILLANTE para que se vea)
+  highlight: [255, 59, 48],          // rojo iOS
+  highlightSoft: [255, 230, 228],
   success: [52, 199, 89],
   successSoft: [232, 248, 235],
-  warn: [255, 159, 10],
-  warnSoft: [255, 248, 230],
-  danger: [255, 59, 48],
-  // Gradient cover
-  g1: [99, 102, 241],
-  g2: [129, 140, 248],
-  g3: [196, 181, 253],
 }
 
 const SCREENS = path.join(__dirname, 'screenshots')
 const readImg = (name) => 'data:image/png;base64,' + fs.readFileSync(path.join(SCREENS, name)).toString('base64')
+const coords = JSON.parse(fs.readFileSync(path.join(SCREENS, 'coords.json'), 'utf8'))
+const membrete = 'data:image/png;base64,' + fs.readFileSync(path.join(__dirname, '..', 'public', 'membrete-header.png')).toString('base64')
 
 const sc = {
   login: readImg('1-login.png'),
   loginFilled: readImg('2-login-filled.png'),
   dashTop: readImg('3-dashboard-top.png'),
-  dashFull: readImg('4-dashboard-full.png'),
+  botones: readImg('4-dashboard-botones.png'),
   historial: readImg('5-historial.png'),
 }
-const membrete = 'data:image/png;base64,' + fs.readFileSync(path.join(__dirname, '..', 'public', 'membrete-header.png')).toString('base64')
-
-// ────────────────────────────────────────────────────────────
-// Primitives
-// ────────────────────────────────────────────────────────────
-
-function addMembrete(doc, opts = {}) {
-  const pw = doc.internal.pageSize.getWidth()
-  const imgH = pw * HEADER_RATIO
-  doc.addImage(membrete, 'PNG', 0, 0, pw, imgH, undefined, 'SLOW')
-  return imgH
-}
-
-function addFooter(doc, pageNum, totalPages) {
-  const pw = doc.internal.pageSize.getWidth()
-  const ph = doc.internal.pageSize.getHeight()
-  // Línea sutil
-  doc.setDrawColor(...C.border)
-  doc.setLineWidth(0.2)
-  doc.line(MARGIN, ph - 14, pw - MARGIN, ph - 14)
-  // Footer text
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(7.5)
-  doc.setTextColor(...C.textTer)
-  doc.text('D&L Soluciones · Manual del Inquilino · Plaza Stefany', MARGIN, ph - 9)
-  doc.text(`Página ${pageNum} de ${totalPages}`, pw - MARGIN, ph - 9, { align: 'right' })
-}
-
-// Dibuja un "phone frame" alrededor de un screenshot. Centra y escala manteniendo aspect ratio.
-function phoneFrame(doc, dataUrl, cx, top, maxW, maxH) {
-  // Screenshots son 390x844 ratio (iPhone 13). Mantener proporción.
-  const ratio = 844 / 390
-  let w = maxW
-  let h = w * ratio
-  if (h > maxH) { h = maxH; w = h / ratio }
-  const x = cx - w / 2
-  const y = top
-
-  // Sombra (rectángulos cada vez más oscuros desplazados)
-  const shadowOffsets = [{ x: 0.8, y: 1.2, a: 0.05 }, { x: 1.4, y: 2, a: 0.04 }, { x: 2.2, y: 3.2, a: 0.03 }]
-  shadowOffsets.forEach(s => {
-    doc.setFillColor(0, 0, 0)
-    // jsPDF no soporta alpha directo en rect — usar GState
-    if (doc.GState) {
-      const gs = new doc.GState({ opacity: s.a })
-      doc.setGState(gs)
-    }
-    doc.roundedRect(x + s.x, y + s.y, w, h, 4, 4, 'F')
-  })
-  // Reset opacity
-  if (doc.GState) doc.setGState(new doc.GState({ opacity: 1 }))
-
-  // Frame negro (bordes del teléfono)
-  doc.setFillColor(20, 20, 24)
-  doc.roundedRect(x - 1.5, y - 1.5, w + 3, h + 3, 5, 5, 'F')
-
-  // Pantalla (screenshot)
-  doc.addImage(dataUrl, 'PNG', x, y, w, h, undefined, 'FAST')
-
-  return { x, y, w, h, bottom: y + h }
-}
-
-// Tag/pill pequeño con número o icono
-function chip(doc, x, y, txt, color = C.brand, textColor = C.white) {
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(9)
-  const tw = doc.getTextWidth(txt) + 6
-  doc.setFillColor(...color)
-  doc.roundedRect(x, y - 4, tw, 6, 1.5, 1.5, 'F')
-  doc.setTextColor(...textColor)
-  doc.text(txt, x + tw / 2, y + 0.3, { align: 'center' })
-  return x + tw
-}
-
-// Texto multilinea con wrap. Devuelve nuevo y.
-function paragraph(doc, txt, x, y, w, opts = {}) {
-  doc.setFont('helvetica', opts.bold ? 'bold' : 'normal')
-  doc.setFontSize(opts.size || 10)
-  doc.setTextColor(...(opts.color || C.text))
-  const lines = doc.splitTextToSize(txt, w)
-  lines.forEach((line, i) => doc.text(line, x, y + i * (opts.lh || 4.6)))
-  return y + lines.length * (opts.lh || 4.6) + (opts.gap || 0)
-}
-
-// "Step" — número grande + título + descripción
-function stepBlock(doc, num, title, body, x, y, w) {
-  // Círculo numerado
-  doc.setFillColor(...C.brand)
-  doc.circle(x + 4, y + 1.5, 4, 'F')
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(...C.white)
-  doc.text(String(num), x + 4, y + 3, { align: 'center' })
-
-  // Título
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(11)
-  doc.setTextColor(...C.text)
-  doc.text(title, x + 12, y + 2.5)
-
-  // Body
-  let bodyY = y + 8
-  bodyY = paragraph(doc, body, x + 12, bodyY, w - 12, { size: 9.5, color: C.textSec, lh: 4.4 })
-  return bodyY + 3
-}
-
-// Callout box con badge de texto + título + body. label = "AVISO"|"TIP"|"OK"|"AYUDA" etc.
-function callout(doc, label, title, body, x, y, w, opts = {}) {
-  const bg = opts.bg || C.brandSoft
-  const accent = opts.accent || C.brand
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  const bodyLines = doc.splitTextToSize(body, w - 12)
-  const h = 8 + 4.5 + bodyLines.length * 4 + 4
-  // Fondo
-  doc.setFillColor(...bg)
-  doc.roundedRect(x, y, w, h, 2, 2, 'F')
-  // Barra izquierda
-  doc.setFillColor(...accent)
-  doc.roundedRect(x, y, 2, h, 1, 1, 'F')
-  // Badge de label
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(6.5)
-  // Calcular ancho del label con su charSpace incluido
-  const labelChars = label.length
-  const labelW = doc.getTextWidth(label) + labelChars * 0.4 + 4
-  doc.setFillColor(...accent)
-  doc.roundedRect(x + 6, y + 3, labelW, 5, 1, 1, 'F')
-  doc.setTextColor(...C.white)
-  doc.text(label, x + 6 + labelW / 2, y + 6.4, { align: 'center', charSpace: 0.4 })
-  // Titulo (con buen gap después del badge)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(...accent)
-  doc.text(title, x + 6 + labelW + 5, y + 6.8)
-  // Body
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(9)
-  doc.setTextColor(...C.text)
-  bodyLines.forEach((l, i) => doc.text(l, x + 6, y + 13 + i * 4))
-  return y + h + 3
-}
-
-// Page section title
-function pageTitle(doc, eyebrow, title, y) {
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(8)
-  doc.setTextColor(...C.brand)
-  doc.text(eyebrow.toUpperCase(), MARGIN, y, { charSpace: 1.2 })
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(20)
-  doc.setTextColor(...C.text)
-  doc.text(title, MARGIN, y + 9)
-  // Línea decorativa
-  doc.setDrawColor(...C.brand)
-  doc.setLineWidth(0.6)
-  doc.line(MARGIN, y + 13, MARGIN + 18, y + 13)
-  return y + 22
-}
-
-// ────────────────────────────────────────────────────────────
-// PAGES
-// ────────────────────────────────────────────────────────────
 
 const doc = new jsPDF({ unit: 'mm', format: 'letter' })
 const pw = doc.internal.pageSize.getWidth()
 const ph = doc.internal.pageSize.getHeight()
-const TOTAL_PAGES = 6
 
-// ═══════════════════════════════════════════════════════════
-// PÁGINA 1 — COVER
-// ═══════════════════════════════════════════════════════════
+// ─── Helpers ───
 
-// Gradient simulado: 30 rectangles de color interpolado
-for (let i = 0; i < 30; i++) {
-  const t = i / 29
-  const r = Math.round(C.g1[0] * (1 - t) + C.g3[0] * t)
-  const g = Math.round(C.g1[1] * (1 - t) + C.g3[1] * t)
-  const b = Math.round(C.g1[2] * (1 - t) + C.g3[2] * t)
-  doc.setFillColor(r, g, b)
-  doc.rect(0, (ph / 30) * i, pw, ph / 30 + 0.5, 'F')
+function addFooter(doc, n, total) {
+  doc.setDrawColor(...C.border)
+  doc.setLineWidth(0.2)
+  doc.line(MARGIN, ph - 14, pw - MARGIN, ph - 14)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(...C.textSec)
+  doc.text('Plaza Stefany · D&L Soluciones', MARGIN, ph - 9)
+  doc.text(`${n} / ${total}`, pw - MARGIN, ph - 9, { align: 'right' })
 }
 
-// Sobre-overlay sutil para profundidad
-if (doc.GState) {
-  doc.setGState(new doc.GState({ opacity: 0.15 }))
-  doc.setFillColor(255, 255, 255)
-  doc.rect(0, 0, pw, ph / 3, 'F')
-  doc.setGState(new doc.GState({ opacity: 1 }))
+// Dibuja un phone frame con la screenshot dentro. Devuelve dims para anotar.
+function bigPhone(doc, dataUrl, cx, top, height) {
+  const ratio = 844 / 390
+  const h = height
+  const w = h / ratio
+  const x = cx - w / 2
+  const y = top
+  // Sombra suave
+  if (doc.GState) {
+    doc.setGState(new doc.GState({ opacity: 0.08 }))
+    doc.setFillColor(0, 0, 0)
+    doc.roundedRect(x + 1.5, y + 2, w, h, 5, 5, 'F')
+    doc.setGState(new doc.GState({ opacity: 1 }))
+  }
+  // Frame negro
+  doc.setFillColor(20, 20, 24)
+  doc.roundedRect(x - 1.8, y - 1.8, w + 3.6, h + 3.6, 6, 6, 'F')
+  // Pantalla
+  doc.addImage(dataUrl, 'PNG', x, y, w, h, undefined, 'FAST')
+  return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 }
 }
 
-// Logo membrete arriba (pequeño, sobre el gradient)
-const memH = pw * HEADER_RATIO * 0.7
-doc.addImage(membrete, 'PNG', pw / 2 - (pw * 0.7) / 2, 12, pw * 0.7, memH, undefined, 'SLOW')
+// Convierte coords CSS del browser (viewport-relative 0..390 x 0..844) a coords PDF (mm)
+// sobre el phone. boundingBox() ya devuelve coords del viewport visible, no del documento.
+function cssToPdf(phone, cssX, cssY) {
+  return {
+    x: phone.x + (cssX / 390) * phone.w,
+    y: phone.y + (cssY / 844) * phone.h,
+  }
+}
 
-// Big title
-let y = memH + 30
-doc.setFont('helvetica', 'bold')
-doc.setFontSize(36)
-doc.setTextColor(...C.white)
-doc.text('Manual del Inquilino', pw / 2, y, { align: 'center' })
+// Círculo rojo grueso alrededor de un rectángulo CSS (con padding extra)
+function circleAround(doc, phone, box, pad = 2) {
+  if (!box) return
+  const p1 = cssToPdf(phone, box.x - pad, box.y - pad)
+  const p2 = cssToPdf(phone, box.x + box.width + pad, box.y + box.height + pad)
+  const cx = (p1.x + p2.x) / 2
+  const cy = (p1.y + p2.y) / 2
+  const rx = (p2.x - p1.x) / 2
+  const ry = (p2.y - p1.y) / 2
+  doc.setDrawColor(...C.highlight)
+  doc.setLineWidth(1.4)
+  doc.ellipse(cx, cy, rx, ry, 'S')
+  return { cx, cy, rx, ry }
+}
 
-y += 11
-doc.setFont('helvetica', 'normal')
-doc.setFontSize(18)
-doc.setTextColor(255, 255, 255)
-if (doc.GState) doc.setGState(new doc.GState({ opacity: 0.85 }))
-doc.text('Plaza Stefany', pw / 2, y, { align: 'center' })
-if (doc.GState) doc.setGState(new doc.GState({ opacity: 1 }))
-
-// Phone preview de login en el centro
-phoneFrame(doc, sc.login, pw / 2, y + 12, 65, 110)
-
-// CTA card abajo
-const ctaY = ph - 55
-doc.setFillColor(255, 255, 255)
-if (doc.GState) doc.setGState(new doc.GState({ opacity: 0.95 }))
-doc.roundedRect(MARGIN + 8, ctaY, pw - 2 * MARGIN - 16, 38, 4, 4, 'F')
-if (doc.GState) doc.setGState(new doc.GState({ opacity: 1 }))
-
-doc.setFont('helvetica', 'bold')
-doc.setFontSize(9)
-doc.setTextColor(...C.brand)
-doc.text('TU ACCESO A LA APP', pw / 2, ctaY + 8, { align: 'center', charSpace: 1.5 })
-
-doc.setFont('helvetica', 'bold')
-doc.setFontSize(16)
-doc.setTextColor(...C.text)
-doc.text('plaza-stefany.vercel.app', pw / 2, ctaY + 18, { align: 'center' })
-
-doc.setFont('helvetica', 'normal')
-doc.setFontSize(9)
-doc.setTextColor(...C.textSec)
-doc.text('Tu usuario y contraseña los recibiste por WhatsApp', pw / 2, ctaY + 26, { align: 'center' })
-doc.text('Si los perdiste: William +504 9462-8618', pw / 2, ctaY + 31, { align: 'center' })
-
-// ═══════════════════════════════════════════════════════════
-// PÁGINA 2 — CÓMO ENTRAR
-// ═══════════════════════════════════════════════════════════
-doc.addPage()
-y = pageTitle(doc, 'Paso 1', 'Cómo entrar a la app', 20)
-
-// Layout 2 columnas: phone a la izquierda, instructions a la derecha
-const phLeft = phoneFrame(doc, sc.loginFilled, MARGIN + 32, y, 60, 110)
-const txtX = phLeft.x + phLeft.w + 14
-const txtW = pw - txtX - MARGIN
-
-let ty = y + 6
-ty = paragraph(doc, 'Desde el navegador de tu celular o computadora:', txtX, ty, txtW, { size: 10.5, gap: 4 })
-
-ty = stepBlock(doc, 1, 'Abrí la app', 'En el navegador escribí:\nplaza-stefany.vercel.app', txtX, ty, txtW)
-ty = stepBlock(doc, 2, 'Escribí tu usuario', 'Ejemplo: tatys, centrodsd, fenixstorehn (lo que te dieron).', txtX, ty, txtW)
-ty = stepBlock(doc, 3, 'Escribí tu contraseña', 'La que recibiste por WhatsApp.', txtX, ty, txtW)
-ty = stepBlock(doc, 4, 'Continuar', 'Click en el botón "Continuar" y entrás.', txtX, ty, txtW)
-
-ty = callout(doc, 'AVISO', 'Mantené tu contraseña segura', 'No la compartas con nadie. Si la perdiste, escribile a William al WhatsApp +504 9462-8618 y te genera una nueva en el momento.', txtX, ty + 2, txtW, { bg: C.warnSoft, accent: C.warn })
-
-addFooter(doc, 2, TOTAL_PAGES)
-
-// ═══════════════════════════════════════════════════════════
-// PÁGINA 3 — TU DASHBOARD (lo que ves)
-// ═══════════════════════════════════════════════════════════
-doc.addPage()
-y = pageTitle(doc, 'Paso 2', 'Lo que ves al entrar', 20)
-
-const phDash = phoneFrame(doc, sc.dashTop, MARGIN + 32, y, 60, 110)
-const dtxtX = phDash.x + phDash.w + 14
-const dtxtW = pw - dtxtX - MARGIN
-
-ty = y + 6
-ty = paragraph(doc, 'Apenas entrás, ves toda tu información del mes:', dtxtX, ty, dtxtW, { size: 10.5, gap: 5 })
-
-// Lista visual con bullets de color
-const items = [
-  { color: C.brand, label: 'Tu nombre y local', body: 'Arriba a la izquierda: "Tatys Tienda" · Local 1 · 84 m²' },
-  { color: C.success, label: 'Renta del mes', body: 'El monto exacto con su cálculo: m² × $/m² × tipo de cambio + ISV' },
-  { color: C.warn, label: 'Historial de meses', body: 'Cada mes con estado: Pagada, Pendiente, No disponible (luz)' },
-  { color: C.brand, label: 'Botones de acción', body: 'Descargar recibos · Subir comprobantes · Ver detalles' },
-]
-
-items.forEach(it => {
-  doc.setFillColor(...it.color)
-  doc.circle(dtxtX + 1.5, ty - 1, 1.8, 'F')
+// Etiqueta colorida con texto, con flecha apuntando al círculo
+function arrowLabel(doc, txt, labelX, labelY, target, opts = {}) {
+  const color = opts.color || C.highlight
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(...C.text)
-  doc.text(it.label, dtxtX + 6, ty)
-  ty = paragraph(doc, it.body, dtxtX + 6, ty + 3, dtxtW - 6, { size: 9, color: C.textSec, lh: 4, gap: 4 })
-})
-
-ty = callout(doc, 'PRIVADO', 'Solo vos ves tus datos', 'Aunque la app maneja todos los locales de la plaza, vos únicamente ves los tuyos. Los demás inquilinos no pueden ver tu información, ni vos la de ellos.', dtxtX, ty + 2, dtxtW)
-
-addFooter(doc, 3, TOTAL_PAGES)
-
-// ═══════════════════════════════════════════════════════════
-// PÁGINA 4 — CÓMO PAGAR Y SUBIR COMPROBANTE
-// ═══════════════════════════════════════════════════════════
-doc.addPage()
-y = pageTitle(doc, 'Paso 3', 'Cómo pagar y subir comprobante', 20)
-
-// Phone con historial mostrando los botones
-const phPay = phoneFrame(doc, sc.historial, MARGIN + 32, y, 60, 110)
-const ptxtX = phPay.x + phPay.w + 14
-const ptxtW = pw - ptxtX - MARGIN
-
-ty = y + 6
-ty = paragraph(doc, 'El proceso completo, de principio a fin:', ptxtX, ty, ptxtW, { size: 10.5, gap: 4 })
-
-ty = stepBlock(doc, 1, 'Hacer la transferencia', 'Transferí el monto a la cuenta que coordinás con William. La app no procesa pagos — solo los registra.', ptxtX, ty, ptxtW)
-ty = stepBlock(doc, 2, 'Sacar foto al comprobante', 'Tomá foto del voucher o screenshot de la app del banco. Asegurate que se lea el monto y la fecha.', ptxtX, ty, ptxtW)
-ty = stepBlock(doc, 3, 'Subir en la app', 'En el mes correspondiente, click en "Subir comprobante" (renta o luz). Elegí la foto. Listo.', ptxtX, ty, ptxtW)
-
-ty = callout(doc, 'LISTO', 'Qué pasa cuando subís un comprobante', 'Se guarda con fecha y hora exacta. William lo ve al toque, confirma tu pago, y la app marca ese mes como "Pagada".', ptxtX, ty + 2, ptxtW, { bg: C.successSoft, accent: C.success })
-
-addFooter(doc, 4, TOTAL_PAGES)
-
-// ═══════════════════════════════════════════════════════════
-// PÁGINA 5 — DESCARGAR RECIBOS
-// ═══════════════════════════════════════════════════════════
-doc.addPage()
-y = pageTitle(doc, 'Paso 4', 'Descargar tus recibos', 20)
-
-ty = paragraph(doc, 'En cada mes del historial vas a ver botones para bajar tus recibos oficiales en PDF.', MARGIN, y + 2, pw - 2 * MARGIN, { size: 11, gap: 8 })
-
-// 2 mini-cards: recibo renta y recibo luz
-const cardW = (pw - 2 * MARGIN - 6) / 2
-const cardH = 50
-const c1X = MARGIN
-const c2X = MARGIN + cardW + 6
-const cY = ty
-
-// Mini-icono PDF (rectángulo con dobladura en la esquina)
-function drawPdfIcon(doc, x, y, color) {
+  doc.setFontSize(opts.size || 12)
+  const tw = doc.getTextWidth(txt) + 8
+  const th = (opts.size || 12) * 0.45 + 4
+  // Pill
   doc.setFillColor(...color)
-  // Cuerpo
-  doc.rect(x, y, 5, 6.5, 'F')
-  // Dobladura (triangulo blanco en esquina sup-der simulando hoja doblada)
-  doc.setFillColor(255, 255, 255)
-  doc.triangle(x + 3.5, y, x + 5, y, x + 5, y + 1.5, 'F')
-  // Texto "PDF" abajo
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(4)
-  doc.setTextColor(...color)
-  doc.text('PDF', x + 2.5, y + 5, { align: 'center' })
+  doc.roundedRect(labelX, labelY - th + 1.5, tw, th, 2, 2, 'F')
+  doc.setTextColor(...C.white)
+  doc.text(txt, labelX + tw / 2, labelY + 0.5, { align: 'center' })
+
+  // Flecha curva del centro de la pill al circle target
+  if (target) {
+    const fromX = opts.arrowFrom === 'left' ? labelX : labelX + tw
+    const fromY = labelY - th / 2 + 1.5
+    const toX = target.cx + (opts.arrowFrom === 'left' ? target.rx : -target.rx) * 0.95
+    const toY = target.cy
+    doc.setDrawColor(...color)
+    doc.setLineWidth(0.9)
+    // Línea principal
+    doc.line(fromX, fromY, toX, toY)
+    // Cabeza de flecha (2 líneas pequeñas)
+    const angle = Math.atan2(toY - fromY, toX - fromX)
+    const headLen = 2.5
+    const headAngle = 0.45
+    doc.line(toX, toY, toX - headLen * Math.cos(angle - headAngle), toY - headLen * Math.sin(angle - headAngle))
+    doc.line(toX, toY, toX - headLen * Math.cos(angle + headAngle), toY - headLen * Math.sin(angle + headAngle))
+  }
+  return { tw, th }
 }
 
-// Card 1: Renta
+function bigStepTitle(doc, num, title, y) {
+  // Círculo grande con número
+  doc.setFillColor(...C.highlight)
+  doc.circle(MARGIN + 8, y - 1, 7, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(...C.white)
+  doc.text(String(num), MARGIN + 8, y + 3, { align: 'center' })
+  // Título grande al lado
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(22)
+  doc.setTextColor(...C.text)
+  doc.text(title, MARGIN + 19, y + 3)
+  return y + 12
+}
+
+// ═══════════════════════════════════════════════════════════
+// PÁGINA 1 — PORTADA simple
+// ═══════════════════════════════════════════════════════════
+
+// Membrete
+const memH = pw * (300 / 1800) * 0.85
+doc.addImage(membrete, 'PNG', pw / 2 - (pw * 0.8) / 2, 18, pw * 0.8, memH, undefined, 'SLOW')
+
+let y = memH + 38
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(42)
+doc.setTextColor(...C.text)
+doc.text('Guía rápida', pw / 2, y, { align: 'center' })
+y += 14
+doc.setFontSize(20)
+doc.setTextColor(...C.textSec)
+doc.text('para inquilinos de Plaza Stefany', pw / 2, y, { align: 'center' })
+
+// Caja grande clara con la dirección
+const boxY = y + 25
 doc.setFillColor(...C.brandSoft)
-doc.roundedRect(c1X, cY, cardW, cardH, 3, 3, 'F')
+doc.roundedRect(MARGIN + 5, boxY, pw - 2 * MARGIN - 10, 50, 4, 4, 'F')
 doc.setDrawColor(...C.brand)
-doc.setLineWidth(0.3)
-doc.roundedRect(c1X, cY, cardW, cardH, 3, 3, 'S')
-drawPdfIcon(doc, c1X + 5, cY + 4, C.brand)
+doc.setLineWidth(0.4)
+doc.roundedRect(MARGIN + 5, boxY, pw - 2 * MARGIN - 10, 50, 4, 4, 'S')
+
 doc.setFont('helvetica', 'bold')
-doc.setFontSize(11)
+doc.setFontSize(13)
 doc.setTextColor(...C.brand)
-doc.text('Recibo de Renta', c1X + 13, cY + 9)
-doc.setFont('helvetica', 'normal')
-doc.setFontSize(9)
-doc.setTextColor(...C.text)
-const r1Lines = doc.splitTextToSize('PDF oficial con tu renta del mes: m², precio por metro, tipo de cambio, ISV, total. Listo para tu contabilidad.', cardW - 10)
-r1Lines.forEach((l, i) => doc.text(l, c1X + 5, cY + 18 + i * 4))
+doc.text('Para entrar a la app:', pw / 2, boxY + 14, { align: 'center' })
 
-// Card 2: Luz
-doc.setFillColor(...C.warnSoft)
-doc.roundedRect(c2X, cY, cardW, cardH, 3, 3, 'F')
-doc.setDrawColor(...C.warn)
-doc.setLineWidth(0.3)
-doc.roundedRect(c2X, cY, cardW, cardH, 3, 3, 'S')
-drawPdfIcon(doc, c2X + 5, cY + 4, C.warn)
 doc.setFont('helvetica', 'bold')
-doc.setFontSize(11)
-doc.setTextColor(...C.warn)
-doc.text('Recibo de Luz', c2X + 13, cY + 9)
-doc.setFont('helvetica', 'normal')
-doc.setFontSize(9)
+doc.setFontSize(22)
 doc.setTextColor(...C.text)
-const r2Lines = doc.splitTextToSize('PDF con lecturas del submedidor (anterior y actual), consumo en kWh, tarifa, cargos fijos y monto.', cardW - 10)
-r2Lines.forEach((l, i) => doc.text(l, c2X + 5, cY + 18 + i * 4))
+doc.text('plaza-stefany.vercel.app', pw / 2, boxY + 30, { align: 'center' })
 
-ty = cY + cardH + 10
-
-ty = callout(doc, 'TIP', '¿Cuándo está disponible?', 'El recibo de renta está siempre disponible. El de luz aparece cuando William carga la factura ENEE del mes (suele ser entre el 11 y el 15).', MARGIN, ty, pw - 2 * MARGIN, { bg: C.brandSoft, accent: C.brand })
-
-ty = callout(doc, 'AVISO', 'Bloqueo por tasa desactualizada', 'Si la tasa de cambio del día no se actualizó (cosa rara), la app bloquea descargas para no darte un monto incorrecto. En ese caso, te ofrece pedirle el recibo a William por WhatsApp con un mensaje pre-armado.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.warnSoft, accent: C.warn })
-
-addFooter(doc, 5, TOTAL_PAGES)
-
-// ═══════════════════════════════════════════════════════════
-// PÁGINA 6 — INSTALAR + AYUDA
-// ═══════════════════════════════════════════════════════════
-doc.addPage()
-y = pageTitle(doc, 'Bonus', 'Instalá la app y ayuda', 20)
-
-ty = paragraph(doc, 'Para acceder rápido sin abrir el navegador cada vez, podés agregarla a la pantalla de inicio de tu celular. Queda igual que una app del App Store / Play Store.', MARGIN, y + 2, pw - 2 * MARGIN, { size: 10, gap: 7 })
-
-// 2 columnas: iPhone | Android
-const iCol = (pw - 2 * MARGIN - 4) / 2
-// iPhone
-doc.setFillColor(...C.bgSoft)
-doc.roundedRect(MARGIN, ty, iCol, 52, 3, 3, 'F')
-doc.setFont('helvetica', 'bold')
-doc.setFontSize(11)
-doc.setTextColor(...C.text)
-doc.text('iPhone (Safari)', MARGIN + 5, ty + 7)
 doc.setFont('helvetica', 'normal')
-doc.setFontSize(8.5)
+doc.setFontSize(11)
 doc.setTextColor(...C.textSec)
-const iLines = [
-  '1. Abrí plaza-stefany.vercel.app',
-  '   en Safari (no Chrome)',
-  '2. Tocá el botón Compartir',
-  '   (cuadrito con flecha hacia arriba)',
-  '3. "Agregar a pantalla de inicio"',
-  '4. Confirmá y listo',
-]
-iLines.forEach((l, i) => doc.text(l, MARGIN + 5, ty + 14 + i * 4.5))
+doc.text('Tu usuario y contraseña te los mandó William por WhatsApp', pw / 2, boxY + 42, { align: 'center' })
 
-// Android
-const aX = MARGIN + iCol + 4
-doc.setFillColor(...C.bgSoft)
-doc.roundedRect(aX, ty, iCol, 52, 3, 3, 'F')
-doc.setFont('helvetica', 'bold')
-doc.setFontSize(11)
-doc.setTextColor(...C.text)
-doc.text('Android (Chrome)', aX + 5, ty + 7)
-doc.setFont('helvetica', 'normal')
-doc.setFontSize(8.5)
-doc.setTextColor(...C.textSec)
-const aLines = [
-  '1. Abrí plaza-stefany.vercel.app',
-  '   en Chrome',
-  '2. Tocá los 3 puntos verticales',
-  '   a la derecha',
-  '3. "Instalar app" / "Agregar a',
-  '    pantalla de inicio"',
-]
-aLines.forEach((l, i) => doc.text(l, aX + 5, ty + 14 + i * 4.5))
-
-ty += 60
-
-// Ayuda
+// Footer simple en portada
+const fy = ph - 60
 doc.setFont('helvetica', 'bold')
 doc.setFontSize(14)
 doc.setTextColor(...C.text)
-doc.text('¿Necesitás ayuda?', MARGIN, ty)
-ty += 7
+doc.text('¿Necesitás ayuda?', pw / 2, fy, { align: 'center' })
 
-ty = callout(doc, 'AYUDA', 'La app no carga o se ve rara', 'Cerrá el navegador completamente y volvé a abrir. En computadora: Ctrl+Shift+R.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.bgSoft, accent: C.textSec })
-ty = callout(doc, 'AYUDA', 'Olvidaste tu contraseña', 'WhatsApp a William: +504 9462-8618. Te genera una nueva en el momento.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.bgSoft, accent: C.textSec })
-ty = callout(doc, 'CONTACTO', 'Cualquier otra duda', 'William · +504 9462-8618 (WhatsApp) · soluciones_dyl@yahoo.com', MARGIN, ty, pw - 2 * MARGIN, { bg: C.successSoft, accent: C.success })
+doc.setFont('helvetica', 'normal')
+doc.setFontSize(13)
+doc.setTextColor(...C.brand)
+doc.text('Mandale WhatsApp a William', pw / 2, fy + 8, { align: 'center' })
 
-addFooter(doc, 6, TOTAL_PAGES)
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(18)
+doc.setTextColor(...C.text)
+doc.text('+504 9462-8618', pw / 2, fy + 18, { align: 'center' })
+
+// ═══════════════════════════════════════════════════════════
+// PÁGINA 2 — PASO 1: Cómo entrar
+// ═══════════════════════════════════════════════════════════
+doc.addPage()
+y = bigStepTitle(doc, 1, 'Abrí la app y entrá', 22)
+
+doc.setFont('helvetica', 'normal')
+doc.setFontSize(12)
+doc.setTextColor(...C.text)
+doc.text('En tu celular o computadora, abrí el navegador (Safari, Chrome) y entrá a:', MARGIN, y + 2)
+y += 9
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(14)
+doc.setTextColor(...C.brand)
+doc.text('plaza-stefany.vercel.app', MARGIN, y + 2)
+y += 12
+
+// Phone con login filled + 3 anotaciones
+const phone1 = bigPhone(doc, sc.loginFilled, pw / 2, y, 145)
+
+const c1User = circleAround(doc, phone1, coords.login.user, 0, 3)
+const c1Pass = circleAround(doc, phone1, coords.login.pass, 0, 3)
+const c1Btn  = circleAround(doc, phone1, coords.login.btn, 0, 3)
+
+// Labels a los costados con flechas
+arrowLabel(doc, '1. Tu usuario', phone1.x - 50, phone1.y + 60, c1User, { arrowFrom: 'right' })
+arrowLabel(doc, '2. Tu contraseña', phone1.x - 56, phone1.y + 80, c1Pass, { arrowFrom: 'right' })
+arrowLabel(doc, '3. Apretá Continuar', phone1.x + phone1.w + 4, phone1.y + 102, c1Btn, { arrowFrom: 'left' })
+
+addFooter(doc, 2, 6)
+
+// ═══════════════════════════════════════════════════════════
+// PÁGINA 3 — PASO 2: Lo que ves al entrar
+// ═══════════════════════════════════════════════════════════
+doc.addPage()
+y = bigStepTitle(doc, 2, 'Lo primero que vas a ver', 22)
+
+doc.setFont('helvetica', 'normal')
+doc.setFontSize(12)
+doc.setTextColor(...C.text)
+doc.text('Apenas entrás, te aparece tu información. Lo más importante:', MARGIN, y + 2)
+y += 10
+
+const phone2 = bigPhone(doc, sc.dashTop, pw / 2, y, 145)
+
+const c2Name = circleAround(doc, phone2, coords.dashboard.name, 0, 3)
+const c2Rent = circleAround(doc, phone2, coords.dashboard.rent, 0, 4)
+const c2Exit = circleAround(doc, phone2, coords.dashboard.exit, 0, 3)
+
+arrowLabel(doc, 'Tu nombre y local', phone2.x - 58, phone2.y + 18, c2Name, { arrowFrom: 'right' })
+arrowLabel(doc, 'Tu renta del mes', phone2.x - 56, phone2.y + 55, c2Rent, { arrowFrom: 'right' })
+arrowLabel(doc, 'Salir / Cerrar sesión', phone2.x + phone2.w + 4, phone2.y + 10, c2Exit, { arrowFrom: 'left' })
+
+addFooter(doc, 3, 6)
+
+// ═══════════════════════════════════════════════════════════
+// PÁGINA 4 — PASO 3: Descargar recibo
+// ═══════════════════════════════════════════════════════════
+doc.addPage()
+y = bigStepTitle(doc, 3, 'Descargar tu recibo', 22)
+
+doc.setFont('helvetica', 'normal')
+doc.setFontSize(12)
+doc.setTextColor(...C.text)
+doc.text('Para bajar tu recibo de renta o luz, tocá los botones de colores:', MARGIN, y + 2)
+y += 10
+
+const phone3 = bigPhone(doc, sc.botones, pw / 2, y, 145)
+
+const c3Recibo = circleAround(doc, phone3, coords.botones.recibo, 3)
+const c3Luz    = circleAround(doc, phone3, coords.botones.luz, 3)
+
+arrowLabel(doc, 'Recibo de Renta', phone3.x - 55, phone3.y + 60, c3Recibo, { arrowFrom: 'right' })
+arrowLabel(doc, 'Recibo de Luz', phone3.x + phone3.w + 4, phone3.y + 85, c3Luz, { arrowFrom: 'left' })
+
+// Nota chiquita al pie
+const noteY = phone3.y + phone3.h + 8
+doc.setFillColor(...C.successSoft)
+doc.roundedRect(MARGIN, noteY, pw - 2 * MARGIN, 18, 2, 2, 'F')
+doc.setDrawColor(...C.success)
+doc.setLineWidth(0.4)
+doc.line(MARGIN, noteY, MARGIN, noteY + 18)
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(11)
+doc.setTextColor(...C.success)
+doc.text('Se baja como PDF a tu celular. Lo podés guardar o mandarlo por WhatsApp.', MARGIN + 4, noteY + 11)
+
+addFooter(doc, 4, 6)
+
+// ═══════════════════════════════════════════════════════════
+// PÁGINA 5 — PASO 4: Subir comprobante
+// ═══════════════════════════════════════════════════════════
+doc.addPage()
+y = bigStepTitle(doc, 4, 'Subir tu comprobante de pago', 22)
+
+doc.setFont('helvetica', 'normal')
+doc.setFontSize(12)
+doc.setTextColor(...C.text)
+const p4Lines = [
+  'Después de hacer la transferencia bancaria:',
+  '  • Sacale foto al voucher (o screenshot de tu banco)',
+  '  • En la app, tocá el botón "Subir comprobante" del mes',
+]
+p4Lines.forEach((l, i) => doc.text(l, MARGIN, y + 2 + i * 6))
+y += 22
+
+const phone4 = bigPhone(doc, sc.botones, pw / 2, y, 130)
+
+const c4Subir = circleAround(doc, phone4, coords.botones.subir, 3)
+
+arrowLabel(doc, 'Tocá "Subir comprobante"', phone4.x + phone4.w + 4, phone4.y + 60, c4Subir, { arrowFrom: 'left', size: 13 })
+
+const note4Y = phone4.y + phone4.h + 8
+doc.setFillColor(...C.brandSoft)
+doc.roundedRect(MARGIN, note4Y, pw - 2 * MARGIN, 22, 2, 2, 'F')
+doc.setDrawColor(...C.brand)
+doc.setLineWidth(0.4)
+doc.line(MARGIN, note4Y, MARGIN, note4Y + 22)
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(11)
+doc.setTextColor(...C.brand)
+doc.text('¿Qué pasa después?', MARGIN + 4, note4Y + 8)
+doc.setFont('helvetica', 'normal')
+doc.setFontSize(10)
+doc.setTextColor(...C.text)
+doc.text('William ve tu comprobante al toque. Confirma tu pago y la app lo marca como "Pagada".', MARGIN + 4, note4Y + 16)
+
+addFooter(doc, 5, 6)
+
+// ═══════════════════════════════════════════════════════════
+// PÁGINA 6 — Ayuda + instalación
+// ═══════════════════════════════════════════════════════════
+doc.addPage()
+y = bigStepTitle(doc, 5, '¿Necesitás ayuda?', 22)
+
+// CTA WhatsApp gigante
+const waY = y + 8
+doc.setFillColor(...C.successSoft)
+doc.roundedRect(MARGIN, waY, pw - 2 * MARGIN, 50, 4, 4, 'F')
+doc.setDrawColor(...C.success)
+doc.setLineWidth(0.5)
+doc.roundedRect(MARGIN, waY, pw - 2 * MARGIN, 50, 4, 4, 'S')
+
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(14)
+doc.setTextColor(...C.success)
+doc.text('Mandale WhatsApp a William', pw / 2, waY + 16, { align: 'center' })
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(26)
+doc.setTextColor(...C.text)
+doc.text('+504 9462-8618', pw / 2, waY + 32, { align: 'center' })
+doc.setFont('helvetica', 'normal')
+doc.setFontSize(11)
+doc.setTextColor(...C.textSec)
+doc.text('Cualquier duda, problema o si olvidaste la contraseña', pw / 2, waY + 43, { align: 'center' })
+
+y = waY + 65
+
+// Sección "Si la app no carga"
+doc.setFont('helvetica', 'bold')
+doc.setFontSize(16)
+doc.setTextColor(...C.text)
+doc.text('Trucos si algo no anda', MARGIN, y)
+y += 10
+
+const tips = [
+  ['La pantalla está vacía o se ve rara', 'Cerrá el navegador completamente y volvé a abrirlo.'],
+  ['No encuentro el botón de "Subir comprobante"', 'Bajá un poco la pantalla con el dedo. Está debajo de cada mes.'],
+  ['No me deja descargar el recibo de luz', 'Es porque William todavía no cargó la factura ENEE del mes. Probá al día siguiente.'],
+]
+tips.forEach(([title, body]) => {
+  doc.setFillColor(...C.bgSoft)
+  doc.roundedRect(MARGIN, y, pw - 2 * MARGIN, 18, 2, 2, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(...C.text)
+  doc.text(title, MARGIN + 4, y + 7)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(...C.textSec)
+  doc.text(body, MARGIN + 4, y + 14)
+  y += 22
+})
+
+addFooter(doc, 6, 6)
 
 // ═══════════════════════════════════════════════════════════
 // SAVE
 // ═══════════════════════════════════════════════════════════
 const out = path.join(__dirname, '..', 'Manual-Inquilino-Plaza-Stefany.pdf')
-const buf = Buffer.from(doc.output('arraybuffer'))
-fs.writeFileSync(out, buf)
+fs.writeFileSync(out, Buffer.from(doc.output('arraybuffer')))
+const size = fs.statSync(out).size
 console.log(`✅ Manual generado: ${out}`)
-console.log(`   ${(buf.length / 1024).toFixed(0)} KB · ${TOTAL_PAGES} páginas`)
+console.log(`   ${(size / 1024).toFixed(0)} KB · 6 páginas`)
