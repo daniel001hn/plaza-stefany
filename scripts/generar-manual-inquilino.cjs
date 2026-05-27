@@ -151,30 +151,40 @@ function stepBlock(doc, num, title, body, x, y, w) {
   return bodyY + 3
 }
 
-// Callout box con icono + título + body
-function callout(doc, icon, title, body, x, y, w, opts = {}) {
+// Callout box con badge de texto + título + body. label = "AVISO"|"TIP"|"OK"|"AYUDA" etc.
+function callout(doc, label, title, body, x, y, w, opts = {}) {
   const bg = opts.bg || C.brandSoft
   const accent = opts.accent || C.brand
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
-  const bodyLines = doc.splitTextToSize(body, w - 18)
-  const h = 6 + 4.5 + bodyLines.length * 4 + 4
+  const bodyLines = doc.splitTextToSize(body, w - 12)
+  const h = 8 + 4.5 + bodyLines.length * 4 + 4
   // Fondo
   doc.setFillColor(...bg)
   doc.roundedRect(x, y, w, h, 2, 2, 'F')
   // Barra izquierda
   doc.setFillColor(...accent)
   doc.roundedRect(x, y, 2, h, 1, 1, 'F')
-  // Icono + título
+  // Badge de label
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(6.5)
+  // Calcular ancho del label con su charSpace incluido
+  const labelChars = label.length
+  const labelW = doc.getTextWidth(label) + labelChars * 0.4 + 4
+  doc.setFillColor(...accent)
+  doc.roundedRect(x + 6, y + 3, labelW, 5, 1, 1, 'F')
+  doc.setTextColor(...C.white)
+  doc.text(label, x + 6 + labelW / 2, y + 6.4, { align: 'center', charSpace: 0.4 })
+  // Titulo (con buen gap después del badge)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(...accent)
-  doc.text(`${icon} ${title}`, x + 6, y + 6)
+  doc.text(title, x + 6 + labelW + 5, y + 6.8)
   // Body
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(...C.text)
-  bodyLines.forEach((l, i) => doc.text(l, x + 6, y + 12 + i * 4))
+  bodyLines.forEach((l, i) => doc.text(l, x + 6, y + 13 + i * 4))
   return y + h + 3
 }
 
@@ -290,7 +300,7 @@ ty = stepBlock(doc, 2, 'Escribí tu usuario', 'Ejemplo: tatys, centrodsd, fenixs
 ty = stepBlock(doc, 3, 'Escribí tu contraseña', 'La que recibiste por WhatsApp.', txtX, ty, txtW)
 ty = stepBlock(doc, 4, 'Continuar', 'Click en el botón "Continuar" y entrás.', txtX, ty, txtW)
 
-ty = callout(doc, '⚠', 'Mantené tu contraseña segura', 'No la compartas con nadie. Si la perdiste, escribile a William al WhatsApp +504 9462-8618 y te genera una nueva en el momento.', txtX, ty + 2, txtW, { bg: C.warnSoft, accent: C.warn })
+ty = callout(doc, 'AVISO', 'Mantené tu contraseña segura', 'No la compartas con nadie. Si la perdiste, escribile a William al WhatsApp +504 9462-8618 y te genera una nueva en el momento.', txtX, ty + 2, txtW, { bg: C.warnSoft, accent: C.warn })
 
 addFooter(doc, 2, TOTAL_PAGES)
 
@@ -325,7 +335,7 @@ items.forEach(it => {
   ty = paragraph(doc, it.body, dtxtX + 6, ty + 3, dtxtW - 6, { size: 9, color: C.textSec, lh: 4, gap: 4 })
 })
 
-ty = callout(doc, '🔒', 'Solo vos ves tus datos', 'Aunque la app maneja todos los locales de la plaza, vos únicamente ves los tuyos. Los demás inquilinos no pueden ver tu información, ni vos la de ellos.', dtxtX, ty + 2, dtxtW)
+ty = callout(doc, 'PRIVADO', 'Solo vos ves tus datos', 'Aunque la app maneja todos los locales de la plaza, vos únicamente ves los tuyos. Los demás inquilinos no pueden ver tu información, ni vos la de ellos.', dtxtX, ty + 2, dtxtW)
 
 addFooter(doc, 3, TOTAL_PAGES)
 
@@ -345,9 +355,9 @@ ty = paragraph(doc, 'El proceso completo, de principio a fin:', ptxtX, ty, ptxtW
 
 ty = stepBlock(doc, 1, 'Hacer la transferencia', 'Transferí el monto a la cuenta que coordinás con William. La app no procesa pagos — solo los registra.', ptxtX, ty, ptxtW)
 ty = stepBlock(doc, 2, 'Sacar foto al comprobante', 'Tomá foto del voucher o screenshot de la app del banco. Asegurate que se lea el monto y la fecha.', ptxtX, ty, ptxtW)
-ty = stepBlock(doc, 3, 'Subir en la app', 'En el mes correspondiente, click en "📎 Subir comprobante" (renta o luz). Elegí la foto. Listo.', ptxtX, ty, ptxtW)
+ty = stepBlock(doc, 3, 'Subir en la app', 'En el mes correspondiente, click en "Subir comprobante" (renta o luz). Elegí la foto. Listo.', ptxtX, ty, ptxtW)
 
-ty = callout(doc, '✓', 'Qué pasa cuando subís un comprobante', 'Se guarda con fecha y hora exacta. William lo ve al toque, confirma tu pago, y la app marca ese mes como "✅ Pagada".', ptxtX, ty + 2, ptxtW, { bg: C.successSoft, accent: C.success })
+ty = callout(doc, 'LISTO', 'Qué pasa cuando subís un comprobante', 'Se guarda con fecha y hora exacta. William lo ve al toque, confirma tu pago, y la app marca ese mes como "Pagada".', ptxtX, ty + 2, ptxtW, { bg: C.successSoft, accent: C.success })
 
 addFooter(doc, 4, TOTAL_PAGES)
 
@@ -366,21 +376,37 @@ const c1X = MARGIN
 const c2X = MARGIN + cardW + 6
 const cY = ty
 
+// Mini-icono PDF (rectángulo con dobladura en la esquina)
+function drawPdfIcon(doc, x, y, color) {
+  doc.setFillColor(...color)
+  // Cuerpo
+  doc.rect(x, y, 5, 6.5, 'F')
+  // Dobladura (triangulo blanco en esquina sup-der simulando hoja doblada)
+  doc.setFillColor(255, 255, 255)
+  doc.triangle(x + 3.5, y, x + 5, y, x + 5, y + 1.5, 'F')
+  // Texto "PDF" abajo
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(4)
+  doc.setTextColor(...color)
+  doc.text('PDF', x + 2.5, y + 5, { align: 'center' })
+}
+
 // Card 1: Renta
 doc.setFillColor(...C.brandSoft)
 doc.roundedRect(c1X, cY, cardW, cardH, 3, 3, 'F')
 doc.setDrawColor(...C.brand)
 doc.setLineWidth(0.3)
 doc.roundedRect(c1X, cY, cardW, cardH, 3, 3, 'S')
+drawPdfIcon(doc, c1X + 5, cY + 4, C.brand)
 doc.setFont('helvetica', 'bold')
 doc.setFontSize(11)
 doc.setTextColor(...C.brand)
-doc.text('📄 Recibo de Renta', c1X + 5, cY + 8)
+doc.text('Recibo de Renta', c1X + 13, cY + 9)
 doc.setFont('helvetica', 'normal')
 doc.setFontSize(9)
 doc.setTextColor(...C.text)
 const r1Lines = doc.splitTextToSize('PDF oficial con tu renta del mes: m², precio por metro, tipo de cambio, ISV, total. Listo para tu contabilidad.', cardW - 10)
-r1Lines.forEach((l, i) => doc.text(l, c1X + 5, cY + 16 + i * 4))
+r1Lines.forEach((l, i) => doc.text(l, c1X + 5, cY + 18 + i * 4))
 
 // Card 2: Luz
 doc.setFillColor(...C.warnSoft)
@@ -388,21 +414,22 @@ doc.roundedRect(c2X, cY, cardW, cardH, 3, 3, 'F')
 doc.setDrawColor(...C.warn)
 doc.setLineWidth(0.3)
 doc.roundedRect(c2X, cY, cardW, cardH, 3, 3, 'S')
+drawPdfIcon(doc, c2X + 5, cY + 4, C.warn)
 doc.setFont('helvetica', 'bold')
 doc.setFontSize(11)
 doc.setTextColor(...C.warn)
-doc.text('⚡ Recibo de Luz', c2X + 5, cY + 8)
+doc.text('Recibo de Luz', c2X + 13, cY + 9)
 doc.setFont('helvetica', 'normal')
 doc.setFontSize(9)
 doc.setTextColor(...C.text)
 const r2Lines = doc.splitTextToSize('PDF con lecturas del submedidor (anterior y actual), consumo en kWh, tarifa, cargos fijos y monto.', cardW - 10)
-r2Lines.forEach((l, i) => doc.text(l, c2X + 5, cY + 16 + i * 4))
+r2Lines.forEach((l, i) => doc.text(l, c2X + 5, cY + 18 + i * 4))
 
 ty = cY + cardH + 10
 
-ty = callout(doc, '💡', '¿Cuándo está disponible?', 'El recibo de renta está siempre disponible. El de luz aparece cuando William carga la factura ENEE del mes (suele ser entre el 11 y el 15).', MARGIN, ty, pw - 2 * MARGIN, { bg: C.brandSoft, accent: C.brand })
+ty = callout(doc, 'TIP', '¿Cuándo está disponible?', 'El recibo de renta está siempre disponible. El de luz aparece cuando William carga la factura ENEE del mes (suele ser entre el 11 y el 15).', MARGIN, ty, pw - 2 * MARGIN, { bg: C.brandSoft, accent: C.brand })
 
-ty = callout(doc, '⚠', 'Bloqueo por tasa desactualizada', 'Si la tasa de cambio del día no se actualizó (cosa rara), la app bloquea descargas para no darte un monto incorrecto. En ese caso, te ofrece pedirle el recibo a William por WhatsApp con un mensaje pre-armado.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.warnSoft, accent: C.warn })
+ty = callout(doc, 'AVISO', 'Bloqueo por tasa desactualizada', 'Si la tasa de cambio del día no se actualizó (cosa rara), la app bloquea descargas para no darte un monto incorrecto. En ese caso, te ofrece pedirle el recibo a William por WhatsApp con un mensaje pre-armado.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.warnSoft, accent: C.warn })
 
 addFooter(doc, 5, TOTAL_PAGES)
 
@@ -430,9 +457,9 @@ const iLines = [
   '1. Abrí plaza-stefany.vercel.app',
   '   en Safari (no Chrome)',
   '2. Tocá el botón Compartir',
-  '   (cuadrito con flecha ↑)',
+  '   (cuadrito con flecha hacia arriba)',
   '3. "Agregar a pantalla de inicio"',
-  '4. Confirmá. Listo ✓',
+  '4. Confirmá y listo',
 ]
 iLines.forEach((l, i) => doc.text(l, MARGIN + 5, ty + 14 + i * 4.5))
 
@@ -450,7 +477,7 @@ doc.setTextColor(...C.textSec)
 const aLines = [
   '1. Abrí plaza-stefany.vercel.app',
   '   en Chrome',
-  '2. Tocá los 3 puntos (⋮) arriba',
+  '2. Tocá los 3 puntos verticales',
   '   a la derecha',
   '3. "Instalar app" / "Agregar a',
   '    pantalla de inicio"',
@@ -466,9 +493,9 @@ doc.setTextColor(...C.text)
 doc.text('¿Necesitás ayuda?', MARGIN, ty)
 ty += 7
 
-ty = callout(doc, '🔄', 'La app no carga o se ve rara', 'Cerrá el navegador completamente y volvé a abrir. En computadora: Ctrl+Shift+R.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.bgSoft, accent: C.textSec })
-ty = callout(doc, '🔑', 'Olvidaste tu contraseña', 'WhatsApp a William: +504 9462-8618. Te genera una nueva en el momento.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.bgSoft, accent: C.textSec })
-ty = callout(doc, '📞', 'Cualquier otra duda', 'William · +504 9462-8618 (WhatsApp) · soluciones_dyl@yahoo.com', MARGIN, ty, pw - 2 * MARGIN, { bg: C.successSoft, accent: C.success })
+ty = callout(doc, 'AYUDA', 'La app no carga o se ve rara', 'Cerrá el navegador completamente y volvé a abrir. En computadora: Ctrl+Shift+R.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.bgSoft, accent: C.textSec })
+ty = callout(doc, 'AYUDA', 'Olvidaste tu contraseña', 'WhatsApp a William: +504 9462-8618. Te genera una nueva en el momento.', MARGIN, ty, pw - 2 * MARGIN, { bg: C.bgSoft, accent: C.textSec })
+ty = callout(doc, 'CONTACTO', 'Cualquier otra duda', 'William · +504 9462-8618 (WhatsApp) · soluciones_dyl@yahoo.com', MARGIN, ty, pw - 2 * MARGIN, { bg: C.successSoft, accent: C.success })
 
 addFooter(doc, 6, TOTAL_PAGES)
 
