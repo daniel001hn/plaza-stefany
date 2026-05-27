@@ -3132,22 +3132,24 @@ function AuditLogSection() {
 function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
   const usuarios = config.usuarios || [];
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ localId: '', nombre: '', usuario: '', password: '', email: '' });
+  const [form, setForm] = useState({ localId: '', nombre: '', usuario: '', email: '' });
   const [editIdx, setEditIdx] = useState(null);
   const [sending, setSending] = useState(false);
 
   const handleSave = () => {
-    if (!form.localId || !form.usuario || !form.password) { alert('Completá todos los campos.'); return; }
+    if (!form.localId || !form.usuario) { alert('Completá local y usuario.'); return; }
     const list = [...usuarios];
-    if (editIdx !== null) list[editIdx] = form;
-    else list.push(form);
+    const { password, ...clean } = form;
+    if (editIdx !== null) list[editIdx] = clean;
+    else list.push(clean);
     onSaveConfig({ ...config, usuarios: list });
     setShowForm(false); setEditIdx(null);
-    setForm({ localId: '', nombre: '', usuario: '', password: '', email: '' });
+    setForm({ localId: '', nombre: '', usuario: '', email: '' });
   };
 
   const handleEdit = (u, i) => {
-    setForm({ email: '', ...u });
+    const { password, ...clean } = u;
+    setForm({ email: '', ...clean });
     setEditIdx(i);
     setShowForm(true);
   };
@@ -3223,18 +3225,17 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
               <div className="ps-label" style={{ marginBottom: '.3rem' }}>Nombre visible</div>
               <input className="ps-input" placeholder="ej: Tatys" value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} />
             </div>
-            <div>
-              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Usuario</div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Usuario (sin espacios)</div>
               <input className="ps-input" placeholder="ej: tatys" value={form.usuario} onChange={e => setForm(p => ({ ...p, usuario: e.target.value.toLowerCase().replace(/\s/g,'') }))} autoComplete="off" />
-            </div>
-            <div>
-              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Contraseña</div>
-              <input className="ps-input" placeholder="Contraseña del inquilino" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} autoComplete="off" />
             </div>
             <div style={{ gridColumn: 'span 2' }}>
               <div className="ps-label" style={{ marginBottom: '.3rem' }}>Email del inquilino (para recordatorios)</div>
               <input className="ps-input" placeholder="ej: contacto@empresa.com" type="email" value={form.email||''} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} autoComplete="off" />
             </div>
+          </div>
+          <div style={{ fontSize: '.72rem', color: '#6E6E78', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', padding: '.6rem .8rem', borderRadius: 8, marginBottom: '.85rem' }}>
+            🔑 <b>Contraseñas:</b> se gestionan desde Supabase Dashboard → Authentication → Users. Esto solo registra el mapeo usuario↔local para que la app muestre los datos correctos al loguearse.
           </div>
           <div style={{ display: 'flex', gap: '.5rem' }}>
             <button onClick={handleSave} className="ps-btn"><Save size={13} /> Guardar</button>
