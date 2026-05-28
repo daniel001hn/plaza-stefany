@@ -25,6 +25,7 @@ import { FacturaModal } from './modals/FacturaModal';
 import { PaymentModal } from './modals/PaymentModal';
 import { Field } from './components/Field';
 import { useLightbox } from './components/Lightbox';
+import { ModalPortal } from './components/ModalPortal';
 // jsPDF + jspdf-autotable son ~600KB. Importarlas dinámicamente solo cuando
 // el admin clickea "Generar recibo", reduce el bundle inicial significativamente.
 const loadPdf = () => import('./generarReciboPdf');
@@ -1872,6 +1873,7 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
   const sumTotal = rows.reduce((s, r) => s + (tipo === 'renta' ? r.renta : tipo === 'luz' ? r.luz : r.total), 0);
 
   return (
+    <ModalPortal onClose={onClose}>
     <div className="ps-modal-backdrop" onClick={onClose}>
       <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem', maxWidth: 580 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -1954,6 +1956,7 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 
@@ -2684,6 +2687,7 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
   };
 
   return (
+    <ModalPortal onClose={onClose}>
     <div className="ps-modal-backdrop" onClick={onClose}>
       <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:800,animation:'psSlide .25s cubic-bezier(0.16,1,0.3,1)'}}>
         <div className="ps-card-elevated" style={{padding:'.85rem 1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',borderRadius:'14px 14px 0 0',borderBottom:'none'}}>
@@ -2775,6 +2779,7 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
 

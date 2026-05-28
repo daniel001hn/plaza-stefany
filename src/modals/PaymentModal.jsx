@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Circle, X, Receipt, ExternalLink, Zap, AlertCircle, Calculator, Save, Printer } from 'lucide-react';
 import { fmt2, MESES_LARGO } from '../utils/format';
 import { useLightbox } from '../components/Lightbox';
+import { ModalPortal } from '../components/ModalPortal';
 
 // Comprime imagen a base64 (max 1200px, calidad 0.7) para usar en recibos.
 function comprimirFotoMedidor(file) {
@@ -97,6 +98,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
   };
 
   return (
+    <ModalPortal onClose={onClose}>
     <div className="ps-modal-backdrop" onClick={onClose}>
       <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -348,5 +350,6 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
       </div>
       {lb.element}
     </div>
+    </ModalPortal>
   );
 }

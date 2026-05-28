@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Circle, X, Activity, Wallet, Check, Save } from 'lucide-react';
 import { Field } from '../components/Field';
+import { ModalPortal } from '../components/ModalPortal';
 import { fmt2 } from '../utils/format';
 
 export function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }) {
@@ -28,6 +29,7 @@ export function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarCon
   };
 
   return (
+    <ModalPortal onClose={onClose}>
     <div className="ps-modal-backdrop" onClick={onClose}>
       <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -150,5 +152,6 @@ export function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarCon
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Zap, Info, Save } from 'lucide-react';
 import { calcTotalKwhSubmedidores } from '../calculos';
 import { MESES_LARGO } from '../utils/format';
+import { ModalPortal } from '../components/ModalPortal';
 
 export function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, pagos, prevPagos, onClose, onSave }) {
   // Default período ENEE: día 11 del mes anterior → día 11 del mes actual
@@ -49,6 +50,7 @@ export function FacturaModal({ factura, prevFactura, monthIdx, year, config, loc
   };
 
   return (
+    <ModalPortal onClose={onClose}>
     <div className="ps-modal-backdrop" onClick={onClose}>
       <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
@@ -207,5 +209,6 @@ export function FacturaModal({ factura, prevFactura, monthIdx, year, config, loc
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
