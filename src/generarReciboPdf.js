@@ -128,6 +128,33 @@ const tablaCalc = {
 
 const safe = (s) => String(s).replace(/[\/\\:*?"<>|]/g, '_').replace(/\s+/g, '-');
 
+// Detecta si estamos en móvil. doc.save() en iOS Safari reemplaza la página
+// con el PDF y al volver re-monta la app entera (perdiendo estado/scroll).
+// En móvil mejor abrir en pestaña nueva con bloburl — al cerrar la pestaña
+// el usuario vuelve a la app intacta.
+function isMobile() {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+}
+
+function entregarPdf(doc, filename) {
+  if (isMobile()) {
+    // Abrir en pestaña nueva — el visor del navegador permite guardar/compartir
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (!win) {
+      // Pop-up bloqueado → caer al download tradicional
+      doc.save(filename);
+    } else {
+      // Liberar el blob después de un rato (no muy rápido, el visor lo necesita)
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+  } else {
+    doc.save(filename);
+  }
+}
+
 // Agrega página 2 al PDF con las 2 fotos del submedidor (si están presentes).
 // fotoAnterior/fotoActual son data URLs base64 (image/jpeg) generadas en
 // PaymentModal con compresión a 1200px. Si alguna falta, no se agrega la página.
@@ -245,7 +272,7 @@ export async function generarReciboLuzPdf(d) {
 
   await agregarPaginaFotos(doc, d);
 
-  doc.save(`Recibo-Luz-Local-${safe(d.local)}-${safe(d.periodo)}.pdf`);
+  entregarPdf(doc, `Recibo-Luz-Local-${safe(d.local)}-${safe(d.periodo)}.pdf`);
 }
 
 // d = { reciboNum, inquilino, local, periodo, fechaEmision,
@@ -275,5 +302,5 @@ export async function generarReciboRentaPdf(d) {
   noteBox(doc, 'Método de cálculo: Renta mensual calculada sobre ' + d.m2 + ' m² al precio pactado de US$' + d.precioUSD + '/m², convertido al tipo de cambio BCH (venta) vigente de L ' + d.tasa + '/US$. ISV (' + d.isvPct + '%) incluido en el total.', y);
 
   drawFooter(doc);
-  doc.save(`Recibo-Renta-Local-${safe(d.local)}-${safe(d.periodo)}.pdf`);
+  entregarPdf(doc, `Recibo-Renta-Local-${safe(d.local)}-${safe(d.periodo)}.pdf`);
 }
