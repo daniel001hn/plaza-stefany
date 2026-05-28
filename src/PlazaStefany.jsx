@@ -1962,6 +1962,7 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
 // =================================================================
 function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
   const [abierto, setAbierto] = useState(false)
+  const lb = useLightbox()
   const tiempoRelativo = (iso) => {
     if (!iso) return null
     const diff = Math.floor((Date.now() - new Date(iso)) / 1000)
@@ -1975,15 +1976,23 @@ function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
   locales.forEach(l => {
     const d = pagos[l.id] || {}
     const nombre = l.inquilino || `Local ${l.numero}`
+    // Recibos generados
     if (d.actividadRenta) alertas.push({
-      id: l.id + 'r', tipo: 'renta', nombre,
-      localNum: l.numero, ts: d.actividadRenta,
-      comprobante: d.comprobanteRenta,
+      id: l.id + 'rr', accion: 'recibo', tipo: 'renta', nombre,
+      localNum: l.numero, ts: d.actividadRenta, comprobante: d.comprobanteRenta,
     })
     if (d.actividadLuz) alertas.push({
-      id: l.id + 'l', tipo: 'luz', nombre,
-      localNum: l.numero, ts: d.actividadLuz,
-      comprobante: d.comprobanteLuz,
+      id: l.id + 'rl', accion: 'recibo', tipo: 'luz', nombre,
+      localNum: l.numero, ts: d.actividadLuz, comprobante: d.comprobanteLuz,
+    })
+    // Comprobantes subidos (puede ser sin haber generado recibo antes)
+    if (d.comprobanteRentaDate) alertas.push({
+      id: l.id + 'cr', accion: 'comprobante', tipo: 'renta', nombre,
+      localNum: l.numero, ts: d.comprobanteRentaDate, comprobante: d.comprobanteRenta,
+    })
+    if (d.comprobanteLuzDate) alertas.push({
+      id: l.id + 'cl', accion: 'comprobante', tipo: 'luz', nombre,
+      localNum: l.numero, ts: d.comprobanteLuzDate, comprobante: d.comprobanteLuz,
     })
   })
 
@@ -2010,22 +2019,26 @@ function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
               border: `1px solid ${a.tipo === 'renta' ? 'rgba(99,102,241,0.2)' : 'rgba(14,165,233,0.2)'}`,
               borderRadius: 10, padding: '.65rem .9rem',
             }}>
-              <span style={{ fontSize: '1.1rem' }}>{a.tipo === 'renta' ? '📄' : '⚡'}</span>
+              <span style={{ fontSize: '1.1rem' }}>
+                {a.accion === 'comprobante' ? '📥' : (a.tipo === 'renta' ? '📄' : '⚡')}
+              </span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '.88rem', fontWeight: 600 }}>
                   <span style={{ color: a.tipo === 'renta' ? '#6366F1' : '#0EA5E9' }}>Local {a.localNum}</span>
                   {' · '}{a.nombre}
                 </div>
                 <div style={{ fontSize: '.74rem', color: '#6E6E78', marginTop: '.1rem' }}>
-                  Generó recibo de <b>{a.tipo}</b> — {tiempoRelativo(a.ts)}
+                  {a.accion === 'comprobante'
+                    ? <>Subió <b>comprobante de {a.tipo}</b> — {tiempoRelativo(a.ts)}</>
+                    : <>Generó <b>recibo de {a.tipo}</b> — {tiempoRelativo(a.ts)}</>}
                 </div>
               </div>
               {a.comprobante
                 ? <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
                     <img src={a.comprobante} alt="comprobante"
                       style={{ width: 40, height: 32, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
-                      onClick={() => window.open(a.comprobante, '_blank')} />
-                    <span style={{ fontSize: '.7rem', color: '#1A7F35', fontWeight: 600 }}>✅ Pagado</span>
+                      onClick={() => lb.open(a.comprobante)} />
+                    <span style={{ fontSize: '.7rem', color: '#1A7F35', fontWeight: 600 }}>✅ Adjunto</span>
                   </div>
                 : <span style={{ fontSize: '.7rem', color: '#F59E0B', fontWeight: 600, background: 'rgba(245,158,11,0.1)', padding: '.15rem .45rem', borderRadius: 6, border: '1px solid rgba(245,158,11,0.3)' }}>⏳ Sin comprobante</span>
               }
@@ -2033,6 +2046,7 @@ function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
           ))}
         </div>
       )}
+      {lb.element}
     </div>
   )
 }

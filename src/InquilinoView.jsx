@@ -327,19 +327,20 @@ export default function InquilinoView({ session, onLogout }) {
     }
   }
 
+  // Registra que el inquilino generó un recibo (Renta o Luz). Va por el endpoint
+  // server-side (RLS bloquea writes directos de inquilinos a kv_store).
+  // Silent failure aceptable: si falla, no rompe la app, solo el admin no ve el log.
   const registrarActividad = async (mes, tipo) => {
     try {
-      const key = monthKey(mes.year, mes.monthIdx)
-      const r = await window.storage.get(key)
-      const data = r ? JSON.parse(r) : { pagos: {}, factura: {} }
-      data.pagos = data.pagos || {}
-      data.pagos[session.localId] = {
-        ...(data.pagos[session.localId] || {}),
-        [`actividad${tipo}`]: new Date().toISOString(),
-        [`actividadNombre`]: session.nombre || local?.inquilino || 'Inquilino',
-      }
-      await window.storage.set(key, JSON.stringify(data))
-    } catch(e) {}
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess?.session?.access_token
+      if (!token) return
+      await fetch('/api/inquilino-comprobante', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'activity', year: mes.year, monthIdx: mes.monthIdx, tipo }),
+      })
+    } catch(e) { console.warn('registrarActividad fail:', e?.message) }
   }
 
   const generarRenta = (mes) => {

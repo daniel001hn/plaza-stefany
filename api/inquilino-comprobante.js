@@ -49,7 +49,7 @@ export default async function handler(req) {
   if (!Number.isInteger(year) || year < 2020 || year > 2100) return json({ error: 'invalid year' }, 400)
   if (!Number.isInteger(monthIdx) || monthIdx < 0 || monthIdx > 11) return json({ error: 'invalid monthIdx' }, 400)
   if (tipo !== 'Renta' && tipo !== 'Luz') return json({ error: 'invalid tipo' }, 400)
-  if (action !== 'upload' && action !== 'delete') return json({ error: 'invalid action' }, 400)
+  if (!['upload', 'delete', 'activity'].includes(action)) return json({ error: 'invalid action' }, 400)
 
   if (action === 'upload') {
     if (typeof comprobanteB64 !== 'string' || !comprobanteB64.startsWith('data:image/')) {
@@ -83,10 +83,14 @@ export default async function handler(req) {
     if (action === 'upload') {
       localPago[`comprobante${tipo}`] = comprobanteB64
       localPago[`comprobante${tipo}Date`] = new Date().toISOString()
-    } else {
-      // delete: remover los campos del comprobante de ese tipo
+      localPago[`actividadNombre`] = u.nombre || usuarioStr
+    } else if (action === 'delete') {
       delete localPago[`comprobante${tipo}`]
       delete localPago[`comprobante${tipo}Date`]
+    } else if (action === 'activity') {
+      // Registrar que el inquilino generó/descargó un recibo
+      localPago[`actividad${tipo}`] = new Date().toISOString()
+      localPago[`actividadNombre`] = u.nombre || usuarioStr
     }
     data.pagos[localId] = localPago
     const newUpdatedAt = new Date().toISOString()
