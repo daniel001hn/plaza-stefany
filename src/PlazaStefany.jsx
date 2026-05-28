@@ -1,7 +1,7 @@
 // Plaza Stefany - Version con Supabase (conexion a BD en la nube)
 // Generado automaticamente - no editar manualmente
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import {
   Settings, Plus, Check, X, Zap, Building2,
   ChevronLeft, ChevronRight, Trash2, Edit3, ExternalLink,
@@ -15,6 +15,15 @@ import {
 import { DL_LOGO } from './dlLogo';
 import { MembreteHeader, MembreteFooter, MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete';
 import { monthKey } from './keys';
+import {
+  getPrecioForMonth, calcConsumoLocal, calcTotalKwhSubmedidores,
+  calcCargosFijosTotal, calcLocalesConMedidor, calcPerLocalFijo,
+  calcTarifaEfectiva, calcConsumoPrincipal,
+} from './calculos';
+import { LocalEditModal } from './modals/LocalEditModal';
+import { FacturaModal } from './modals/FacturaModal';
+import { PaymentModal } from './modals/PaymentModal';
+import { Field } from './components/Field';
 // jsPDF + jspdf-autotable son ~600KB. Importarlas dinámicamente solo cuando
 // el admin clickea "Generar recibo", reduce el bundle inicial significativamente.
 const loadPdf = () => import('./generarReciboPdf');
@@ -85,84 +94,7 @@ async function loadAuditLog() {
   } catch (e) { return []; }
 }
 
-// Devuelve el precio por m² aplicable a un mes/año determinado.
-// Usa config.precioHistorial si existe; si no, cae al precio actual.
-function getPrecioForMonth(config, year, monthIdx) {
-  if (year != null && monthIdx != null) {
-    const targetKey = `${year}-${String(monthIdx).padStart(2, '0')}`;
-    const hist = (config.precioHistorial || []).filter(h => h.desde <= targetKey);
-    if (hist.length > 0) {
-      hist.sort((a, b) => b.desde.localeCompare(a.desde));
-      return hist[0].precio;
-    }
-  }
-  return config.rentPerM2USD || 29;
-}
-
-function calcConsumoLocal(locale, pagos, prevPagos) {
-  if ((locale.tipoLuz || 'incluido') !== 'medidor') return null;
-  const pago = pagos[locale.id] || {};
-  const lecturaActual = pago.lecturaActual;
-  if (lecturaActual == null) return null;
-  // Si este mes el medidor fue reemplazado, partir desde lecturaInicialReseteo (no del mes anterior)
-  if (pago.medidorReemplazado && pago.lecturaInicialReseteo != null) {
-    return lecturaActual - pago.lecturaInicialReseteo;
-  }
-  const lecturaAnterior = prevPagos[locale.id]?.lecturaActual ?? locale.lecturaInicial;
-  if (lecturaAnterior == null) return null;
-  return lecturaActual - lecturaAnterior;
-}
-
-function calcTotalKwhSubmedidores(locales, pagos, prevPagos) {
-  let total = 0;
-  locales.forEach((l) => {
-    const c = calcConsumoLocal(l, pagos, prevPagos);
-    if (c != null && c > 0) total += c;
-  });
-  return total;
-}
-
-// Cargos fijos = comercialización + regulación + alumbrado público.
-// Se leen de la factura mensual primero (snapshot al guardar) y si no
-// existen, se usan los de config (compat con datos viejos).
-function calcCargosFijosTotal(factura, config) {
-  const f = factura || {};
-  const c = config || {};
-  const cc = (f.cargoComercializacion ?? c.cargoComercializacion ?? 0);
-  const cr = (f.cargoRegulacion ?? c.cargoRegulacion ?? 0);
-  const ap = (f.alumbradoPublico ?? c.alumbradoPublico ?? 0);
-  return Number(cc) + Number(cr) + Number(ap);
-}
-
-function calcLocalesConMedidor(locales) {
-  return (locales || []).filter(l => (l.tipoLuz || 'incluido') === 'medidor').length;
-}
-
-function calcPerLocalFijo(factura, config, locales) {
-  const n = calcLocalesConMedidor(locales);
-  if (n <= 0) return 0;
-  return calcCargosFijosTotal(factura, config) / n;
-}
-
-// Tarifa efectiva = (montoFactura - cargosFijos) / totalKwhSubmedidores.
-// Es la tarifa que solo aplica a la parte de energía. Los cargos fijos van
-// aparte, en partes iguales por local con medidor.
-function calcTarifaEfectiva(factura, locales, pagos, prevPagos, config) {
-  const monto = Number(factura.montoTotal) || 0;
-  if (monto <= 0) return null;
-  const cargosFijos = calcCargosFijosTotal(factura, config);
-  const energia = monto - cargosFijos;
-  const totalKwh = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
-  if (totalKwh <= 0) return null;
-  return energia / totalKwh;
-}
-
-function calcConsumoPrincipal(factura, prevFactura) {
-  const actual = Number(factura.lecturaPrincipal);
-  const anterior = Number(prevFactura.lecturaPrincipal);
-  if (!actual || isNaN(actual) || !anterior || isNaN(anterior)) return null;
-  return actual - anterior;
-}
+// (las funciones de cálculo viven en src/calculos.js — import al top del archivo)
 
 const STYLES = `
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -556,11 +488,21 @@ export default function App({ supabase, onLogout }) {
     reload();
     const onVisibility = () => { if (document.visibilityState === 'visible') reload(); };
     document.addEventListener('visibilitychange', onVisibility);
-    // Polling cada 60s (era 30s). Realtime subscribe ya cubre updates en vivo,
-    // este interval es solo fallback para refrescar después de cambios externos.
-    const interval = setInterval(reload, 60000);
+    // Realtime subscribe es la fuente primaria de updates en vivo.
+    // Si Realtime no conecta en 5s (Supabase free a veces falla), caemos
+    // a polling cada 5 min como safety net. Polling cada 60s era redundante
+    // y drenaba batería + queries.
     let unsub = () => {};
-    try { unsub = window.storage?.subscribe?.(() => reload()) || (() => {}); } catch {}
+    let realtimeConnected = false;
+    try {
+      unsub = window.storage?.subscribe?.(() => reload()) || (() => {});
+      // Marcar conectado después de 5s sin errores
+      setTimeout(() => { realtimeConnected = true }, 5000);
+    } catch {}
+    // Fallback polling: solo si realtime no respondió. 5 min en vez de 60s.
+    const interval = setInterval(() => {
+      if (!realtimeConnected) reload();
+    }, 300000);
     return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisibility); clearInterval(interval); unsub(); };
   }, [year]);
 
@@ -1736,7 +1678,7 @@ function HistorialENEE({ monthsData, year }) {
 // =================================================================
 // FACTURA CARD
 // =================================================================
-function FacturaCard({ factura, consumoPrincipal, consumoSubmedidores, areasComunes, tarifaEfectiva, onEdit }) {
+const FacturaCard = memo(function FacturaCard({ factura, consumoPrincipal, consumoSubmedidores, areasComunes, tarifaEfectiva, onEdit }) {
   const tieneFactura = factura.montoTotal > 0;
 
   if (!tieneFactura) {
@@ -1809,7 +1751,7 @@ function FacturaCard({ factura, consumoPrincipal, consumoSubmedidores, areasComu
       </div>
     </div>
   );
-}
+});
 
 function FacturaStat({ label, value, sub, accent, highlight }) {
   return (
@@ -1829,7 +1771,7 @@ function FacturaStat({ label, value, sub, accent, highlight }) {
   );
 }
 
-function KPI({ label, value, target, accent, icon, big, onClick }) {
+const KPI = memo(function KPI({ label, value, target, accent, icon, big, onClick }) {
   const pct = target > 0 ? (value / target) * 100 : 0;
   const clickable = !!onClick;
   return (
@@ -1867,9 +1809,9 @@ function KPI({ label, value, target, accent, icon, big, onClick }) {
       </div>
     </div>
   );
-}
+});
 
-function KPIPending({ rentaPend, luzPend, onClick }) {
+const KPIPending = memo(function KPIPending({ rentaPend, luzPend, onClick }) {
   const total = rentaPend + luzPend;
   const clickable = !!onClick && total > 0;
   return (
@@ -1898,7 +1840,7 @@ function KPIPending({ rentaPend, luzPend, onClick }) {
       {clickable && <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.5rem' }}>ver detalle →</div>}
     </div>
   );
-}
+});
 
 function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onOpenPayment }) {
   const titulos = {
@@ -2094,7 +2036,7 @@ function ActividadInquilinos({ pagos, locales, monthIdx, year }) {
   )
 }
 
-function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick, i, onToggleRenta, onToggleLuz }) {
+const LocalRow = memo(function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick, i, onToggleRenta, onToggleLuz }) {
   const tipoLuz = l.tipoLuz || 'incluido';
   const luzAplica = tipoLuz !== 'incluido';
   const luzCalculable = tipoLuz === 'medidor' ? (l.consumo != null && tarifaEfectiva != null) : true;
@@ -2172,581 +2114,14 @@ function LocalRow({ l, data, tarifaEfectiva, prevData = {}, mesAnterior, onClick
       <div className="ps-local-arrow"><ArrowRight size={16} style={{ color: '#5A5A64' }} /></div>
     </div>
   );
-}
+});
 
 // =================================================================
 // FACTURA MODAL
 // =================================================================
-function FacturaModal({ factura, prevFactura, monthIdx, year, config, locales, pagos, prevPagos, onClose, onSave }) {
-  // Default período ENEE: día 11 del mes anterior → día 11 del mes actual
-  const pad = (n) => String(n).padStart(2, '0');
-  const defPeriodoDesde = `${monthIdx === 0 ? year - 1 : year}-${pad(monthIdx === 0 ? 12 : monthIdx)}-11`;
-  const defPeriodoHasta = `${year}-${pad(monthIdx + 1)}-11`;
-  const [form, setForm] = useState({
-    montoTotal: factura.montoTotal ?? '',
-    lecturaPrincipal: factura.lecturaPrincipal ?? '',
-    fechaEmision: factura.fechaEmision || '',
-    fechaPago: factura.fechaPago || '',
-    pagada: !!factura.pagada,
-    notas: factura.notas || '',
-    // Cargos fijos: del snapshot si existe; si no, del config actual.
-    cargoComercializacion: factura.cargoComercializacion ?? config?.cargoComercializacion ?? 60,
-    cargoRegulacion: factura.cargoRegulacion ?? config?.cargoRegulacion ?? 30,
-    alumbradoPublico: factura.alumbradoPublico ?? config?.alumbradoPublico ?? 130,
-    // Período real que ENEE factura (default 11 → 11, ajustable)
-    periodoDesde: factura.periodoDesde || defPeriodoDesde,
-    periodoHasta: factura.periodoHasta || defPeriodoHasta,
-  });
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const lecturaAnt = prevFactura.lecturaPrincipal;
-  const consumo = (form.lecturaPrincipal !== '' && lecturaAnt != null && !isNaN(Number(lecturaAnt)))
-    ? Number(form.lecturaPrincipal) - Number(lecturaAnt) : null;
-  const cargosFijosTotal = (Number(form.cargoComercializacion) || 0) + (Number(form.cargoRegulacion) || 0) + (Number(form.alumbradoPublico) || 0);
-  // Auditoría: comparar consumo del medidor principal vs suma de submedidores
-  const sumSubmedidores = calcTotalKwhSubmedidores(locales || [], pagos || {}, prevPagos || {});
-  const diff = (consumo != null) ? consumo - sumSubmedidores : null;
-  // Guardado parcial habilitado: el admin puede registrar cargos fijos primero
-  // (cualquier día del mes) y completar monto + lectura después (día 1 del mes
-  // siguiente cuando llega la factura ENEE). Solo se exige que los 3 cargos
-  // fijos tengan valor. El recibo no se emite hasta que el monto esté lleno
-  // (lógica de tieneLuz en InquilinoView).
-  const cargosCompletos = form.cargoComercializacion !== '' && form.cargoRegulacion !== '' && form.alumbradoPublico !== '';
-  const facturaCompleta = cargosCompletos && form.montoTotal !== '' && Number(form.montoTotal) > 0;
-
-  const handleSave = () => {
-    if (!cargosCompletos) return;
-    onSave({
-      montoTotal: form.montoTotal === '' ? 0 : Number(form.montoTotal),
-      lecturaPrincipal: form.lecturaPrincipal === '' ? null : Number(form.lecturaPrincipal),
-      fechaEmision: form.fechaEmision,
-      fechaPago: form.fechaPago,
-      pagada: form.pagada,
-      notas: form.notas,
-      cargoComercializacion: Number(form.cargoComercializacion) || 0,
-      cargoRegulacion: Number(form.cargoRegulacion) || 0,
-      alumbradoPublico: Number(form.alumbradoPublico) || 0,
-      periodoDesde: form.periodoDesde || null,
-      periodoHasta: form.periodoHasta || null,
-    });
-  };
-
-  return (
-    <div className="ps-modal-backdrop" onClick={onClose}>
-      <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-          <div>
-            <div className="ps-eyebrow" style={{ color: '#6366F1', marginBottom: '.25rem' }}>
-              <Zap size={11} /> FACTURA ENEE · {MESES_LARGO[monthIdx]} {year}
-            </div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>Energía del mes</div>
-          </div>
-          <button onClick={onClose} className="ps-btn-icon"><X size={16} /></button>
-        </div>
-
-        <div className="ps-divider-soft" style={{ marginBottom: '1.25rem' }} />
-
-        <div style={{
-          background: 'rgba(99,102,241, 0.06)', border: '1px solid rgba(99,102,241, 0.2)',
-          padding: '.7rem .9rem', borderRadius: 8, marginBottom: '1.25rem', fontSize: '.78rem',
-          color: '#8E8E96', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
-        }}>
-          <Info size={14} color="#5AC8FA" style={{ flexShrink: 0, marginTop: '.1rem' }} />
-          <div>
-            Metés el <strong style={{ color: '#1C1C1E' }}>monto total</strong> que ENEE te cobró y la <strong style={{ color: '#1C1C1E' }}>lectura del medidor principal</strong>. Con eso la app calcula sola la tarifa efectiva del mes y reparte entre los locales.
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '.85rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.3rem' }}>Período real de ENEE</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem' }}>
-            <div>
-              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Desde</div>
-              <input type="date" className="ps-input" value={form.periodoDesde}
-                onChange={(e) => set('periodoDesde', e.target.value)} />
-            </div>
-            <div>
-              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Hasta</div>
-              <input type="date" className="ps-input" value={form.periodoHasta}
-                onChange={(e) => set('periodoHasta', e.target.value)} />
-            </div>
-          </div>
-          <div style={{ fontSize: '.7rem', color: '#6E6E78', marginTop: '.3rem' }}>
-            Solo informativo (qué período te factura ENEE). No afecta el cálculo de los inquilinos.
-          </div>
-        </div>
-
-        <div style={{ marginBottom: '.85rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.3rem' }}>Monto total a pagar (L)</div>
-          <input type="number" step="0.01" className="ps-input ps-mono" value={form.montoTotal}
-            onChange={(e) => set('montoTotal', e.target.value)} placeholder="11602.05" />
-        </div>
-
-        <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '.9rem', marginBottom: '.85rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Medidor principal del edificio (opcional, solo para auditoría)</span>
-            {consumo != null && (
-              <span style={{ color: '#8E8E96', fontWeight: 500, fontSize: '.7rem' }}>
-                Consumo edificio: <b style={{ color: consumo < 0 ? '#FF5C5C' : '#1C1C1E' }}>{consumo} kWh</b>
-              </span>
-            )}
-          </div>
-          <div style={{
-            background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.55rem .85rem',
-            borderRadius: 8, marginBottom: '.5rem', fontSize: '.74rem', color: '#8E8E96',
-            display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.4rem',
-          }}>
-            <span>Lectura anterior del medidor principal:</span>
-            <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>
-              {lecturaAnt != null ? lecturaAnt : '— sin registro previo'}
-            </span>
-          </div>
-          <input type="number" className="ps-input ps-mono" value={form.lecturaPrincipal}
-            onChange={(e) => set('lecturaPrincipal', e.target.value)} placeholder="Lectura actual (ej. 13057)" />
-          {consumo != null && sumSubmedidores > 0 && (
-            <div style={{
-              marginTop: '.5rem', padding: '.55rem .8rem', borderRadius: 8, fontSize: '.74rem',
-              background: Math.abs(diff) < 50 ? 'rgba(52,199,89,0.10)' : 'rgba(255,193,7,0.10)',
-              border: '1px solid ' + (Math.abs(diff) < 50 ? 'rgba(52,199,89,0.35)' : 'rgba(255,193,7,0.35)'),
-              color: Math.abs(diff) < 50 ? '#1A7F35' : '#8B5A00',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Consumo edificio (medidor principal):</span><b className="ps-mono">{consumo} kWh</b></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Suma de submedidores de locales:</span><b className="ps-mono">{sumSubmedidores} kWh</b></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid currentColor', paddingTop: '.25rem', marginTop: '.25rem', opacity: .85 }}>
-                <span>Áreas comunes / no medido:</span><b className="ps-mono">{diff} kWh</b>
-              </div>
-              {Math.abs(diff) >= 50 && (
-                <div style={{ marginTop: '.3rem', fontSize: '.7rem' }}>⚠️ Diferencia alta. Revisá lecturas de submedidores o si hay consumo no medido (pasillos, bomba, etc.)</div>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginBottom: '.85rem' }}>
-          <div>
-            <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha de emisión</div>
-            <input type="date" className="ps-input" value={form.fechaEmision}
-              onChange={(e) => set('fechaEmision', e.target.value)} />
-          </div>
-          <div>
-            <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha límite de pago</div>
-            <input type="date" className="ps-input" value={form.fechaPago}
-              onChange={(e) => set('fechaPago', e.target.value)} />
-          </div>
-        </div>
-
-        <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '.9rem', marginBottom: '.85rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Cargos fijos de esta factura (se dividen en partes iguales entre los locales)</span>
-            <span style={{ color: '#6366F1', fontWeight: 700 }}>Total: L {cargosFijosTotal.toFixed(2)}</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '.5rem' }}>
-            <div>
-              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Comercialización</div>
-              <input type="number" step="0.01" className="ps-input ps-mono" value={form.cargoComercializacion}
-                onChange={(e) => set('cargoComercializacion', e.target.value)} placeholder="60" />
-            </div>
-            <div>
-              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Regulación</div>
-              <input type="number" step="0.01" className="ps-input ps-mono" value={form.cargoRegulacion}
-                onChange={(e) => set('cargoRegulacion', e.target.value)} placeholder="30" />
-            </div>
-            <div>
-              <div style={{ fontSize: '.68rem', color: '#8E8E96', marginBottom: '.2rem' }}>Alumbrado público</div>
-              <input type="number" step="0.01" className="ps-input ps-mono" value={form.alumbradoPublico}
-                onChange={(e) => set('alumbradoPublico', e.target.value)} placeholder="130" />
-            </div>
-          </div>
-          <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.35rem' }}>
-            Confirmá estos valores con tu factura ENEE del mes — se quedan congelados acá y los recibos los usan tal cual.
-          </div>
-        </div>
-
-        <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.4rem 0', marginBottom: '.85rem' }}>
-          <input type="checkbox" className="ps-checkbox" checked={form.pagada} onChange={(e) => set('pagada', e.target.checked)} />
-          <span style={{ fontSize: '.92rem', fontWeight: 500 }}>Ya pagué la factura ENEE</span>
-        </label>
-
-        <div style={{ marginBottom: '1.25rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.3rem' }}>Notas</div>
-          <textarea className="ps-input" rows={2} value={form.notas}
-            onChange={(e) => set('notas', e.target.value)} placeholder="Observaciones..." />
-        </div>
-
-        {!cargosCompletos && (
-          <div style={{ background: 'rgba(255,193,7,0.10)', border: '1px solid rgba(255,193,7,0.35)', padding: '.55rem .8rem', borderRadius: 8, marginBottom: '.7rem', fontSize: '.75rem', color: '#8B5A00' }}>
-            ⚠️ Necesitás los 3 cargos fijos para guardar.
-          </div>
-        )}
-        {cargosCompletos && !facturaCompleta && (
-          <div style={{ background: 'rgba(0,122,255,0.08)', border: '1px solid rgba(0,122,255,0.30)', padding: '.55rem .8rem', borderRadius: 8, marginBottom: '.7rem', fontSize: '.75rem', color: '#004B99' }}>
-            <b>📝 Factura parcial.</b> Vas a guardar solo los cargos fijos. Los recibos <b>no se emiten</b> hasta que metas el monto total ENEE (el día 1 del próximo mes cuando llegue la factura).
-          </div>
-        )}
-        {facturaCompleta && (
-          <div style={{ background: 'rgba(52,199,89,0.10)', border: '1px solid rgba(52,199,89,0.35)', padding: '.55rem .8rem', borderRadius: 8, marginBottom: '.7rem', fontSize: '.75rem', color: '#1A7F35' }}>
-            ✅ Factura completa. Al guardar, los recibos quedan disponibles.
-          </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem' }}>
-          <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
-          <button onClick={handleSave} className="ps-btn" disabled={!cargosCompletos}><Save size={14} strokeWidth={2.5} /> Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Comprime imagen a base64 (max 1200px, calidad 0.7) para usar en recibos.
 // 1200px da buena resolución para que se lea el medidor en el PDF.
-function comprimirFotoMedidor(file) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      const canvas = document.createElement('canvas')
-      const max = 1200
-      let w = img.width, h = img.height
-      if (w > max || h > max) {
-        if (w > h) { h = Math.round(h * max / w); w = max }
-        else { w = Math.round(w * max / h); h = max }
-      }
-      canvas.width = w; canvas.height = h
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-      URL.revokeObjectURL(url)
-      resolve(canvas.toDataURL('image/jpeg', 0.7))
-    }
-    img.onerror = reject
-    img.src = url
-  })
-}
-
-function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEfectiva, fijoLocal = 0, config, calcRenta, onClose, onSave, onGenerateRecibo, onGenerateReciboRenta }) {
-  const [form, setForm] = useState({
-    rentaPagada: !!data.rentaPagada,
-    fechaRenta: data.fechaRenta || '',
-    numFactura: data.numFactura || '',
-    linkFactura: data.linkFactura || '',
-    luzPagada: !!data.luzPagada,
-    fechaLuz: data.fechaLuz || '',
-    lecturaActual: data.lecturaActual ?? '',
-    medidorReemplazado: !!data.medidorReemplazado,
-    lecturaInicialReseteo: data.lecturaInicialReseteo ?? '',
-    notas: data.notas || '',
-    fotoMedidorAnterior: data.fotoMedidorAnterior || '',
-    fotoMedidorActual: data.fotoMedidorActual || '',
-  });
-  const [fotoLoading, setFotoLoading] = useState({ anterior: false, actual: false });
-
-  const handleFotoChange = async (tipo, file) => {
-    if (!file) return
-    setFotoLoading(s => ({ ...s, [tipo]: true }))
-    try {
-      const b64 = await comprimirFotoMedidor(file)
-      setForm(f => ({ ...f, [`fotoMedidor${tipo === 'anterior' ? 'Anterior' : 'Actual'}`]: b64 }))
-    } catch (e) {
-      alert('No se pudo procesar la foto. Probá con otra.')
-    } finally {
-      setFotoLoading(s => ({ ...s, [tipo]: false }))
-    }
-  };
-  const tipoLuz = local.tipoLuz || 'incluido';
-  const renta = calcRenta(local.m2);
-  const lecturaAnterior = prevData.lecturaActual ?? local.lecturaInicial ?? null;
-
-  // Si medidor fue reemplazado este mes, calcular consumo desde la lectura inicial nueva
-  const consumo = tipoLuz === 'medidor' && form.lecturaActual !== ''
-    ? (form.medidorReemplazado && form.lecturaInicialReseteo !== ''
-        ? Number(form.lecturaActual) - Number(form.lecturaInicialReseteo)
-        : (lecturaAnterior != null ? Number(form.lecturaActual) - Number(lecturaAnterior) : null))
-    : null;
-
-  // luz = consumo × tarifa + parte del cargo fijo. Si consumo=0/null, igual paga el fijo.
-  const montoEnergiaCalc = tipoLuz === 'medidor' && consumo != null && tarifaEfectiva
-    ? consumo * tarifaEfectiva : 0;
-  const montoLuzCalc = tipoLuz === 'medidor'
-    ? montoEnergiaCalc + fijoLocal
-    : (tipoLuz === 'fijo' ? (local.luzFija || 0) : 0);
-
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const todayStr = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
-
-  const handleSave = () => {
-    const out = {
-      rentaPagada: form.rentaPagada, fechaRenta: form.fechaRenta,
-      numFactura: form.numFactura, linkFactura: form.linkFactura, notas: form.notas,
-    };
-    if (tipoLuz !== 'incluido') {
-      out.luzPagada = form.luzPagada;
-      out.fechaLuz = form.fechaLuz;
-      if (tipoLuz === 'medidor') {
-        out.lecturaActual = form.lecturaActual === '' ? null : Number(form.lecturaActual);
-        out.medidorReemplazado = !!form.medidorReemplazado;
-        out.lecturaInicialReseteo = form.medidorReemplazado && form.lecturaInicialReseteo !== ''
-          ? Number(form.lecturaInicialReseteo) : null;
-        out.fotoMedidorAnterior = form.fotoMedidorAnterior || null;
-        out.fotoMedidorActual = form.fotoMedidorActual || null;
-      }
-      out.montoLuz = montoLuzCalc;
-    }
-    onSave(out);
-  };
-
-  return (
-    <div className="ps-modal-backdrop" onClick={onClose}>
-      <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-          <div>
-            <div className="ps-eyebrow" style={{ marginBottom: '.3rem' }}>
-              <Circle size={6} fill="#1D4ED8" stroke="none" /> {MESES_LARGO[monthIdx]} {year} · LOCAL {local.numero}
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 600, lineHeight: 1.1 }}>
-              {local.inquilino || 'Sin inquilino'}
-            </div>
-          </div>
-          <button onClick={onClose} className="ps-btn-icon"><X size={16} /></button>
-        </div>
-
-        <div className="ps-divider-soft" style={{ marginBottom: '1.25rem' }} />
-
-        <div style={{ marginBottom: '1.25rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.6rem' }}>
-            <div className="ps-eyebrow" style={{ color: '#6366F1' }}><Receipt size={11} /> RENTA</div>
-            <div className="ps-mono" style={{ fontSize: '1rem', fontWeight: 600 }}>L {fmt2(renta)}</div>
-          </div>
-          <div style={{ background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.65rem .85rem', borderRadius: 8, fontSize: '.78rem', color: '#8E8E96', marginBottom: '.85rem' }}>
-            {local.m2} m² × ${config.rentPerM2USD ?? 29} × {config.tasaCambio ?? 25} + ISV {(config.isv * 100).toFixed(0)}%
-          </div>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.4rem 0' }}>
-            <input type="checkbox" className="ps-checkbox" checked={form.rentaPagada} onChange={(e) => set('rentaPagada', e.target.checked)} />
-            <span style={{ fontSize: '.92rem', fontWeight: 500 }}>Renta pagada</span>
-          </label>
-
-          {form.rentaPagada && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginTop: '.6rem' }}>
-              <div>
-                <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>
-                <input type="date" className="ps-input" value={form.fechaRenta || todayStr()} onChange={(e) => set('fechaRenta', e.target.value)} />
-              </div>
-              <div>
-                <div className="ps-label" style={{ marginBottom: '.3rem' }}>N° Factura</div>
-                <input className="ps-input" placeholder="000-000-..." value={form.numFactura} onChange={(e) => set('numFactura', e.target.value)} />
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginTop: '.75rem' }}>
-            <div className="ps-label" style={{ marginBottom: '.3rem' }}>Enlace de factura</div>
-            <input type="url" className="ps-input" placeholder="https://drive.google.com/..." value={form.linkFactura} onChange={(e) => set('linkFactura', e.target.value)} />
-            {form.linkFactura && (
-              <a href={form.linkFactura} target="_blank" rel="noreferrer" style={{
-                fontSize: '.75rem', color: '#6366F1', textDecoration: 'none', marginTop: '.4rem',
-                display: 'inline-flex', alignItems: 'center', gap: '.3rem',
-              }}>
-                <ExternalLink size={11} /> Abrir factura
-              </a>
-            )}
-          </div>
-        </div>
-
-        {tipoLuz !== 'incluido' && (
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div className="ps-divider-soft" style={{ marginBottom: '1rem' }} />
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.6rem' }}>
-              <div className="ps-eyebrow" style={{ color: '#6366F1' }}><Zap size={11} /> ENERGÍA ELÉCTRICA</div>
-              <div className="ps-mono" style={{ fontSize: '1rem', fontWeight: 600, color: tarifaEfectiva || tipoLuz === 'fijo' ? '#6366F1' : '#6E6E78' }}>
-                L {fmt2(montoLuzCalc)}
-              </div>
-            </div>
-
-            {tipoLuz === 'medidor' && (
-              <>
-                {!tarifaEfectiva && (
-                  <div style={{
-                    background: 'rgba(255, 184, 84, 0.06)', border: '1px solid rgba(255, 184, 84, 0.25)',
-                    padding: '.65rem .85rem', borderRadius: 8, marginBottom: '.85rem', fontSize: '.78rem',
-                    color: '#8B5CF6', display: 'flex', alignItems: 'flex-start', gap: '.5rem',
-                  }}>
-                    <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '.1rem' }} />
-                    <div>Aún no hay factura ENEE registrada del mes. Metela primero para calcular el monto.</div>
-                  </div>
-                )}
-
-                {tarifaEfectiva && (
-                  <div style={{
-                    background: 'rgba(99,102,241, 0.06)', border: '1px solid rgba(99,102,241, 0.2)',
-                    padding: '.65rem .85rem', borderRadius: 8, marginBottom: '.85rem',
-                    display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem', fontSize: '.78rem',
-                  }}>
-                    <div style={{ color: '#8E8E96', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                      <Calculator size={12} /> Tarifa efectiva del mes:
-                    </div>
-                    <div className="ps-mono" style={{ color: '#6366F1', fontWeight: 600 }}>L {fmt2(tarifaEfectiva)}/kWh</div>
-                  </div>
-                )}
-
-                <div style={{
-                  background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.5rem .8rem',
-                  borderRadius: 8, marginBottom: '.85rem', fontSize: '.75rem', color: '#8E8E96',
-                  display: 'flex', justifyContent: 'space-between',
-                }}>
-                  <span>Lectura anterior:</span>
-                  <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>{lecturaAnterior ?? '—'}</span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginBottom: '.85rem' }}>
-                  <div>
-                    <div className="ps-label" style={{ marginBottom: '.3rem' }}>Lectura actual</div>
-                    <input type="number" className="ps-input ps-mono" value={form.lecturaActual} onChange={(e) => set('lecturaActual', e.target.value)} placeholder="0" />
-                  </div>
-                  <div>
-                    <div className="ps-label" style={{ marginBottom: '.3rem' }}>Consumo</div>
-                    <div className="ps-input ps-mono" style={{ background: 'rgba(255,255,255,0.75)', color: consumo < 0 ? '#FF5C5C' : '#6366F1', fontWeight: 600 }}>
-                      {consumo != null ? `${consumo} kWh` : '—'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Medidor reemplazado */}
-                <div style={{ marginBottom: '.85rem', padding: '.6rem .85rem', background: 'rgba(251, 146, 60, 0.06)', border: '1px solid rgba(251, 146, 60, 0.25)', borderRadius: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', fontSize: '.8rem' }}>
-                    <input type="checkbox" className="ps-checkbox" checked={form.medidorReemplazado} onChange={(e) => set('medidorReemplazado', e.target.checked)} />
-                    <span>🔧 Submedidor reemplazado este mes</span>
-                  </label>
-                  {form.medidorReemplazado && (
-                    <div style={{ marginTop: '.5rem' }}>
-                      <div className="ps-label" style={{ marginBottom: '.3rem', fontSize: '.7rem' }}>Lectura inicial del nuevo medidor</div>
-                      <input type="number" className="ps-input ps-mono" value={form.lecturaInicialReseteo} onChange={(e) => set('lecturaInicialReseteo', e.target.value)} placeholder="0" style={{ fontSize: '.85rem' }} />
-                      <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.3rem' }}>
-                        El consumo de este mes se calcula desde esta lectura, no desde el mes anterior.
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Fotos del medidor — van como segunda página del recibo */}
-                <div style={{ marginBottom: '.85rem', padding: '.7rem .85rem', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8 }}>
-                  <div className="ps-label" style={{ marginBottom: '.5rem', fontSize: '.72rem', color: '#6366F1' }}>
-                    📸 FOTOS DEL CONTADOR (opcional — van como página 2 del recibo)
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem' }}>
-                    {['anterior', 'actual'].map((tipo) => {
-                      const key = tipo === 'anterior' ? 'fotoMedidorAnterior' : 'fotoMedidorActual';
-                      const url = form[key];
-                      const labelTxt = tipo === 'anterior' ? `Anterior (${lecturaAnterior ?? '—'})` : `Actual (${form.lecturaActual || '—'})`;
-                      return (
-                        <div key={tipo}>
-                          <div style={{ fontSize: '.7rem', color: '#5A5A64', marginBottom: '.3rem', fontWeight: 500 }}>{labelTxt}</div>
-                          {url ? (
-                            <div style={{ position: 'relative' }}>
-                              <img src={url} alt={`medidor ${tipo}`}
-                                onClick={() => window.open(url, '_blank')}
-                                style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer' }} />
-                              <button onClick={(e) => { e.preventDefault(); set(key, '') }}
-                                style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: '.7rem', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
-                            </div>
-                          ) : (
-                            <label style={{ display: 'block', cursor: 'pointer' }}>
-                              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
-                                onChange={(e) => handleFotoChange(tipo, e.target.files?.[0])} />
-                              <div style={{ height: 90, display: 'grid', placeItems: 'center', border: '1px dashed rgba(99,102,241,0.4)', borderRadius: 6, background: 'rgba(255,255,255,0.5)', color: '#6366F1', fontSize: '.78rem', textAlign: 'center', padding: '.5rem' }}>
-                                {fotoLoading[tipo] ? '⏳ Procesando...' : '📷 Tomar / Subir'}
-                              </div>
-                            </label>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-
-            {tipoLuz === 'fijo' && (
-              <div style={{
-                background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.65rem .85rem',
-                borderRadius: 8, marginBottom: '.85rem', fontSize: '.78rem', color: '#8E8E96',
-                display: 'flex', justifyContent: 'space-between',
-              }}>
-                <span>Monto fijo configurado:</span>
-                <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>L {fmt2(local.luzFija || 0)}</span>
-              </div>
-            )}
-
-            {montoLuzCalc > 0 && (
-              <>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.4rem 0' }}>
-                  <input type="checkbox" className="ps-checkbox" checked={form.luzPagada} onChange={(e) => set('luzPagada', e.target.checked)} />
-                  <span style={{ fontSize: '.92rem', fontWeight: 500 }}>Luz pagada</span>
-                </label>
-                {form.luzPagada && (
-                  <div style={{ marginTop: '.5rem', maxWidth: 220 }}>
-                    <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>
-                    <input type="date" className="ps-input" value={form.fechaLuz || todayStr()} onChange={(e) => set('fechaLuz', e.target.value)} />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        <div className="ps-divider-soft" style={{ marginBottom: '1rem' }} />
-        <div style={{ marginBottom: '1.25rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.3rem' }}>Notas</div>
-          <textarea className="ps-input" rows={2} value={form.notas} onChange={(e) => set('notas', e.target.value)} placeholder="Abonos parciales, observaciones..." />
-        </div>
-
-        {/* Comprobantes subidos por el inquilino */}
-        {(data.comprobanteRenta || data.comprobanteLuz) && (
-          <div style={{ marginBottom: '1.25rem', background: 'rgba(52,199,89,0.08)', border: '1px solid rgba(52,199,89,0.25)', borderRadius: 12, padding: '1rem' }}>
-            <div className="ps-label" style={{ marginBottom: '.65rem', color: '#1A7F35' }}>✅ Comprobantes del inquilino</div>
-            <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-              {data.comprobanteRenta && (
-                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
-                  <img src={data.comprobanteRenta} alt="comp renta"
-                    style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
-                    onClick={() => window.open(data.comprobanteRenta, '_blank')} />
-                  <div style={{ fontSize: '.74rem', color: '#5A5A64' }}>
-                    <div style={{ fontWeight: 600, color: '#1A7F35' }}>📄 Renta</div>
-                    {data.comprobanteRentaDate && <div style={{ color: '#6E6E78', marginTop: '.15rem' }}>{new Date(data.comprobanteRentaDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
-                  </div>
-                </div>
-              )}
-              {data.comprobanteLuz && (
-                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
-                  <img src={data.comprobanteLuz} alt="comp luz"
-                    style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer' }}
-                    onClick={() => window.open(data.comprobanteLuz, '_blank')} />
-                  <div style={{ fontSize: '.74rem', color: '#5A5A64' }}>
-                    <div style={{ fontWeight: 600, color: '#0EA5E9' }}>⚡ Luz</div>
-                    {data.comprobanteLuzDate && <div style={{ color: '#6E6E78', marginTop: '.15rem' }}>{new Date(data.comprobanteLuzDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-            <button onClick={onGenerateReciboRenta} className="ps-btn-ghost" style={{ background: 'rgba(99,102,241, 0.08)', borderColor: 'rgba(99,102,241, 0.3)', color: '#6366F1' }}>
-              <Printer size={14} /> Recibo de renta
-            </button>
-            {tipoLuz !== 'incluido' && montoLuzCalc > 0 && (
-              <button onClick={onGenerateRecibo} className="ps-btn-ghost" style={{ background: 'rgba(14,165,233, 0.08)', borderColor: 'rgba(14,165,233, 0.3)', color: '#0EA5E9' }}>
-                <Printer size={14} /> Recibo de luz
-              </button>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: '.5rem' }}>
-            <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
-            <button onClick={handleSave} className="ps-btn"><Save size={14} strokeWidth={2.5} /> Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, onDeleteLocal, calcRenta }) {
   const [draft, setDraft] = useState(config);
@@ -3254,164 +2629,7 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
   );
 }
 
-function Field({ label, children }) {
-  return (
-    <div>
-      <div className="ps-label" style={{ marginBottom: '.3rem' }}>{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarContrato }) {
-  const [f, setF] = useState({
-    id: locale.id,
-    numero: locale.numero || '',
-    nombre: locale.nombre || '',
-    inquilino: locale.inquilino || '',
-    m2: locale.m2 || '',
-    tipoLuz: locale.tipoLuz || 'medidor',
-    lecturaInicial: locale.lecturaInicial ?? '',
-    luzFija: locale.luzFija ?? '',
-    contratoDesde: locale.contratoDesde || '',
-  });
-  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
-
-  const handleSave = () => {
-    if (!f.m2 || Number(f.m2) <= 0) { alert('Indicá los metros cuadrados.'); return; }
-    onSave({
-      ...f, m2: Number(f.m2),
-      lecturaInicial: f.lecturaInicial === '' ? null : Number(f.lecturaInicial),
-      luzFija: f.luzFija === '' ? null : Number(f.luzFija),
-      contratoDesde: f.contratoDesde || null,
-    });
-  };
-
-  return (
-    <div className="ps-modal-backdrop" onClick={onClose}>
-      <div className="ps-modal ps-card-elevated" onClick={(e) => e.stopPropagation()} style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <div>
-            <div className="ps-eyebrow" style={{ marginBottom: '.25rem' }}>
-              <Circle size={6} fill="#1D4ED8" stroke="none" /> {locale.id ? 'EDITAR' : 'NUEVO'} LOCAL
-            </div>
-            <div style={{ fontSize: '1.3rem', fontWeight: 600 }}>
-              {locale.inquilino || (locale.id ? 'Editar' : 'Configurar local')}
-            </div>
-          </div>
-          <button onClick={onClose} className="ps-btn-icon"><X size={16} /></button>
-        </div>
-
-        <div className="ps-divider-soft" style={{ marginBottom: '1.25rem' }} />
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.65rem', marginBottom: '.85rem' }}>
-          <Field label="N° de local">
-            <input className="ps-input" value={f.numero} onChange={(e) => set('numero', e.target.value)} placeholder="1, A1..." />
-          </Field>
-          <Field label="m²">
-            <input type="number" step="0.01" className="ps-input ps-mono" value={f.m2} onChange={(e) => set('m2', e.target.value)} />
-          </Field>
-        </div>
-
-        <div style={{ marginBottom: '.85rem' }}>
-          <Field label="Inquilino">
-            <input className="ps-input" value={f.inquilino} onChange={(e) => set('inquilino', e.target.value)} placeholder="Nombre del inquilino" />
-          </Field>
-        </div>
-
-        <div style={{ marginBottom: '.85rem' }}>
-          <Field label="Negocio (opcional)">
-            <input className="ps-input" value={f.nombre} onChange={(e) => set('nombre', e.target.value)} placeholder="DSD, Salón María, etc." />
-          </Field>
-        </div>
-
-        {f.inquilino && (
-          <div style={{ marginBottom: '.85rem' }}>
-            <Field label="Inicio del contrato (el inquilino verá solo desde este mes)">
-              <input type="date" className="ps-input" value={f.contratoDesde} onChange={(e) => set('contratoDesde', e.target.value)} />
-            </Field>
-            <div style={{ fontSize: '.72rem', color: '#6E6E78', marginTop: '.35rem' }}>
-              Si lo dejás vacío, el inquilino ve los 12 meses del año actual (algunos vacíos). Poner una fecha esconde los meses anteriores en su vista.
-            </div>
-          </div>
-        )}
-
-        <div style={{ marginBottom: '.85rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.4rem' }}>Tipo de cobro de luz</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '.4rem' }}>
-            {[
-              { v: 'medidor', label: 'Submedidor', icon: <Activity size={13} /> },
-              { v: 'fijo', label: 'Monto fijo', icon: <Wallet size={13} /> },
-              { v: 'incluido', label: 'Incluida', icon: <Check size={13} /> },
-            ].map((opt) => (
-              <button
-                key={opt.v} type="button" onClick={() => set('tipoLuz', opt.v)}
-                style={{
-                  padding: '.6rem .5rem', borderRadius: 8, cursor: 'pointer',
-                  fontSize: '.8rem', fontWeight: 500,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.35rem',
-                  background: f.tipoLuz === opt.v ? 'rgba(99,102,241,0.1)' : '#E8E8ED',
-                  border: '1px solid', borderColor: f.tipoLuz === opt.v ? '#6366F1' : '#2E2E38',
-                  color: f.tipoLuz === opt.v ? '#6366F1' : '#B0B0BA',
-                  transition: 'all .15s', fontFamily: 'Geist, sans-serif',
-                }}
-              >{opt.icon} {opt.label}</button>
-            ))}
-          </div>
-        </div>
-
-        {f.tipoLuz === 'medidor' && (
-          <div style={{ marginBottom: '.85rem' }}>
-            <Field label="Lectura inicial del submedidor (kWh)">
-              <input type="number" className="ps-input ps-mono" value={f.lecturaInicial} onChange={(e) => set('lecturaInicial', e.target.value)} placeholder="Ej: 4250" />
-            </Field>
-            <div style={{ fontSize: '.72rem', color: '#6E6E78', marginTop: '.35rem' }}>
-              Solo se usa la primera vez. Las lecturas mensuales se guardan automáticamente después.
-            </div>
-          </div>
-        )}
-
-        {f.tipoLuz === 'fijo' && (
-          <div style={{ marginBottom: '.85rem' }}>
-            <Field label="Monto fijo mensual de luz (L)">
-              <input type="number" step="0.01" className="ps-input ps-mono" value={f.luzFija} onChange={(e) => set('luzFija', e.target.value)} placeholder="Ej: 500" />
-            </Field>
-          </div>
-        )}
-
-        {f.m2 > 0 && (
-          <div style={{
-            background: 'rgba(132, 248, 65, 0.06)', border: '1px solid rgba(99,102,241,0.2)',
-            padding: '.75rem 1rem', borderRadius: 8, marginBottom: '1.25rem',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.85rem',
-          }}>
-            <span style={{ color: '#8E8E96' }}>Renta calculada (con ISV)</span>
-            <span className="ps-mono" style={{ fontWeight: 600, color: '#6366F1', fontSize: '1.05rem' }}>
-              L {fmt2(calcRenta(Number(f.m2)))}
-            </span>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '.5rem', alignItems: 'center' }}>
-          {locale.id && locale.inquilino && onCerrarContrato ? (
-            <button
-              onClick={() => onCerrarContrato(locale.id)}
-              className="ps-btn-ghost"
-              style={{ color: '#FF3B30', borderColor: 'rgba(255,59,48,0.25)', fontSize: '.8rem' }}
-              title="Cerrar contrato y dejar el local libre"
-            >
-              ⊘ Cerrar contrato
-            </button>
-          ) : <span />}
-          <div style={{ display: 'flex', gap: '.5rem' }}>
-            <button onClick={onClose} className="ps-btn-ghost">Cancelar</button>
-            <button onClick={handleSave} className="ps-btn"><Save size={14} strokeWidth={2.5} /> Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// (Field movido a src/components/Field.jsx)
 
 // =================================================================
 // REPORTE MENSUAL — resumen de todos los locales del mes

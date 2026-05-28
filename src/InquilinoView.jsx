@@ -1,61 +1,18 @@
 import { useState, useEffect } from 'react'
 import { monthKey } from './keys'
 import { MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete'
+import { supabase } from './supabaseClient'
+// Calculos compartidos con admin (src/calculos.js) — antes estaban duplicados aquí.
+import {
+  calcConsumoLocal, calcTotalKwhSubmedidores, calcCargosFijosTotal,
+  calcLocalesConMedidor, calcPerLocalFijo, calcTarifaEfectiva,
+} from './calculos'
 // jsPDF lazy-loaded para reducir bundle inicial
 const loadPdf = () => import('./generarReciboPdf')
-import { supabase } from './supabaseClient'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 const fmt  = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const fmt0 = (n) => Number(n || 0).toLocaleString('es-HN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-
-// Cálculo de luz — réplica exacta de la lógica del admin (PlazaStefany.jsx).
-// El inquilino calcula la tarifa y el consumo él mismo en vez de depender de
-// campos que el "Guardar" del admin no persiste.
-function calcConsumoLocal(locale, pagos, prevPagos) {
-  if (!locale || (locale.tipoLuz || 'incluido') !== 'medidor') return null
-  const pago = pagos[locale.id] || {}
-  const lecturaActual = pago.lecturaActual
-  if (lecturaActual == null) return null
-  if (pago.medidorReemplazado && pago.lecturaInicialReseteo != null) {
-    return lecturaActual - pago.lecturaInicialReseteo
-  }
-  const lecturaAnterior = prevPagos[locale.id]?.lecturaActual ?? locale.lecturaInicial
-  if (lecturaAnterior == null) return null
-  return lecturaActual - lecturaAnterior
-}
-function calcTotalKwhSubmedidores(locales, pagos, prevPagos) {
-  let total = 0
-  for (const l of locales) {
-    const c = calcConsumoLocal(l, pagos, prevPagos)
-    if (c != null && c > 0) total += c
-  }
-  return total
-}
-function calcCargosFijosTotal(factura, config) {
-  const f = factura || {}; const c = config || {}
-  const cc = (f.cargoComercializacion ?? c.cargoComercializacion ?? 0)
-  const cr = (f.cargoRegulacion ?? c.cargoRegulacion ?? 0)
-  const ap = (f.alumbradoPublico ?? c.alumbradoPublico ?? 0)
-  return Number(cc) + Number(cr) + Number(ap)
-}
-function calcLocalesConMedidor(locales) {
-  return (locales || []).filter(l => (l.tipoLuz || 'incluido') === 'medidor').length
-}
-function calcPerLocalFijo(factura, config, locales) {
-  const n = calcLocalesConMedidor(locales)
-  if (n <= 0) return 0
-  return calcCargosFijosTotal(factura, config) / n
-}
-function calcTarifaEfectiva(factura, locales, pagos, prevPagos, config) {
-  const monto = Number(factura?.montoTotal) || 0
-  if (monto <= 0) return null
-  const cargosFijos = calcCargosFijosTotal(factura, config)
-  const energia = monto - cargosFijos
-  const totalKwh = calcTotalKwhSubmedidores(locales, pagos, prevPagos)
-  if (totalKwh <= 0) return null
-  return energia / totalKwh
-}
 
 async function loadCfg() {
   try { const r = await window.storage.get('config-and-locales'); if (r) return typeof r === 'string' ? JSON.parse(r) : r } catch(e) {}
