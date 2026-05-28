@@ -53,7 +53,13 @@ function LoginScreen({ onLogin }) {
     const email = usuarioStr ? `${usuarioStr}@plaza-stefany.local` : 'admin@plaza-stefany.local'
 
     try {
-      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
+      // Timeout de 20s para que el "Verificando..." no se quede colgado
+      // eternamente si la red está muy lenta o Supabase no responde.
+      const loginPromise = supabase.auth.signInWithPassword({ email, password })
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT: tu conexión está muy lenta. Probá de nuevo o cambiá de red.')), 20000)
+      )
+      const { data, error: authErr } = await Promise.race([loginPromise, timeoutPromise])
       if (!authErr && data?.user) {
         const meta = data.user.user_metadata || {}
         const isAdmin = meta.role === 'admin' || email === 'admin@plaza-stefany.local'
@@ -73,7 +79,16 @@ function LoginScreen({ onLogin }) {
           return
         }
       }
-    } catch(e) {}
+    } catch(e) {
+      // Si fue timeout, mostrar mensaje específico (no genérico de credenciales)
+      if (e?.message?.startsWith('TIMEOUT')) {
+        setError('Conexión lenta — probá de nuevo o cambiá de WiFi')
+        setLoading(false)
+        setShake(true)
+        setTimeout(() => setShake(false), 600)
+        return
+      }
+    }
 
     setError('Usuario o contraseña incorrectos')
     setLoading(false)
