@@ -89,7 +89,7 @@ function LoginScreen({ onLogin }) {
       <style>{css}</style>
       <div className='lc' style={{width:'340px',background:'rgba(44,44,46,0.88)',backdropFilter:'blur(40px)',WebkitBackdropFilter:'blur(40px)',borderRadius:'20px',border:'1px solid rgba(255,255,255,0.1)',padding:'44px 36px 40px',boxShadow:'0 32px 80px rgba(0,0,0,0.6)',animation:shake?'shake 0.4s ease':undefined}}>
         <div style={{width:'68px',height:'68px',background:'linear-gradient(145deg,#3a3a3c,#2c2c2e)',borderRadius:'16px',margin:'0 auto 24px',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'32px',boxShadow:'0 4px 16px rgba(0,0,0,0.4)',border:'1px solid rgba(255,255,255,0.08)'}}>🏢</div>
-        <h1 style={{color:'#fff',fontSize:'22px',fontWeight:'700',textAlign:'center',margin:'0 0 4px',letterSpacing:'-0.4px'}}>Plaza Stefany</h1>
+        <h1 style={{color:'#fff',fontSize:'22px',fontWeight:'700',textAlign:'center',margin:'0 0 4px',letterSpacing:'-0.4px'}}>Stefany Plaza</h1>
         <p style={{color:'rgba(255,255,255,0.35)',fontSize:'13px',textAlign:'center',margin:'0 0 28px'}}>Portal de acceso</p>
         <form onSubmit={handleSubmit}>
           <input className='li' type='text' placeholder='Usuario (dejar vacío si sos admin)' value={usuario} onChange={e=>{setUsuario(e.target.value);setError('')}} style={error?inpErr:inp} autoComplete='off' />

@@ -23,7 +23,7 @@ const DEFAULT_CONFIG = {
   rentPerM2USD: 29,
   tasaCambio: 25,
   isv: 0.15,
-  plazaNombre: 'Plaza Stefany',
+  plazaNombre: 'Stefany Plaza',
   // Cargos fijos de la factura ENEE (residencial). Se dividen en partes iguales
   // entre TODOS los locales con submedidor — la parte de energía sí se prorratea
   // por consumo. Cambian trimestralmente, el admin los ajusta en Configuración.
@@ -2899,8 +2899,8 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
                   tool: 'create_draft',
                   input: {
                     to: u.email,
-                    subject: `Plaza Stefany — Su recibo de ${mes} está disponible`,
-                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Plaza Stefany.\n\nPuede acceder en: https://plaza-stefany.vercel.app\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nPlaza Stefany\n+504 9462-8618`
+                    subject: `Stefany Plaza — Su recibo de ${mes} está disponible`,
+                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Stefany Plaza.\n\nPuede acceder en: https://plazastefany.com\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nStefany Plaza\n+504 9462-8618`
                   }
                 })
               });

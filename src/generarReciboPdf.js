@@ -88,7 +88,7 @@ async function nuevoDoc(subtitulo) {
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
   doc.setTextColor(...C.text);
-  doc.text('PLAZA STEFANY', pw / 2, y, { align: 'center', charSpace: 0.8 });
+  doc.text('STEFANY PLAZA', pw / 2, y, { align: 'center', charSpace: 0.8 });
   y += 6.5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);

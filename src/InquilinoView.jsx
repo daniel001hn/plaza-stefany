@@ -444,7 +444,7 @@ export default function InquilinoView({ session, onLogout }) {
 
         <div className="glass" style={{padding:'1.2rem 1.5rem',marginBottom:'1rem',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div>
-            <div style={{fontSize:'.67rem',fontWeight:600,color:'#6366F1',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.2rem'}}>🏢 Plaza Stefany</div>
+            <div style={{fontSize:'.67rem',fontWeight:600,color:'#6366F1',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:'.2rem'}}>🏢 Stefany Plaza</div>
             <div style={{fontSize:'1.05rem',fontWeight:700,lineHeight:1.2}}>{session.nombre || local?.inquilino}</div>
             <div style={{fontSize:'.78rem',color:'#6E6E78',marginTop:'.22rem'}}>Local {local?.numero} · {local?.m2} m²</div>
           </div>
@@ -620,7 +620,7 @@ export default function InquilinoView({ session, onLogout }) {
           )
         })}
 
-        <div style={{textAlign:'center',marginTop:'1.5rem',fontSize:'.72rem',color:'rgba(60,60,70,.35)'}}>Plaza Stefany · D&amp;L Soluciones</div>
+        <div style={{textAlign:'center',marginTop:'1.5rem',fontSize:'.72rem',color:'rgba(60,60,70,.35)'}}>Stefany Plaza · D&amp;L Soluciones</div>
       </div>
     </div>
   )

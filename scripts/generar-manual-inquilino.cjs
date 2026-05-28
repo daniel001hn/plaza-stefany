@@ -49,7 +49,7 @@ function addFooter(doc, n, total) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.setTextColor(...C.textSec)
-  doc.text('Plaza Stefany · D&L Soluciones', MARGIN, ph - 9)
+  doc.text('Stefany Plaza · D&L Soluciones', MARGIN, ph - 9)
   doc.text(`${n} / ${total}`, pw - MARGIN, ph - 9, { align: 'right' })
 }
 
@@ -195,7 +195,7 @@ doc.text('Guía rápida', pw / 2, y, { align: 'center' })
 y += 14
 doc.setFontSize(20)
 doc.setTextColor(...C.textSec)
-doc.text('para inquilinos de Plaza Stefany', pw / 2, y, { align: 'center' })
+doc.text('para inquilinos de Stefany Plaza', pw / 2, y, { align: 'center' })
 
 // Caja grande clara con la dirección
 const boxY = y + 25
@@ -426,7 +426,7 @@ addFooter(doc, 6, 6)
 // ═══════════════════════════════════════════════════════════
 // SAVE
 // ═══════════════════════════════════════════════════════════
-const out = path.join(__dirname, '..', 'Manual-Inquilino-Plaza-Stefany.pdf')
+const out = path.join(__dirname, '..', 'Manual-Inquilino-Stefany-Plaza.pdf')
 fs.writeFileSync(out, Buffer.from(doc.output('arraybuffer')))
 const size = fs.statSync(out).size
 console.log(`✅ Manual generado: ${out}`)
