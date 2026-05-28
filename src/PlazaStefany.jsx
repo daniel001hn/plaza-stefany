@@ -511,31 +511,26 @@ export default function App({ supabase, onLogout }) {
     return () => document.head.removeChild(style);
   }, []);
 
+  // Tasa BAC en background (no bloquea el primer render). El segundo useEffect
+  // se encarga del primer load del config + meses (en paralelo) y marca loading=false.
+  // Acá solo disparamos el fetch a /api/tasa-bac SI hace falta refrescar.
   useEffect(() => {
-    (async () => {
-      const cl = await loadCfg();
-      setConfig({ ...DEFAULT_CONFIG, ...cl.config });
-      setLocales(cl.locales || []);
-      setLoading(false);
-
-      // Tasa de cambio BAC: el cron de Vercel la actualiza 1×/día. Como
-      // fallback (si el cron no corrió o estamos en preview), si la fecha
-      // guardada no es la de hoy, disparamos el endpoint nosotros mismos
-      // y refrescamos el config local con lo que devuelva.
+    const t = setTimeout(async () => {
       try {
+        const cl = await loadCfg();
         const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
         if (cl.config?.tasaFechaActualizada !== hoy) {
           const res = await fetch('/api/tasa-bac');
           const data = await res.json();
           if (data?.ok && data.sell) {
-            const newConfig = { ...DEFAULT_CONFIG, ...cl.config, tasaCambio: data.sell, tasaFechaActualizada: data.fecha, tasaFuente: 'BAC' };
-            setConfig(newConfig);
+            setConfig((prev) => ({ ...prev, tasaCambio: data.sell, tasaFechaActualizada: data.fecha, tasaFuente: 'BAC' }));
             setToast(`Tasa BAC: L ${Number(data.sell).toFixed(4)}/$`);
             setTimeout(() => setToast(null), 2800);
           }
         }
       } catch {}
-    })();
+    }, 1500); // esperar a que el primer load termine
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -556,6 +551,7 @@ export default function App({ supabase, onLogout }) {
       const result = {};
       monthKeys.forEach(([key], i) => { result[key] = months[i] })
       setYearData(result);
+      setLoading(false);
     };
     reload();
     const onVisibility = () => { if (document.visibilityState === 'visible') reload(); };
@@ -3021,10 +3017,11 @@ function AuditLogSection() {
       const data = await loadAuditLog();
       if (alive) { setLog(data); setLoading(false); }
     })();
+    // Polling 30s (era 5s — 12× menos queries). Realtime sub cubre updates en vivo igual.
     const interval = setInterval(async () => {
       const data = await loadAuditLog();
       if (alive) setLog(data);
-    }, 5000);
+    }, 30000);
     return () => { alive = false; clearInterval(interval); };
   }, []);
 
