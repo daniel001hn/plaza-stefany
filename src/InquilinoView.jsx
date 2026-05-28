@@ -578,7 +578,7 @@ export default function InquilinoView({ session, onLogout }) {
                       color: mes.data.comprobanteRenta ? '#1A7F35' : '#6E6E78',
                       backdropFilter:'blur(8px)',
                     }}>
-                      <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
+                      <input type="file" accept="image/*" style={{display:'none'}}
                         onChange={e => subirComprobante(mes,'Renta',e.target.files[0])} />
                       {mes.data.comprobanteRenta ? '✅ Comprobante renta' : '📎 Subir comprobante'}
                     </label>
@@ -603,7 +603,7 @@ export default function InquilinoView({ session, onLogout }) {
                         color: luzData.comprobanteLuz ? '#1A7F35' : '#6E6E78',
                         backdropFilter:'blur(8px)',
                       }}>
-                        <input type="file" accept="image/*" capture="environment" style={{display:'none'}}
+                        <input type="file" accept="image/*" style={{display:'none'}}
                           onChange={e => subirComprobante(luzMes,'Luz',e.target.files[0])} />
                         {luzData.comprobanteLuz ? '✅ Comprobante luz' : '📎 Subir comprobante'}
                       </label>
