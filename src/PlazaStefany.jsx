@@ -1896,7 +1896,7 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
           </div>
         ) : (
           <>
-            <div style={{ display: 'grid', gap: '.5rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', marginBottom: '1rem' }}>
               {rows.map(r => {
                 const monto = tipo === 'renta' ? r.renta : tipo === 'luz' ? r.luz : r.total;
                 const pagado = tipo === 'renta' ? r.rentaPagada : tipo === 'luz' ? r.luzPagada : (r.rentaPagada && r.luzPagada);
@@ -1910,6 +1910,7 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
                       border: '1px solid rgba(0,0,0,0.06)',
                       borderRadius: 8, cursor: onOpenPayment ? 'pointer' : 'default',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.8rem',
+                      minWidth: 0,
                     }}
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
