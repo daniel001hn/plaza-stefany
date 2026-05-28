@@ -315,19 +315,27 @@ select.ps-input {
 /* ── MODAL ── */
 .ps-modal-backdrop {
   position: fixed;
-  inset: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
+  height: 100vh; height: 100dvh; /* dvh respeta la barra del browser en mobile */
   background: rgba(10, 10, 20, 0.45);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   z-index: 50;
   display: flex;
-  align-items: flex-start;
+  align-items: center;        /* centrado vertical si cabe, scroll si no */
   justify-content: center;
-  padding: 4vh 1rem;
-  overflow-y: auto;
+  padding: 2vh 1rem;
+  overflow-y: auto;            /* scroll del backdrop como fallback */
+  -webkit-overflow-scrolling: touch;
   animation: psFade .2s ease;
 }
-.ps-modal { width: 100%; max-width: 540px; animation: psSlide .3s cubic-bezier(0.16, 1, 0.3, 1); }
+.ps-modal {
+  width: 100%; max-width: 540px;
+  max-height: calc(100dvh - 4vh);   /* nunca excede el viewport visible */
+  overflow-y: auto;                  /* SCROLL DENTRO DEL MODAL */
+  -webkit-overflow-scrolling: touch;
+  animation: psSlide .3s cubic-bezier(0.16, 1, 0.3, 1);
+}
 
 @keyframes psFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes psSlide { from { opacity: 0; transform: translateY(-16px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
