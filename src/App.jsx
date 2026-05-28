@@ -143,59 +143,61 @@ async function deriveSession(user) {
   return null
 }
 
+// Restaurar sesión cacheada (optimistic) al montar. Evita que el usuario vea
+// LoginScreen cada vez que refresca, incluso si getSession() tarda en iOS.
+function readCachedSession() {
+  try {
+    const cached = sessionStorage.getItem(SESSION_KEY)
+    return cached ? JSON.parse(cached) : null
+  } catch { return null }
+}
+
 function App() {
-  const [session, setSession] = useState(null)
-  const [checking, setChecking] = useState(true)
+  // Optimistic: si hay cache, mostrar la view inmediatamente. La validación
+  // del JWT real corre en background. Si falla, kickeamos a login.
+  const [session, setSession] = useState(readCachedSession)
+  // checking solo sirve para el primer mount sin cache (cuando NO hay nada)
+  const [checking, setChecking] = useState(!readCachedSession())
 
   useEffect(() => {
     let cancelled = false
-    // Si el watchdog se dispara, marca que YA mostramos LoginScreen al usuario.
-    // Eso significa que si getSession resuelve TARDE con una sesión vieja, NO
-    // hay que saltar automáticamente al dashboard — el user ya está intentando
-    // loguear de nuevo (probablemente con OTRO usuario). Solo SIGNED_IN explícito
-    // (vía signInWithPassword del LoginScreen) puede setear session después.
-    let loginShownByWatchdog = false
-    const watchdog = setTimeout(() => {
-      if (!cancelled) { loginShownByWatchdog = true; setChecking(false) }
+    // Watchdog solo aplica si NO hay cache (primera visita). Con cache,
+    // ya estamos renderizando, no hay nada que esperar.
+    const hadCache = !!readCachedSession()
+    const watchdog = hadCache ? null : setTimeout(() => {
+      if (!cancelled) setChecking(false)
     }, 2000)
+
     ;(async () => {
       try {
         const { data } = await supabase.auth.getSession()
+        if (cancelled) return
         if (data?.session?.user) {
+          // JWT válido → refrescar derived state por si cambió rol/localId
           const derived = await deriveSession(data.session.user)
-          // Si ya mostramos login, no saltar aunque encontremos sesión. El user
-          // está activamente intentando re-loguear; respetar esa intención.
-          if (!cancelled && derived && !loginShownByWatchdog) {
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
-            setSession(derived)
-          }
+          if (cancelled || !derived) return
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
+          setSession(derived)
         } else {
+          // No hay JWT → si teníamos cache, fue inválido o expiró → kick to login.
+          // Si no había cache, simplemente quedamos en login.
           sessionStorage.removeItem(SESSION_KEY)
+          if (hadCache) setSession(null)
         }
-      } catch (e) {}
-      clearTimeout(watchdog)
+      } catch (e) {
+        // getSession falló (network, lock, etc) — mantener sesión cacheada si había.
+        // Si no había cache, mostrar login (watchdog ya lo hizo o lo hará).
+      }
+      if (watchdog) clearTimeout(watchdog)
       if (!cancelled) setChecking(false)
     })()
-    // Reaccionar a cambios de auth (login, logout, token refresh).
-    // SIGNED_IN siempre es respetado (es el resultado de un click en Continuar).
-    // TOKEN_REFRESHED solo lo respetamos si no mostramos login todavía.
+
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, supSession) => {
       if (event === 'SIGNED_OUT') {
         sessionStorage.removeItem(SESSION_KEY)
         if (!cancelled) setSession(null)
-      } else if (event === 'SIGNED_IN') {
-        // Click en Continuar — siempre setear sesión, incluso si watchdog se disparó
-        loginShownByWatchdog = false
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (supSession?.user) {
-          const derived = await deriveSession(supSession.user)
-          if (!cancelled && derived) {
-            sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
-            setSession(derived)
-          }
-        }
-      } else if (event === 'TOKEN_REFRESHED') {
-        // Refresh en background — no interrumpir si user está en LoginScreen
-        if (supSession?.user && !loginShownByWatchdog) {
           const derived = await deriveSession(supSession.user)
           if (!cancelled && derived) {
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
