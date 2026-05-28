@@ -283,16 +283,8 @@ export default function InquilinoView({ session, onLogout }) {
       if (!token) throw new Error('no auth session')
       const res = await fetch('/api/inquilino-comprobante', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          year: mes.year,
-          monthIdx: mes.monthIdx,
-          tipo,
-          comprobanteB64: b64,
-        }),
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'upload', year: mes.year, monthIdx: mes.monthIdx, tipo, comprobanteB64: b64 }),
       })
       const result = await res.json()
       if (!res.ok || !result.ok) throw new Error(result?.error || 'upload failed')
@@ -304,6 +296,33 @@ export default function InquilinoView({ session, onLogout }) {
     } catch(e) {
       console.error('subirComprobante:', e)
       alert('Error al subir la imagen: ' + (e?.message || 'reintentá'))
+    }
+  }
+
+  // Borra el comprobante (por si el inquilino subió la imagen incorrecta).
+  const borrarComprobante = async (mes, tipo) => {
+    if (!confirm(`¿Borrar el comprobante de ${tipo.toLowerCase()}? Después podés subir otro.`)) return
+    try {
+      const { data: sess } = await supabase.auth.getSession()
+      const token = sess?.session?.access_token
+      if (!token) throw new Error('no auth session')
+      const res = await fetch('/api/inquilino-comprobante', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'delete', year: mes.year, monthIdx: mes.monthIdx, tipo }),
+      })
+      const result = await res.json()
+      if (!res.ok || !result.ok) throw new Error(result?.error || 'delete failed')
+      setMeses(prev => prev.map(m => {
+        if (m.year !== mes.year || m.monthIdx !== mes.monthIdx) return m
+        const newData = { ...m.data }
+        delete newData[`comprobante${tipo}`]
+        delete newData[`comprobante${tipo}Date`]
+        return { ...m, data: newData }
+      }))
+    } catch(e) {
+      console.error('borrarComprobante:', e)
+      alert('No se pudo borrar: ' + (e?.message || 'reintentá'))
     }
   }
 
@@ -529,21 +548,12 @@ export default function InquilinoView({ session, onLogout }) {
                     ? <button className="btn-r" onClick={() => generarRenta(mes)}>📄 Recibo de renta</button>
                     : <button className="btn-r" disabled style={{opacity:.4,cursor:'default'}}>📄 Recibo pendiente</button>}
                   {reciboRentaDisponible && (
-                    <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
-                      background: mes.data.comprobanteRenta ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
-                      border: mes.data.comprobanteRenta ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
-                      color: mes.data.comprobanteRenta ? '#1A7F35' : '#6E6E78',
-                      backdropFilter:'blur(8px)',
-                    }}>
-                      <input type="file" accept="image/*" style={{display:'none'}}
-                        onChange={e => subirComprobante(mes,'Renta',e.target.files[0])} />
-                      {mes.data.comprobanteRenta ? '✅ Comprobante renta' : '📎 Subir comprobante'}
-                    </label>
-                  )}
-                  {mes.data.comprobanteRenta && (
-                    <img src={mes.data.comprobanteRenta} alt="comp renta"
-                      style={{width:36,height:28,objectFit:'cover',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
-                      onClick={() => window.open(mes.data.comprobanteRenta,'_blank')} />
+                    <ComprobanteSlot
+                      imgUrl={mes.data.comprobanteRenta}
+                      tipo="Renta"
+                      onSubir={(file) => subirComprobante(mes, 'Renta', file)}
+                      onBorrar={() => borrarComprobante(mes, 'Renta')}
+                    />
                   )}
                 </div>
 
@@ -554,21 +564,12 @@ export default function InquilinoView({ session, onLogout }) {
                       ? <button className="btn-l" onClick={() => generarLuz(luzMes, { lecturaAnt, lecturaAct, consumo, tarifaEf, montoEnergia, montoLuz, kWhPlaza, fijoLocal, cargosFijos, nLocalesMed })}>⚡ Recibo de luz {luzLabel} — L {fmt(montoLuz)}</button>
                       : <button className="btn-l" disabled style={{opacity:.4,cursor:'default'}}>⚡ Luz no disponible</button>}
                     {tieneLuz && (
-                      <label style={{display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,cursor:'pointer',fontSize:'.74rem',fontWeight:600,
-                        background: luzData.comprobanteLuz ? 'rgba(52,199,89,0.12)' : 'rgba(255,255,255,0.5)',
-                        border: luzData.comprobanteLuz ? '1px solid rgba(52,199,89,0.35)' : '1px solid rgba(255,255,255,0.7)',
-                        color: luzData.comprobanteLuz ? '#1A7F35' : '#6E6E78',
-                        backdropFilter:'blur(8px)',
-                      }}>
-                        <input type="file" accept="image/*" style={{display:'none'}}
-                          onChange={e => subirComprobante(luzMes,'Luz',e.target.files[0])} />
-                        {luzData.comprobanteLuz ? '✅ Comprobante luz' : '📎 Subir comprobante'}
-                      </label>
-                    )}
-                    {luzData.comprobanteLuz && (
-                      <img src={luzData.comprobanteLuz} alt="comp luz"
-                        style={{width:36,height:28,objectFit:'cover',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
-                        onClick={() => window.open(luzData.comprobanteLuz,'_blank')} />
+                      <ComprobanteSlot
+                        imgUrl={luzData.comprobanteLuz}
+                        tipo="Luz"
+                        onSubir={(file) => subirComprobante(luzMes, 'Luz', file)}
+                        onBorrar={() => borrarComprobante(luzMes, 'Luz')}
+                      />
                     )}
                   </div>
                 )}
@@ -578,6 +579,55 @@ export default function InquilinoView({ session, onLogout }) {
         })}
 
         <div style={{textAlign:'center',marginTop:'1.5rem',fontSize:'.72rem',color:'rgba(60,60,70,.35)'}}>Stefany Plaza · D&amp;L Soluciones</div>
+      </div>
+    </div>
+  )
+}
+
+// Slot que muestra:
+//   - Sin comprobante: botón "📎 Subir comprobante"
+//   - Con comprobante: thumbnail 56×56 + botones Ver / Cambiar / Borrar
+function ComprobanteSlot({ imgUrl, tipo, onSubir, onBorrar }) {
+  if (!imgUrl) {
+    return (
+      <label style={{
+        display:'inline-flex',alignItems:'center',gap:'.3rem',padding:'.42rem .75rem',borderRadius:8,
+        cursor:'pointer',fontSize:'.74rem',fontWeight:600,
+        background:'rgba(255,255,255,0.5)',border:'1px solid rgba(255,255,255,0.7)',
+        color:'#6E6E78',backdropFilter:'blur(8px)',
+      }}>
+        <input type="file" accept="image/*" style={{display:'none'}}
+          onChange={e => onSubir(e.target.files[0])} />
+        📎 Subir comprobante
+      </label>
+    )
+  }
+  return (
+    <div style={{
+      display:'inline-flex',alignItems:'center',gap:'.4rem',padding:'.3rem .4rem',borderRadius:10,
+      background:'rgba(52,199,89,0.10)',border:'1px solid rgba(52,199,89,0.35)',
+    }}>
+      <img src={imgUrl} alt={`comp ${tipo}`}
+        style={{width:48,height:48,objectFit:'cover',borderRadius:6,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
+        onClick={() => window.open(imgUrl,'_blank')}
+        title="Click para ver en grande" />
+      <div style={{display:'flex',flexDirection:'column',gap:'.18rem'}}>
+        <button onClick={() => window.open(imgUrl,'_blank')}
+          style={{fontSize:'.66rem',padding:'.18rem .5rem',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',
+            background:'rgba(255,255,255,0.7)',color:'#1A7F35',cursor:'pointer',fontWeight:600,fontFamily:'inherit'}}>
+          👁 Ver
+        </button>
+        <label style={{fontSize:'.66rem',padding:'.18rem .5rem',borderRadius:5,border:'1px solid rgba(99,102,241,0.4)',
+          background:'rgba(255,255,255,0.7)',color:'#6366F1',cursor:'pointer',fontWeight:600,textAlign:'center'}}>
+          <input type="file" accept="image/*" style={{display:'none'}}
+            onChange={e => e.target.files[0] && onSubir(e.target.files[0])} />
+          ✏ Cambiar
+        </label>
+        <button onClick={onBorrar}
+          style={{fontSize:'.66rem',padding:'.18rem .5rem',borderRadius:5,border:'1px solid rgba(255,59,48,0.35)',
+            background:'rgba(255,255,255,0.7)',color:'#FF3B30',cursor:'pointer',fontWeight:600,fontFamily:'inherit'}}>
+          🗑 Borrar
+        </button>
       </div>
     </div>
   )

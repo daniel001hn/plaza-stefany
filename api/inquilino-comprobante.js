@@ -1,7 +1,11 @@
-// Permite que un inquilino suba el comprobante de su pago (renta o luz)
-// del mes correspondiente. La RLS bloquea writes directos al kv_store para
-// no-admin, así que esta function hace el merge usando service_role
-// después de validar que el inquilino está escribiendo SOLO a su propio localId.
+// Permite que un inquilino suba o BORRE el comprobante de su pago del mes.
+// RLS bloquea writes directos al kv_store para no-admin, esta function valida
+// JWT + matchea localId + escribe con service_role.
+//
+// Body:
+//   { action: 'upload', year, monthIdx, tipo: 'Renta'|'Luz', comprobanteB64 }
+//   { action: 'delete', year, monthIdx, tipo: 'Renta'|'Luz' }
+// Si action falta, se asume upload (backwards compat).
 import { createClient } from '@supabase/supabase-js'
 
 export const config = { runtime: 'edge' }
@@ -24,12 +28,14 @@ export default async function handler(req) {
   if (!auth.startsWith('Bearer ')) return json({ error: 'unauthorized' }, 401)
   const jwt = auth.slice(7)
 
+  if (!URL_BASE) return json({ error: 'SUPABASE_URL no configurado' }, 500)
+  if (!SERVICE_KEY) return json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurado' }, 500)
+
   const sbUser = createClient(URL_BASE, ANON_KEY)
   const { data: userData, error: authErr } = await sbUser.auth.getUser(jwt)
   if (authErr || !userData?.user) return json({ error: 'invalid jwt' }, 401)
 
   const email = (userData.user.email || '').toLowerCase()
-  // Admin no debe usar este endpoint — escribe directo
   if (email === 'admin@plaza-stefany.local' || userData.user.user_metadata?.role === 'admin') {
     return json({ error: 'admin should write directly' }, 400)
   }
@@ -37,21 +43,24 @@ export default async function handler(req) {
   let body
   try { body = await req.json() } catch { return json({ error: 'invalid body' }, 400) }
 
+  const action = body.action || 'upload'
   const { year, monthIdx, tipo, comprobanteB64 } = body
+
   if (!Number.isInteger(year) || year < 2020 || year > 2100) return json({ error: 'invalid year' }, 400)
   if (!Number.isInteger(monthIdx) || monthIdx < 0 || monthIdx > 11) return json({ error: 'invalid monthIdx' }, 400)
   if (tipo !== 'Renta' && tipo !== 'Luz') return json({ error: 'invalid tipo' }, 400)
-  if (typeof comprobanteB64 !== 'string' || !comprobanteB64.startsWith('data:image/')) {
-    return json({ error: 'invalid comprobante (expected data:image/...)' }, 400)
-  }
-  if (comprobanteB64.length > 400000) return json({ error: 'image too large (max ~300KB)' }, 413)
+  if (action !== 'upload' && action !== 'delete') return json({ error: 'invalid action' }, 400)
 
-  // Resolver localId del inquilino vía config-and-locales
-  if (!URL_BASE) return json({ error: 'SUPABASE_URL no configurado en Vercel' }, 500)
-  if (!SERVICE_KEY) return json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurado en Vercel' }, 500)
+  if (action === 'upload') {
+    if (typeof comprobanteB64 !== 'string' || !comprobanteB64.startsWith('data:image/')) {
+      return json({ error: 'invalid comprobante (expected data:image/...)' }, 400)
+    }
+    if (comprobanteB64.length > 400000) return json({ error: 'image too large (max ~300KB)' }, 413)
+  }
+
   const sbAdmin = createClient(URL_BASE, SERVICE_KEY)
   const { data: cfgRow, error: cfgErr } = await sbAdmin.from('kv_store').select('value').eq('key', 'config-and-locales').maybeSingle()
-  if (cfgErr) return json({ error: 'config query error: ' + cfgErr.message, code: cfgErr.code }, 500)
+  if (cfgErr) return json({ error: 'config query error: ' + cfgErr.message }, 500)
   if (!cfgRow) return json({ error: 'config-and-locales row not found' }, 500)
 
   const usuarios = cfgRow.value?.config?.usuarios || cfgRow.value?.usuarios || []
@@ -61,9 +70,7 @@ export default async function handler(req) {
   const localId = u.localId
 
   const key = `pagos:${year}-${String(monthIdx + 1).padStart(2, '0')}`
-  // Concurrency: read-modify-write con UPDATE condicional en updated_at.
-  // Si admin guarda entre nuestro read y write, el WHERE no matchea y reintentamos.
-  // 3 intentos suficiente para race conditions reales en este nivel de tráfico.
+
   for (let attempt = 0; attempt < 3; attempt++) {
     const { data: row, error: rdErr } = await sbAdmin.from('kv_store')
       .select('value,updated_at').eq('key', key).maybeSingle()
@@ -71,33 +78,37 @@ export default async function handler(req) {
 
     const data = row?.value || { pagos: {}, factura: {} }
     data.pagos = data.pagos || {}
-    data.pagos[localId] = {
-      ...(data.pagos[localId] || {}),
-      [`comprobante${tipo}`]: comprobanteB64,
-      [`comprobante${tipo}Date`]: new Date().toISOString(),
+    const localPago = { ...(data.pagos[localId] || {}) }
+
+    if (action === 'upload') {
+      localPago[`comprobante${tipo}`] = comprobanteB64
+      localPago[`comprobante${tipo}Date`] = new Date().toISOString()
+    } else {
+      // delete: remover los campos del comprobante de ese tipo
+      delete localPago[`comprobante${tipo}`]
+      delete localPago[`comprobante${tipo}Date`]
     }
+    data.pagos[localId] = localPago
     const newUpdatedAt = new Date().toISOString()
 
     if (row) {
-      // UPDATE condicional: solo si nadie tocó la fila desde nuestro read
       const { data: updated, error: upErr } = await sbAdmin.from('kv_store')
         .update({ value: data, updated_at: newUpdatedAt })
         .eq('key', key).eq('updated_at', row.updated_at)
         .select('key')
       if (upErr) return json({ error: 'write error: ' + upErr.message }, 500)
-      if (updated && updated.length === 1) return json({ ok: true, localId, attempt: attempt + 1 })
-      // 0 rows = conflicto, alguien más escribió. Retry con fresh read.
+      if (updated && updated.length === 1) return json({ ok: true, action, localId, attempt: attempt + 1 })
       continue
     } else {
-      // No existía la fila — INSERT (sin conflict porque key es unique)
+      // Solo upload puede insertar; delete sobre fila inexistente no tiene sentido
+      if (action === 'delete') return json({ ok: true, action, localId, note: 'nada que borrar' })
       const { error: insErr } = await sbAdmin.from('kv_store')
         .insert({ key, value: data, updated_at: newUpdatedAt })
       if (insErr) {
-        // Si alguien más insertó la misma key en paralelo, reintenta como update
         if (insErr.code === '23505') continue
         return json({ error: 'insert error: ' + insErr.message }, 500)
       }
-      return json({ ok: true, localId, attempt: attempt + 1 })
+      return json({ ok: true, action, localId, attempt: attempt + 1 })
     }
   }
   return json({ error: 'conflict: 3 reintentos fallidos, intentá de nuevo' }, 409)
