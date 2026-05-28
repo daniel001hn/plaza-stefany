@@ -584,9 +584,9 @@ export default function InquilinoView({ session, onLogout }) {
   )
 }
 
-// Slot que muestra:
-//   - Sin comprobante: botón "📎 Subir comprobante"
-//   - Con comprobante: thumbnail 56×56 + botones Ver / Cambiar / Borrar
+// Slot del comprobante:
+//   - Sin imagen: botón "📎 Subir comprobante"
+//   - Con imagen: nombre + thumbnail clickeable + X para borrar
 function ComprobanteSlot({ imgUrl, tipo, onSubir, onBorrar }) {
   if (!imgUrl) {
     return (
@@ -604,31 +604,19 @@ function ComprobanteSlot({ imgUrl, tipo, onSubir, onBorrar }) {
   }
   return (
     <div style={{
-      display:'inline-flex',alignItems:'center',gap:'.4rem',padding:'.3rem .4rem',borderRadius:10,
+      display:'inline-flex',alignItems:'center',gap:'.5rem',padding:'.3rem .55rem',borderRadius:8,
       background:'rgba(52,199,89,0.10)',border:'1px solid rgba(52,199,89,0.35)',
     }}>
+      <span style={{fontSize:'.75rem',fontWeight:600,color:'#1A7F35'}}>Comprobante {tipo.toLowerCase()}</span>
       <img src={imgUrl} alt={`comp ${tipo}`}
-        style={{width:48,height:48,objectFit:'cover',borderRadius:6,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
+        style={{width:36,height:36,objectFit:'cover',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',cursor:'pointer'}}
         onClick={() => window.open(imgUrl,'_blank')}
-        title="Click para ver en grande" />
-      <div style={{display:'flex',flexDirection:'column',gap:'.18rem'}}>
-        <button onClick={() => window.open(imgUrl,'_blank')}
-          style={{fontSize:'.66rem',padding:'.18rem .5rem',borderRadius:5,border:'1px solid rgba(52,199,89,0.4)',
-            background:'rgba(255,255,255,0.7)',color:'#1A7F35',cursor:'pointer',fontWeight:600,fontFamily:'inherit'}}>
-          👁 Ver
-        </button>
-        <label style={{fontSize:'.66rem',padding:'.18rem .5rem',borderRadius:5,border:'1px solid rgba(99,102,241,0.4)',
-          background:'rgba(255,255,255,0.7)',color:'#6366F1',cursor:'pointer',fontWeight:600,textAlign:'center'}}>
-          <input type="file" accept="image/*" style={{display:'none'}}
-            onChange={e => e.target.files[0] && onSubir(e.target.files[0])} />
-          ✏ Cambiar
-        </label>
-        <button onClick={onBorrar}
-          style={{fontSize:'.66rem',padding:'.18rem .5rem',borderRadius:5,border:'1px solid rgba(255,59,48,0.35)',
-            background:'rgba(255,255,255,0.7)',color:'#FF3B30',cursor:'pointer',fontWeight:600,fontFamily:'inherit'}}>
-          🗑 Borrar
-        </button>
-      </div>
+        title="Click para verla" />
+      <button onClick={onBorrar} title="Borrar"
+        style={{width:22,height:22,borderRadius:'50%',border:'none',background:'rgba(255,59,48,0.85)',color:'#fff',
+          cursor:'pointer',fontWeight:700,fontSize:'.8rem',fontFamily:'inherit',display:'grid',placeItems:'center',padding:0}}>
+        ×
+      </button>
     </div>
   )
 }
