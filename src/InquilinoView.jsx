@@ -239,21 +239,26 @@ export default function InquilinoView({ session, onLogout }) {
       const loc = locales.find(l => l.id === session.localId)
       setLocal(loc)
       // Si el local tiene contratoDesde, no mostrar meses anteriores a esa fecha.
-      // Esto evita que un inquilino nuevo vea pagos del inquilino anterior.
-      const desdeStr = loc?.contratoDesde // 'YYYY-MM-DD'
+      const desdeStr = loc?.contratoDesde
       const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null
-      const months = []
       const now = new Date()
+      // Construir lista de meses a cargar (saltando los previos al contrato)
+      const monthsToLoad = []
       for (let i = 0; i < 12; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const y = d.getFullYear(); const m = d.getMonth()
         const finDeMes = new Date(y, m + 1, 0)
         if (desde && desde > finDeMes) continue
-        const data = await loadMonth(y, m)
-        const pago = (data.pagos || {})[session.localId] || {}
-        months.push({ year: y, monthIdx: m, data: pago, factura: data.factura || {}, pagosAll: data.pagos || {} })
+        monthsToLoad.push({ y, m })
       }
+      // Cargar TODOS los meses en paralelo (antes era secuencial — ~3s vs ~500ms).
+      const datas = await Promise.all(monthsToLoad.map(({ y, m }) => loadMonth(y, m)))
       if (cancelled) return
+      const months = monthsToLoad.map(({ y, m }, i) => {
+        const data = datas[i]
+        const pago = (data.pagos || {})[session.localId] || {}
+        return { year: y, monthIdx: m, data: pago, factura: data.factura || {}, pagosAll: data.pagos || {} }
+      })
       setMeses(months); setLoading(false)
     }
     load()

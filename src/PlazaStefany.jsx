@@ -540,32 +540,30 @@ export default function App({ supabase, onLogout }) {
     let cancelled = false;
     const reload = async () => {
       if (cancelled) return;
-      const cl = await loadCfg();
+      // Cargar config + 13 meses EN PARALELO. Antes era secuencial:
+      // 13 roundtrips × 200-500ms cada uno = 3-6s. Ahora ~500ms total.
+      const monthKeys = Array.from({ length: 12 }, (_, m) => [m, year, m])
+      monthKeys.push(['_prevDec', year - 1, 11])
+      const [cl, ...months] = await Promise.all([
+        loadCfg(),
+        ...monthKeys.map(([_, y, m]) => loadMonth(y, m)),
+      ])
       if (cancelled) return;
       setConfig((prev) => ({ ...prev, ...cl.config }));
       setLocales(cl.locales || []);
       const result = {};
-      for (let m = 0; m < 12; m++) result[m] = await loadMonth(year, m);
-      result['_prevDec'] = await loadMonth(year - 1, 11);
-      if (cancelled) return;
+      monthKeys.forEach(([key], i) => { result[key] = months[i] })
       setYearData(result);
     };
+    reload();
     const onVisibility = () => { if (document.visibilityState === 'visible') reload(); };
     document.addEventListener('visibilitychange', onVisibility);
-    const interval = setInterval(reload, 30000);
-    // Realtime: cuando otro cliente actualiza la BD, refrescar automáticamente.
+    // Polling cada 60s (era 30s). Realtime subscribe ya cubre updates en vivo,
+    // este interval es solo fallback para refrescar después de cambios externos.
+    const interval = setInterval(reload, 60000);
     let unsub = () => {};
     try { unsub = window.storage?.subscribe?.(() => reload()) || (() => {}); } catch {}
     return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisibility); clearInterval(interval); unsub(); };
-  }, [year]);
-
-  useEffect(() => {
-    (async () => {
-      const result = {};
-      for (let m = 0; m < 12; m++) result[m] = await loadMonth(year, m);
-      result['_prevDec'] = await loadMonth(year - 1, 11);
-      setYearData(result);
-    })();
   }, [year]);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 2200); };

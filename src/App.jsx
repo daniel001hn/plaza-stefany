@@ -46,8 +46,6 @@ function LoginScreen({ onLogin }) {
     setLoading(true)
     setError('')
 
-    await new Promise(r => setTimeout(r, 400))
-
     // Convertir usuario+password → email+password para Supabase Auth.
     // Admin: usuario vacío → admin@plaza-stefany.local
     // Inquilino: tatys → tatys@plaza-stefany.local
