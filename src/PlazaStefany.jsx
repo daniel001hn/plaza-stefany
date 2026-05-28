@@ -316,24 +316,23 @@ select.ps-input {
 .ps-modal-backdrop {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  height: 100vh; height: 100dvh; /* dvh respeta la barra del browser en mobile */
+  height: 100vh;                      /* fallback */
+  height: 100dvh;                     /* iOS 15.4+ */
   background: rgba(10, 10, 20, 0.45);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   z-index: 50;
   display: flex;
-  align-items: center;        /* centrado vertical si cabe, scroll si no */
+  align-items: flex-start;            /* arriba — si es alto, queda anclado y scrollea */
   justify-content: center;
-  padding: 2vh 1rem;
-  overflow-y: auto;            /* scroll del backdrop como fallback */
+  padding: 2vh 1rem 8vh;              /* extra bottom-padding para que el último contenido sea alcanzable scroleando */
+  overflow-y: auto;                   /* scroll del BACKDROP — la pieza clave */
   -webkit-overflow-scrolling: touch;
   animation: psFade .2s ease;
 }
 .ps-modal {
   width: 100%; max-width: 540px;
-  max-height: calc(100dvh - 4vh);   /* nunca excede el viewport visible */
-  overflow-y: auto;                  /* SCROLL DENTRO DEL MODAL */
-  -webkit-overflow-scrolling: touch;
+  /* sin max-height — dejamos que el backdrop scrollee. Esto funciona en TODOS los navegadores */
   animation: psSlide .3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
