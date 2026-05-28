@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { supabase } from './supabaseClient'
-import PlazaStefany from './PlazaStefany'
-import InquilinoView from './InquilinoView'
 import './storageAdapter'
+
+// Lazy-load views post-login. El bundle inicial solo carga el login (~50KB).
+// Despues de loguear, segun el role, se baja PlazaStefany (~admin, 350KB) O
+// InquilinoView (~tenant, 80KB). El usuario nunca paga el costo del otro.
+const PlazaStefany = lazy(() => import('./PlazaStefany'))
+const InquilinoView = lazy(() => import('./InquilinoView'))
 
 const SESSION_KEY = 'plaza_session'
 const BUILD_VERSION = '2026-05-24-auth-v3'
@@ -194,8 +198,24 @@ function App() {
 
   if (checking) return null
   if (!session) return <LoginScreen onLogin={setSession} />
-  if (session.role === 'admin') return <PlazaStefany supabase={supabase} onLogout={handleLogout} />
-  if (session.role === 'inquilino') return <InquilinoView session={session} onLogout={handleLogout} />
+
+  // Fallback minimal mientras baja el chunk de la view post-login (<300ms tipico)
+  const fallback = (
+    <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:'#f0f0f5',fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif',color:'#6366F1',fontSize:'14px'}}>
+      Cargando…
+    </div>
+  )
+
+  if (session.role === 'admin') return (
+    <Suspense fallback={fallback}>
+      <PlazaStefany supabase={supabase} onLogout={handleLogout} />
+    </Suspense>
+  )
+  if (session.role === 'inquilino') return (
+    <Suspense fallback={fallback}>
+      <InquilinoView session={session} onLogout={handleLogout} />
+    </Suspense>
+  )
   return <LoginScreen onLogin={setSession} />
 }
 
