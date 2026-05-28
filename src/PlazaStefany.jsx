@@ -316,23 +316,20 @@ select.ps-input {
 .ps-modal-backdrop {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  height: 100vh;                      /* fallback */
-  height: 100dvh;                     /* iOS 15.4+ */
   background: rgba(10, 10, 20, 0.45);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   z-index: 50;
   display: flex;
-  align-items: flex-start;            /* arriba — si es alto, queda anclado y scrollea */
   justify-content: center;
-  padding: 2vh 1rem 8vh;              /* extra bottom-padding para que el último contenido sea alcanzable scroleando */
-  overflow-y: auto;                   /* scroll del BACKDROP — la pieza clave */
-  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;                     /* scrollea el OVERLAY completo, no el modal */
+  -webkit-overflow-scrolling: touch;    /* smooth en iOS */
+  padding: 1rem;
   animation: psFade .2s ease;
 }
 .ps-modal {
   width: 100%; max-width: 540px;
-  /* sin max-height — dejamos que el backdrop scrollee. Esto funciona en TODOS los navegadores */
+  margin: auto;                         /* centrado si cabe; si no, se alinea arriba y el overlay scrollea (truco flexbox margin:auto) */
   animation: psSlide .3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2696,7 +2693,7 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
   return (
     <ModalPortal onClose={onClose}>
     <div className="ps-modal-backdrop" onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:800,animation:'psSlide .25s cubic-bezier(0.16,1,0.3,1)'}}>
+      <div onClick={e=>e.stopPropagation()} style={{width:'100%',maxWidth:800,margin:'auto',animation:'psSlide .25s cubic-bezier(0.16,1,0.3,1)'}}>
         <div className="ps-card-elevated" style={{padding:'.85rem 1.25rem',display:'flex',justifyContent:'space-between',alignItems:'center',borderRadius:'14px 14px 0 0',borderBottom:'none'}}>
           <div>
             <div className="ps-eyebrow" style={{color:'#6366F1'}}><FileText size={11}/> REPORTE MENSUAL</div>
@@ -2707,7 +2704,7 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
             <button onClick={onClose} className="ps-btn-icon"><X size={16}/></button>
           </div>
         </div>
-        <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem',maxHeight:'80vh',overflowY:'auto'}}>
+        <div style={{background:'#d8d8d4',borderRadius:'0 0 14px 14px',border:'1px solid #2E2E38',borderTop:'none',padding:'1.25rem'}}>
           <div id="reporte-print">
             <div style={{background:'white',maxWidth:750,margin:'0 auto',fontFamily:'Arial,Helvetica,sans-serif',color:C.text,boxShadow:'0 4px 24px rgba(0,0,0,0.12)'}}>
               {/* HEADER — membrete oficial D&L */}
