@@ -39,27 +39,36 @@ export function Lightbox({ src, onClose }) {
     <div onClick={onClose}
       style={{
         position:'fixed', top:0, left:0, right:0, bottom:0,
-        background:'rgba(245, 240, 230, 0.96)', // beige claro
+        // Mismo mesh gradient que el resto de la app (admin + inquilino)
+        background: `
+          radial-gradient(ellipse 80% 60% at 10% 0%,   rgba(99, 102, 241, 0.35) 0%, transparent 55%),
+          radial-gradient(ellipse 60% 50% at 90% 5%,   rgba(236, 72, 153, 0.25) 0%, transparent 50%),
+          radial-gradient(ellipse 50% 60% at 70% 85%,  rgba(20, 184, 166, 0.20) 0%, transparent 55%),
+          radial-gradient(ellipse 70% 50% at 5%  85%,  rgba(251, 146, 60, 0.18) 0%, transparent 50%),
+          radial-gradient(ellipse 60% 40% at 50% 50%,  rgba(168, 85, 247, 0.12) 0%, transparent 60%),
+          #EEF0F8
+        `,
+        backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)',
         zIndex:99999,
         display:'flex', alignItems:'center', justifyContent:'center',
         padding:'1.5rem', cursor:'pointer',
-        // Importante para mobile: usar dvh para evitar problemas con la barra del browser
         height:'100dvh', maxHeight:'100dvh',
       }}>
       <button onClick={(e) => { e.stopPropagation(); onClose() }} aria-label="Cerrar"
         style={{
           position:'fixed', top:18, right:18, width:44, height:44, borderRadius:'50%',
-          border:'1px solid rgba(0,0,0,0.12)',
-          background:'rgba(255,255,255,0.85)', color:'#1C1C1E',
+          border:'1px solid rgba(255,255,255,0.65)',
+          background:'rgba(255,255,255,0.55)', color:'#1C1C1E',
           cursor:'pointer', fontSize:'1.6rem', fontWeight:600, fontFamily:'inherit',
-          display:'grid', placeItems:'center', backdropFilter:'blur(12px)',
-          boxShadow:'0 4px 16px rgba(0,0,0,0.12)', zIndex:100000,
+          display:'grid', placeItems:'center',
+          backdropFilter:'blur(24px) saturate(180%)', WebkitBackdropFilter:'blur(24px) saturate(180%)',
+          boxShadow:'0 4px 16px rgba(0,0,0,0.10)', zIndex:100000,
         }}>×</button>
       <img src={src} alt="comprobante"
         onClick={(e) => e.stopPropagation()}
         style={{
-          maxWidth:'100%', maxHeight:'92vh', objectFit:'contain', borderRadius:10,
-          boxShadow:'0 12px 48px rgba(0,0,0,0.18)', cursor:'default',
+          maxWidth:'100%', maxHeight:'92dvh', objectFit:'contain', borderRadius:14,
+          boxShadow:'0 16px 56px rgba(0,0,0,0.22)', cursor:'default',
           background:'#fff',
         }} />
     </div>
