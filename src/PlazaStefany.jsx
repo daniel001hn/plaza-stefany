@@ -24,6 +24,7 @@ import { LocalEditModal } from './modals/LocalEditModal';
 import { FacturaModal } from './modals/FacturaModal';
 import { PaymentModal } from './modals/PaymentModal';
 import { Field } from './components/Field';
+import { useLightbox } from './components/Lightbox';
 // jsPDF + jspdf-autotable son ~600KB. Importarlas dinámicamente solo cuando
 // el admin clickea "Generar recibo", reduce el bundle inicial significativamente.
 const loadPdf = () => import('./generarReciboPdf');
@@ -2292,6 +2293,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
 }
 
 function ComprobantesInbox({ locales, pagos, monthIdx, year, onAprobar }) {
+  const lb = useLightbox();
   // Buscar comprobantes subidos pero pago aún no marcado como pagado
   const pendientes = useMemo(() => {
     const out = [];
@@ -2345,7 +2347,7 @@ function ComprobantesInbox({ locales, pagos, monthIdx, year, onAprobar }) {
           }}>
             <img src={item.comprobante} alt="comprobante"
               style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: '1px solid #e2e8f0' }}
-              onClick={() => window.open(item.comprobante, '_blank')}
+              onClick={() => lb.open(item.comprobante)}
             />
             <div>
               <div style={{ fontSize: '.85rem', fontWeight: 600 }}>
@@ -2364,7 +2366,7 @@ function ComprobantesInbox({ locales, pagos, monthIdx, year, onAprobar }) {
             <button
               className="ps-btn-ghost"
               style={{ fontSize: '.75rem', padding: '.4rem .65rem' }}
-              onClick={() => window.open(item.comprobante, '_blank')}
+              onClick={() => lb.open(item.comprobante)}
             >👁 Ver</button>
             <button
               className="ps-btn"
@@ -2374,6 +2376,7 @@ function ComprobantesInbox({ locales, pagos, monthIdx, year, onAprobar }) {
           </div>
         ))}
       </div>
+      {lb.element}
     </div>
   );
 }

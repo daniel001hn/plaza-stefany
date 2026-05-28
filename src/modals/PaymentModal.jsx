@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Circle, X, Receipt, ExternalLink, Zap, AlertCircle, Calculator, Save, Printer } from 'lucide-react';
 import { fmt2, MESES_LARGO } from '../utils/format';
+import { useLightbox } from '../components/Lightbox';
 
 // Comprime imagen a base64 (max 1200px, calidad 0.7) para usar en recibos.
 function comprimirFotoMedidor(file) {
@@ -26,6 +27,7 @@ function comprimirFotoMedidor(file) {
 }
 
 export function PaymentModal({ local, monthIdx, year, data, prevData, factura, tarifaEfectiva, fijoLocal = 0, config, calcRenta, onClose, onSave, onGenerateRecibo, onGenerateReciboRenta }) {
+  const lb = useLightbox();
   const [form, setForm] = useState({
     rentaPagada: !!data.rentaPagada,
     fechaRenta: data.fechaRenta || '',
@@ -241,7 +243,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
                           {url ? (
                             <div style={{ position: 'relative' }}>
                               <img src={url} alt={`medidor ${tipo}`}
-                                onClick={() => window.open(url, '_blank')}
+                                onClick={() => lb.open(url)}
                                 style={{ width: '100%', height: 90, objectFit: 'cover', borderRadius: 6, border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer' }} />
                               <button onClick={(e) => { e.preventDefault(); set(key, '') }}
                                 style={{ position: 'absolute', top: 4, right: 4, background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, fontSize: '.7rem', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
@@ -305,7 +307,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
                 <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
                   <img src={data.comprobanteRenta} alt="comp renta"
                     style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(52,199,89,0.4)', cursor: 'pointer' }}
-                    onClick={() => window.open(data.comprobanteRenta, '_blank')} />
+                    onClick={() => lb.open(data.comprobanteRenta)} />
                   <div style={{ fontSize: '.74rem', color: '#5A5A64' }}>
                     <div style={{ fontWeight: 600, color: '#1A7F35' }}>📄 Renta</div>
                     {data.comprobanteRentaDate && <div style={{ color: '#6E6E78', marginTop: '.15rem' }}>{new Date(data.comprobanteRentaDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
@@ -316,7 +318,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
                 <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
                   <img src={data.comprobanteLuz} alt="comp luz"
                     style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(14,165,233,0.4)', cursor: 'pointer' }}
-                    onClick={() => window.open(data.comprobanteLuz, '_blank')} />
+                    onClick={() => lb.open(data.comprobanteLuz)} />
                   <div style={{ fontSize: '.74rem', color: '#5A5A64' }}>
                     <div style={{ fontWeight: 600, color: '#0EA5E9' }}>⚡ Luz</div>
                     {data.comprobanteLuzDate && <div style={{ color: '#6E6E78', marginTop: '.15rem' }}>{new Date(data.comprobanteLuzDate).toLocaleDateString('es-HN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</div>}
@@ -344,6 +346,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
           </div>
         </div>
       </div>
+      {lb.element}
     </div>
   );
 }
