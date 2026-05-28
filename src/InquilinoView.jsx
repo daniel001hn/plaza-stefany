@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { monthKey } from './keys'
 import { MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete'
-import { generarReciboLuzPdf, generarReciboRentaPdf } from './generarReciboPdf'
+// jsPDF lazy-loaded para reducir bundle inicial
+const loadPdf = () => import('./generarReciboPdf')
 import { supabase } from './supabaseClient'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -379,7 +380,7 @@ export default function InquilinoView({ session, onLogout }) {
     const isv      = config.isv || 0.15
     const isvMonto = base * isv
     const renta    = base * (1 + isv)
-    generarReciboRentaPdf({
+    loadPdf().then(({ generarReciboRentaPdf }) => generarReciboRentaPdf({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-${String(local?.numero).padStart(3,'0')}`,
       inquilino: session.nombre || local?.inquilino || 'Inquilino',
       local: String(local?.numero ?? ''),
@@ -392,7 +393,7 @@ export default function InquilinoView({ session, onLogout }) {
       rentaBase: fmt(base),
       isvMonto: fmt(isvMonto),
       rentaTotal: fmt(renta),
-    }).catch(e => {
+    })).catch(e => {
       console.error('Error generando recibo de renta:', e)
       alert('No se pudo generar el recibo. Reintentá o avisá al admin.')
     })
@@ -407,7 +408,7 @@ export default function InquilinoView({ session, onLogout }) {
       return
     }
     registrarActividad(mes, 'Luz')
-    generarReciboLuzPdf({
+    loadPdf().then(({ generarReciboLuzPdf }) => generarReciboLuzPdf({
       reciboNum: `PS-${mes.year}-${String(mes.monthIdx+1).padStart(2,'0')}-L${String(local?.numero).padStart(2,'0')}`,
       inquilino: session.nombre || local?.inquilino || 'Inquilino',
       local: String(local?.numero ?? ''),
@@ -426,7 +427,7 @@ export default function InquilinoView({ session, onLogout }) {
       total: fmt(calc.montoLuz || 0),
       fotoMedidorAnterior: mes.data?.fotoMedidorAnterior || null,
       fotoMedidorActual: mes.data?.fotoMedidorActual || null,
-    }).catch(e => {
+    })).catch(e => {
       console.error('Error generando recibo de luz:', e)
       alert('No se pudo generar el recibo de luz. Reintentá o avisá al admin.')
     })

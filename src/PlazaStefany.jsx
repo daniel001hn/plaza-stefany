@@ -15,7 +15,9 @@ import {
 import { DL_LOGO } from './dlLogo';
 import { MembreteHeader, MembreteFooter, MEMBRETE_HEADER_HTML, MEMBRETE_FOOTER_HTML } from './dlMembrete';
 import { monthKey } from './keys';
-import { generarReciboLuzPdf, generarReciboRentaPdf } from './generarReciboPdf';
+// jsPDF + jspdf-autotable son ~600KB. Importarlas dinámicamente solo cuando
+// el admin clickea "Generar recibo", reduce el bundle inicial significativamente.
+const loadPdf = () => import('./generarReciboPdf');
 
 const DEFAULT_CONFIG = {
   rentPerM2USD: 29,
@@ -875,6 +877,7 @@ export default function App({ supabase, onLogout }) {
               const nLocales = calcLocalesConMedidor(locales);
               const totalKwhPlaza = calcTotalKwhSubmedidores(locales, pagos, prevPagos);
               const total = montoEnergia + fijoLocal;
+              const { generarReciboLuzPdf } = await loadPdf();
               await generarReciboLuzPdf({
                 reciboNum: `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(loc.numero || '').padStart(3, '0')}`,
                 inquilino: loc.inquilino || loc.nombre || 'N/A',
@@ -917,6 +920,7 @@ export default function App({ supabase, onLogout }) {
               const fechaEmision = d.fechaRentaPagada
                 ? new Date(d.fechaRentaPagada).toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' })
                 : new Date().toLocaleDateString('es-HN', { day: '2-digit', month: 'long', year: 'numeric' });
+              const { generarReciboRentaPdf } = await loadPdf();
               await generarReciboRentaPdf({
                 reciboNum: `PS-${year}-${String(monthIdx + 1).padStart(2, '0')}-R${String(loc.numero || '').padStart(2, '0')}`,
                 inquilino: loc.inquilino || loc.nombre || 'N/A',
