@@ -213,7 +213,7 @@ doc.text('Para entrar a la app:', pw / 2, boxY + 14, { align: 'center' })
 doc.setFont('helvetica', 'bold')
 doc.setFontSize(22)
 doc.setTextColor(...C.text)
-doc.text('plaza-stefany.vercel.app', pw / 2, boxY + 30, { align: 'center' })
+doc.text('plazastefany.com', pw / 2, boxY + 30, { align: 'center' })
 
 doc.setFont('helvetica', 'normal')
 doc.setFontSize(11)
@@ -251,7 +251,7 @@ y += 9
 doc.setFont('helvetica', 'bold')
 doc.setFontSize(14)
 doc.setTextColor(...C.brand)
-doc.text('plaza-stefany.vercel.app', MARGIN, y + 2)
+doc.text('plazastefany.com', MARGIN, y + 2)
 y += 12
 
 // Phone con login filled + 3 anotaciones
