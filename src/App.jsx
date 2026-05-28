@@ -149,16 +149,23 @@ function App() {
 
   useEffect(() => {
     let cancelled = false
-    // Watchdog: si getSession se cuelga (locks internos de supabase-js, network
-    // muerto), igual sacamos checking=false después de 2s para no quedar en
-    // blanco. En el peor caso muestra LoginScreen y el usuario re-loguea.
-    const watchdog = setTimeout(() => { if (!cancelled) setChecking(false) }, 2000)
+    // Si el watchdog se dispara, marca que YA mostramos LoginScreen al usuario.
+    // Eso significa que si getSession resuelve TARDE con una sesión vieja, NO
+    // hay que saltar automáticamente al dashboard — el user ya está intentando
+    // loguear de nuevo (probablemente con OTRO usuario). Solo SIGNED_IN explícito
+    // (vía signInWithPassword del LoginScreen) puede setear session después.
+    let loginShownByWatchdog = false
+    const watchdog = setTimeout(() => {
+      if (!cancelled) { loginShownByWatchdog = true; setChecking(false) }
+    }, 2000)
     ;(async () => {
       try {
         const { data } = await supabase.auth.getSession()
         if (data?.session?.user) {
           const derived = await deriveSession(data.session.user)
-          if (!cancelled && derived) {
+          // Si ya mostramos login, no saltar aunque encontremos sesión. El user
+          // está activamente intentando re-loguear; respetar esa intención.
+          if (!cancelled && derived && !loginShownByWatchdog) {
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
             setSession(derived)
           }
@@ -169,13 +176,26 @@ function App() {
       clearTimeout(watchdog)
       if (!cancelled) setChecking(false)
     })()
-    // Reaccionar a cambios de auth (login, logout, token refresh)
+    // Reaccionar a cambios de auth (login, logout, token refresh).
+    // SIGNED_IN siempre es respetado (es el resultado de un click en Continuar).
+    // TOKEN_REFRESHED solo lo respetamos si no mostramos login todavía.
     const { data: sub } = supabase.auth.onAuthStateChange(async (event, supSession) => {
       if (event === 'SIGNED_OUT') {
         sessionStorage.removeItem(SESSION_KEY)
         if (!cancelled) setSession(null)
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      } else if (event === 'SIGNED_IN') {
+        // Click en Continuar — siempre setear sesión, incluso si watchdog se disparó
+        loginShownByWatchdog = false
         if (supSession?.user) {
+          const derived = await deriveSession(supSession.user)
+          if (!cancelled && derived) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
+            setSession(derived)
+          }
+        }
+      } else if (event === 'TOKEN_REFRESHED') {
+        // Refresh en background — no interrumpir si user está en LoginScreen
+        if (supSession?.user && !loginShownByWatchdog) {
           const derived = await deriveSession(supSession.user)
           if (!cancelled && derived) {
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(derived))
