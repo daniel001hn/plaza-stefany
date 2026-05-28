@@ -101,20 +101,21 @@ export default async function handler(req) {
   // Fecha local de Honduras (UTC-6). Usar UTC genera off-by-one entre 18:00 y 24:00 hora local.
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
 
-  // Para writes (persistir en DB), exigir uno de:
-  //   - Header Authorization: Bearer <CRON_SECRET>  (Vercel Cron lo manda automático)
-  //   - Header x-cron-key: <CRON_SECRET>            (admin manual)
-  //   - Origen del propio dominio (request del front autenticado)
+  // Para writes (persistir en DB), exigir Authorization: Bearer <CRON_SECRET>.
+  // Vercel Cron lo manda automático. Admin manual puede usar x-cron-key.
   // dryRun siempre está abierto: solo lee fuentes públicas, no toca DB.
-  const cronSecret = process.env.CRON_SECRET;
-  if (!dryRun && cronSecret) {
+  // SECURITY: si CRON_SECRET no está seteado en env, BLOQUEAR todos los writes
+  // (antes esto permitía writes públicos si la env var faltaba).
+  if (!dryRun) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      return new Response(JSON.stringify({ ok: false, error: 'CRON_SECRET not configured' }), {
+        status: 503, headers: { 'content-type': 'application/json' },
+      });
+    }
     const auth = req.headers.get('authorization') || '';
     const cronKey = req.headers.get('x-cron-key') || '';
-    const fromCron = auth === `Bearer ${cronSecret}` || cronKey === cronSecret;
-    const referer = req.headers.get('referer') || '';
-    const host = req.headers.get('host') || '';
-    const fromSameOrigin = host && referer.includes(host);
-    if (!fromCron && !fromSameOrigin) {
+    if (auth !== `Bearer ${cronSecret}` && cronKey !== cronSecret) {
       return new Response(JSON.stringify({ ok: false, error: 'unauthorized' }), {
         status: 401, headers: { 'content-type': 'application/json' },
       });
