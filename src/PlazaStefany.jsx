@@ -1627,8 +1627,7 @@ function HistorialENEE({ monthsData, year }) {
             <tr>
               <th>Mes</th>
               <th>Período ENEE</th>
-              <th className="num">Lectura</th>
-              <th className="num">kWh principal</th>
+              <th className="num">kWh edificio</th>
               <th className="num">kWh submed.</th>
               <th className="num">Áreas com.</th>
               <th className="num">Monto</th>
@@ -1643,9 +1642,6 @@ function HistorialENEE({ monthsData, year }) {
                   {m.factura.periodoDesde && m.factura.periodoHasta
                     ? `${m.factura.periodoDesde.slice(8)}/${m.factura.periodoDesde.slice(5,7)} → ${m.factura.periodoHasta.slice(8)}/${m.factura.periodoHasta.slice(5,7)}`
                     : '—'}
-                </td>
-                <td className="num" style={{ color: '#8E8E96' }}>
-                  {m.factura.lecturaPrincipal != null ? m.factura.lecturaPrincipal : '—'}
                 </td>
                 <td className="num">{m.consumoPrincipal != null ? `${fmt(m.consumoPrincipal)}` : '—'}</td>
                 <td className="num" style={{ color: '#6366F1' }}>
@@ -1665,7 +1661,6 @@ function HistorialENEE({ monthsData, year }) {
             <tr style={{ background: '#E8E8ED' }}>
               <td style={{ fontWeight: 700 }}>TOTAL {year}</td>
               <td></td>
-              <td className="num"></td>
               <td className="num" style={{ fontWeight: 700 }}>{fmt(yearTotals.kwhPrincipal)}</td>
               <td className="num" style={{ fontWeight: 700, color: '#6366F1' }}>{fmt(yearTotals.kwhSubmedidores)}</td>
               <td className="num" style={{ fontWeight: 700, color: '#8B5CF6' }}>{fmt(yearTotals.areasComunes)}</td>
@@ -1741,9 +1736,9 @@ const FacturaCard = memo(function FacturaCard({ factura, consumoPrincipal, consu
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1.25rem', paddingTop: '.5rem' }}>
         <FacturaStat label="Total ENEE" value={`L ${fmt2(factura.montoTotal)}`} accent="#5AC8FA" />
-        <FacturaStat label="Consumo principal"
+        <FacturaStat label="Consumo edificio"
           value={consumoPrincipal != null ? `${fmt(consumoPrincipal)} kWh` : '—'}
-          sub={`Lectura: ${factura.lecturaPrincipal || '—'}`} />
+          sub="kWh del período (11→11)" />
         <FacturaStat label="Submedidores"
           value={consumoSubmedidores > 0 ? `${fmt(consumoSubmedidores)} kWh` : '—'}
           sub={consumoSubmedidores > 0 ? 'Suma de los 5 locales' : 'Falta lecturas'} />
@@ -2286,27 +2281,7 @@ function ConfigView({ config, locales, onSaveConfig, onAddLocal, onEditLocal, on
       </div>
 
       {/* ── USUARIOS INQUILINOS ── */}
-      <UsuariosSection config={config} locales={locales} onSaveConfig={onSaveConfig}
-        onSendReminders={async (usuarios) => {
-          const mes = MESES_LARGO[new Date().getMonth()];
-          for (const u of usuarios) {
-            try {
-              await fetch('https://gmailmcp.googleapis.com/mcp/v1', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  tool: 'create_draft',
-                  input: {
-                    to: u.email,
-                    subject: `Stefany Plaza — Su recibo de ${mes} está disponible`,
-                    body: `Estimado/a ${u.nombre},\n\nLe informamos que su recibo de renta correspondiente al mes de ${mes} ya está disponible en el portal de inquilinos de Stefany Plaza.\n\nPuede acceder en: https://plazastefany.com\nUsuario: ${u.usuario}\n\nSaludos,\nD&L Soluciones\nStefany Plaza\n+504 9462-8618`
-                  }
-                })
-              });
-            } catch(e) {}
-          }
-          alert(`Borradores de email creados para ${usuarios.length} inquilino(s). Revisá tu Gmail para enviarlos.`);
-        }}
-      />
+      <UsuariosSection config={config} locales={locales} onSaveConfig={onSaveConfig} />
 
       {/* ── AUDIT LOG ── */}
       <AuditLogSection />
@@ -2536,12 +2511,11 @@ function AuditLogSection() {
   );
 }
 
-function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
+function UsuariosSection({ config, locales, onSaveConfig }) {
   const usuarios = config.usuarios || [];
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ localId: '', nombre: '', usuario: '', email: '' });
+  const [form, setForm] = useState({ localId: '', nombre: '', usuario: '' });
   const [editIdx, setEditIdx] = useState(null);
-  const [sending, setSending] = useState(false);
 
   const handleSave = () => {
     if (!form.localId || !form.usuario) { alert('Completá local y usuario.'); return; }
@@ -2551,12 +2525,12 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
     else list.push(clean);
     onSaveConfig({ ...config, usuarios: list });
     setShowForm(false); setEditIdx(null);
-    setForm({ localId: '', nombre: '', usuario: '', email: '' });
+    setForm({ localId: '', nombre: '', usuario: '' });
   };
 
   const handleEdit = (u, i) => {
     const { password, ...clean } = u;
-    setForm({ email: '', ...clean });
+    setForm(clean);
     setEditIdx(i);
     setShowForm(true);
   };
@@ -2567,14 +2541,6 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
     onSaveConfig({ ...config, usuarios: list });
   };
 
-  const handleSendReminders = async () => {
-    const conEmail = usuarios.filter(u => u.email);
-    if (conEmail.length === 0) { alert('Ningún inquilino tiene email configurado.'); return; }
-    setSending(true);
-    await onSendReminders(conEmail);
-    setSending(false);
-  };
-
   return (
     <div className="ps-card" style={{ padding: '1.4rem 1.5rem', marginTop: '1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
@@ -2583,12 +2549,7 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
           <div style={{ fontSize: '1rem', fontWeight: 600 }}>Usuarios del portal</div>
         </div>
         <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-          {usuarios.some(u=>u.email) && (
-            <button onClick={handleSendReminders} disabled={sending} className="ps-btn-ghost" style={{ fontSize: '.8rem' }}>
-              {sending ? '⏳ Enviando…' : '✉ Enviar recordatorios'}
-            </button>
-          )}
-          <button onClick={() => { setShowForm(true); setEditIdx(null); setForm({ localId: '', nombre: '', usuario: '', password: '', email: '' }); }} className="ps-btn">
+          <button onClick={() => { setShowForm(true); setEditIdx(null); setForm({ localId: '', nombre: '', usuario: '' }); }} className="ps-btn">
             <Plus size={14} strokeWidth={2.5} /> Agregar usuario
           </button>
         </div>
@@ -2635,10 +2596,6 @@ function UsuariosSection({ config, locales, onSaveConfig, onSendReminders }) {
             <div style={{ gridColumn: 'span 2' }}>
               <div className="ps-label" style={{ marginBottom: '.3rem' }}>Usuario (sin espacios)</div>
               <input className="ps-input" placeholder="ej: tatys" value={form.usuario} onChange={e => setForm(p => ({ ...p, usuario: e.target.value.toLowerCase().replace(/\s/g,'') }))} autoComplete="off" />
-            </div>
-            <div style={{ gridColumn: 'span 2' }}>
-              <div className="ps-label" style={{ marginBottom: '.3rem' }}>Email del inquilino (para recordatorios)</div>
-              <input className="ps-input" placeholder="ej: contacto@empresa.com" type="email" value={form.email||''} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} autoComplete="off" />
             </div>
           </div>
           <div style={{ fontSize: '.72rem', color: '#6E6E78', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)', padding: '.6rem .8rem', borderRadius: 8, marginBottom: '.85rem' }}>

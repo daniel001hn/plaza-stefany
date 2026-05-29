@@ -11,7 +11,7 @@ export function FacturaModal({ factura, prevFactura, monthIdx, year, config, loc
   const defPeriodoHasta = `${year}-${pad(monthIdx + 1)}-11`;
   const [form, setForm] = useState({
     montoTotal: factura.montoTotal ?? '',
-    lecturaPrincipal: factura.lecturaPrincipal ?? '',
+    consumoEdificio: factura.consumoEdificio ?? '',
     fechaEmision: factura.fechaEmision || '',
     fechaPago: factura.fechaPago || '',
     pagada: !!factura.pagada,
@@ -23,9 +23,8 @@ export function FacturaModal({ factura, prevFactura, monthIdx, year, config, loc
     periodoHasta: factura.periodoHasta || defPeriodoHasta,
   });
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const lecturaAnt = prevFactura.lecturaPrincipal;
-  const consumo = (form.lecturaPrincipal !== '' && lecturaAnt != null && !isNaN(Number(lecturaAnt)))
-    ? Number(form.lecturaPrincipal) - Number(lecturaAnt) : null;
+  const consumo = form.consumoEdificio !== '' && !isNaN(Number(form.consumoEdificio))
+    ? Number(form.consumoEdificio) : null;
   const cargosFijosTotal = (Number(form.cargoComercializacion) || 0) + (Number(form.cargoRegulacion) || 0) + (Number(form.alumbradoPublico) || 0);
   const sumSubmedidores = calcTotalKwhSubmedidores(locales || [], pagos || {}, prevPagos || {});
   const diff = (consumo != null) ? consumo - sumSubmedidores : null;
@@ -36,7 +35,8 @@ export function FacturaModal({ factura, prevFactura, monthIdx, year, config, loc
     if (!cargosCompletos) return;
     onSave({
       montoTotal: form.montoTotal === '' ? 0 : Number(form.montoTotal),
-      lecturaPrincipal: form.lecturaPrincipal === '' ? null : Number(form.lecturaPrincipal),
+      consumoEdificio: form.consumoEdificio === '' ? null : Number(form.consumoEdificio),
+      lecturaPrincipal: null,
       fechaEmision: form.fechaEmision,
       fechaPago: form.fechaPago,
       pagada: form.pagada,
@@ -100,26 +100,14 @@ export function FacturaModal({ factura, prevFactura, monthIdx, year, config, loc
         </div>
 
         <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: '.9rem', marginBottom: '.85rem' }}>
-          <div className="ps-label" style={{ marginBottom: '.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span>Medidor principal del edificio (opcional, solo para auditoría)</span>
-            {consumo != null && (
-              <span style={{ color: '#8E8E96', fontWeight: 500, fontSize: '.7rem' }}>
-                Consumo edificio: <b style={{ color: consumo < 0 ? '#FF5C5C' : '#1C1C1E' }}>{consumo} kWh</b>
-              </span>
-            )}
+          <div className="ps-label" style={{ marginBottom: '.4rem' }}>
+            Consumo del edificio en el período (kWh, del 11 al 11)
           </div>
-          <div style={{
-            background: '#E8E8ED', border: '1px solid rgba(255,255,255,0.50)', padding: '.55rem .85rem',
-            borderRadius: 8, marginBottom: '.5rem', fontSize: '.74rem', color: '#8E8E96',
-            display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.4rem',
-          }}>
-            <span>Lectura anterior del medidor principal:</span>
-            <span className="ps-mono" style={{ color: '#1C1C1E', fontWeight: 600 }}>
-              {lecturaAnt != null ? lecturaAnt : '— sin registro previo'}
-            </span>
+          <input type="number" className="ps-input ps-mono" value={form.consumoEdificio}
+            onChange={(e) => set('consumoEdificio', e.target.value)} placeholder="kWh consumidos (ej. 2450)" />
+          <div style={{ fontSize: '.7rem', color: '#6E6E78', marginTop: '.3rem' }}>
+            Los kWh totales que te facturó ENEE en el período. Solo para auditoría — se compara con la suma de los submedidores de los locales para ver el consumo de áreas comunes.
           </div>
-          <input type="number" className="ps-input ps-mono" value={form.lecturaPrincipal}
-            onChange={(e) => set('lecturaPrincipal', e.target.value)} placeholder="Lectura actual (ej. 13057)" />
           {consumo != null && sumSubmedidores > 0 && (
             <div style={{
               marginTop: '.5rem', padding: '.55rem .8rem', borderRadius: 8, fontSize: '.74rem',

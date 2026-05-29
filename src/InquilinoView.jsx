@@ -191,12 +191,13 @@ export default function InquilinoView({ session, onLogout }) {
   useEffect(() => {
     let cancelled = false
     async function load() {
+     try {
       const { config: cfg, locales } = await loadCfg()
       if (cancelled) return
       setConfig(cfg)
       setLocales(locales || [])
-      const loc = locales.find(l => l.id === session.localId)
-      setLocal(loc)
+      const loc = (locales || []).find(l => l.id === session.localId)
+      if (loc) setLocal(loc)   // no pisar un local bueno con undefined si el fetch vino vacío
       // Si el local tiene contratoDesde, no mostrar meses anteriores a esa fecha.
       const desdeStr = loc?.contratoDesde
       const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null
@@ -219,6 +220,10 @@ export default function InquilinoView({ session, onLogout }) {
         return { year: y, monthIdx: m, data: pago, factura: data.factura || {}, pagosAll: data.pagos || {} }
       })
       setMeses(months); setLoading(false)
+     } catch (e) {
+      console.error('InquilinoView load error:', e)
+      if (!cancelled) setLoading(false)   // salir del "Cargando…"; el guard de !local muestra reintentar
+     }
     }
     load()
     const onVisibility = () => { if (document.visibilityState === 'visible') load() }
@@ -412,6 +417,20 @@ export default function InquilinoView({ session, onLogout }) {
   }
 
   if (loading) return <div style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><style>{CSS}</style><div style={{color:'#6366F1',fontSize:'1rem',fontFamily:'Geist,sans-serif'}}>Cargando…</div></div>
+
+  if (!local) return (
+    <div style={{minHeight:'100vh',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:'1rem',padding:'2rem',textAlign:'center',fontFamily:'Geist,-apple-system,sans-serif'}}>
+      <style>{CSS}</style>
+      <div style={{fontSize:'2.5rem'}}>📶</div>
+      <div style={{fontSize:'1.05rem',fontWeight:600,color:'#1C1C1E'}}>No pudimos cargar tu local</div>
+      <div style={{fontSize:'.85rem',color:'#6E6E78',maxWidth:320}}>Puede ser tu conexión. Recargá la página; si sigue, avisanos por WhatsApp.</div>
+      <div style={{display:'flex',gap:'.5rem',flexWrap:'wrap',justifyContent:'center'}}>
+        <button className="btn-p" onClick={() => window.location.reload()} style={{padding:'.6rem 1.2rem',borderRadius:10,border:'none',background:'#6366F1',color:'#fff',fontWeight:600,cursor:'pointer'}}>Recargar</button>
+        <a className="btn-g" href={wspUrl('recibo')} target="_blank" rel="noreferrer" style={{padding:'.6rem 1.2rem',borderRadius:10,textDecoration:'none'}}>WhatsApp</a>
+        <button className="btn-g" onClick={onLogout} style={{padding:'.6rem 1.2rem',borderRadius:10,cursor:'pointer'}}>Salir</button>
+      </div>
+    </div>
+  )
 
   const renta = calcRenta(local)
 

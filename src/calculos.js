@@ -23,7 +23,7 @@ export function getPrecioForMonth(config, year, monthIdx) {
 // Returns null si no hay lectura o si no tiene medidor.
 // Maneja el caso de medidor reemplazado (resetea desde lecturaInicialReseteo).
 export function calcConsumoLocal(locale, pagos, prevPagos) {
-  if ((locale.tipoLuz || 'incluido') !== 'medidor') return null;
+  if (!locale || (locale.tipoLuz || 'incluido') !== 'medidor') return null;
   const pago = pagos[locale.id] || {};
   const lecturaActual = pago.lecturaActual;
   if (lecturaActual == null) return null;
@@ -97,6 +97,12 @@ export function calcTarifaEfectiva(factura, locales, pagos, prevPagos, config) {
 // Consumo total ENEE medido por la compañía (lectura principal de medidor)
 // ──────────────────────────────────────────────────────────────
 export function calcConsumoPrincipal(factura, prevFactura) {
+  // Nuevo: el admin registra directo los kWh consumidos del período (11→11).
+  if (factura?.consumoEdificio != null && factura.consumoEdificio !== '') {
+    const c = Number(factura.consumoEdificio);
+    return isNaN(c) ? null : c;
+  }
+  // Legacy: meses viejos guardados con lectura anterior → actual.
   const actual = Number(factura?.lecturaPrincipal);
   const anterior = Number(prevFactura?.lecturaPrincipal);
   if (!actual || isNaN(actual) || !anterior || isNaN(anterior)) return null;
