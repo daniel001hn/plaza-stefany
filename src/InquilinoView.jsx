@@ -534,12 +534,16 @@ export default function InquilinoView({ session, onLogout }) {
           const kWhPlaza    = luzMes ? calcTotalKwhSubmedidores(locales, luzPagosAll, luzPrevPagosAll) : 0
           const montoEnergia = (consumo != null && consumo > 0 && tarifaEf > 0) ? consumo * tarifaEf : 0
           const montoLuz    = montoEnergia + (luzMes ? fijoLocal : 0)
-          // Hay recibo si: hay factura del mes Y este local tiene medidor (aunque consumo=0, paga fijo)
-          const tieneLuz    = luzAplica && !!luzMes && !!luzMes.factura?.montoTotal && (local?.tipoLuz === 'medidor')
+          // Hay recibo si: hay factura del mes, el local tiene medidor, Y la lectura del
+          // submedidor ya fue cargada (consumo != null). consumo=0 SÍ vale (paga fijo);
+          // null = todavía no cargaron la lectura → no se puede emitir el recibo.
+          const tieneLuz    = luzAplica && !!luzMes && !!luzMes.factura?.montoTotal && (local?.tipoLuz === 'medidor') && consumo != null
           const luzNueva    = tieneLuz && !luzPagada
           const luzLabel    = luzMes ? `${MESES[luzMes.monthIdx]} ${luzMes.year}` : null
-          // El recibo de renta solo está disponible si ya fue registrado por el admin
-          const reciboRentaDisponible = rentaPagada || !esActual
+          // La renta es determinística (m² × tarifa × ISV): el recibo siempre se puede
+          // emitir, esté pagada o no, sea el mes actual o pasado. El inquilino lo usa
+          // justamente para saber cuánto pagar.
+          const reciboRentaDisponible = true
           // Monto de renta con tasa congelada (o actual si no hay congelada aún)
           const tasaMes  = data.tasaCambioCongelado || config.tasaCambio || 25
           const precioM2Mes = getPrecioMes(mes.year, mes.monthIdx)
