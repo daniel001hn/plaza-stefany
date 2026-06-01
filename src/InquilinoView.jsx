@@ -200,45 +200,75 @@ export default function InquilinoView({ session, onLogout }) {
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-     try {
-      const { config: cfg, locales } = await loadCfg()
-      if (cancelled) return
-      setConfig(cfg)
-      setLocales(locales || [])
-      const loc = (locales || []).find(l => l.id === session.localId)
-      if (loc) setLocal(loc)   // no pisar un local bueno con undefined si el fetch vino vacío
-      // Si el local tiene contratoDesde, no mostrar meses anteriores a esa fecha.
+    let inFlight = false   // B) evita cargas duplicadas concurrentes (mount + subscribe + visibility)
+
+    // Lista de meses a mostrar (saltando los previos al contrato).
+    const computeMonths = (loc) => {
       const desdeStr = loc?.contratoDesde
       const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null
       const now = new Date()
-      // Construir lista de meses a cargar (saltando los previos al contrato)
-      const monthsToLoad = []
+      const list = []
       for (let i = 0; i < 12; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const y = d.getFullYear(); const m = d.getMonth()
         const finDeMes = new Date(y, m + 1, 0)
         if (desde && desde > finDeMes) continue
-        monthsToLoad.push({ y, m })
+        list.push({ y, m })
       }
-      // Cargar TODOS los meses en paralelo (antes era secuencial — ~3s vs ~500ms).
-      const datas = await Promise.all(monthsToLoad.map(({ y, m }) => loadMonth(y, m)))
-      if (cancelled) return
-      const months = monthsToLoad.map(({ y, m }, i) => {
-        const data = datas[i]
-        const pago = (data.pagos || {})[session.localId] || {}
-        return { year: y, monthIdx: m, data: pago, factura: data.factura || {}, pagosAll: data.pagos || {} }
-      })
-      setMeses(months); setLoading(false)
-     } catch (e) {
-      console.error('InquilinoView load error:', e)
-      if (!cancelled) setLoading(false)   // salir del "Cargando…"; el guard de !local muestra reintentar
-     }
+      return list
+    }
+    const toMeses = (monthsToLoad, datas) => monthsToLoad.map(({ y, m }, i) => {
+      const data = datas[i] || {}
+      const pago = (data.pagos || {})[session.localId] || {}
+      return { year: y, monthIdx: m, data: pago, factura: data.factura || {}, pagosAll: data.pagos || {} }
+    })
+
+    // A) Cache-first: pintar AL INSTANTE con lo último guardado en el dispositivo
+    // (lectura sincrónica de localStorage). El fetch fresco corre abajo y actualiza.
+    try {
+      const cRaw = window.storage.getCached?.('config-and-locales')
+      if (cRaw) {
+        const { config: cfg, locales } = JSON.parse(cRaw)
+        const loc = (locales || []).find(l => l.id === session.localId)
+        setConfig(cfg || {}); setLocales(locales || [])
+        if (loc) {
+          setLocal(loc)
+          const ml = computeMonths(loc)
+          const datas = ml.map(({ y, m }) => {
+            try { const r = window.storage.getCached?.(monthKey(y, m)); return r ? JSON.parse(r) : {} } catch { return {} }
+          })
+          setMeses(toMeses(ml, datas))
+          setLoading(false)
+        }
+      }
+    } catch {}
+
+    async function load() {
+      if (inFlight) return
+      inFlight = true
+      try {
+        const { config: cfg, locales } = await loadCfg()
+        if (cancelled) return
+        setConfig(cfg)
+        setLocales(locales || [])
+        const loc = (locales || []).find(l => l.id === session.localId)
+        if (loc) setLocal(loc)   // no pisar un local bueno con undefined si el fetch vino vacío
+        const monthsToLoad = computeMonths(loc)
+        // Cargar TODOS los meses en paralelo (antes era secuencial — ~3s vs ~500ms).
+        const datas = await Promise.all(monthsToLoad.map(({ y, m }) => loadMonth(y, m)))
+        if (cancelled) return
+        setMeses(toMeses(monthsToLoad, datas)); setLoading(false)
+      } catch (e) {
+        console.error('InquilinoView load error:', e)
+        if (!cancelled) setLoading(false)   // salir del "Cargando…"; el guard de !local muestra reintentar
+      } finally {
+        inFlight = false
+      }
     }
     load()
     const onVisibility = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', onVisibility)
-    const interval = setInterval(load, 30000)
+    const interval = setInterval(load, 60000)
     let unsub = () => {}
     try { unsub = window.storage?.subscribe?.(() => load()) || (() => {}) } catch {}
     return () => { cancelled = true; document.removeEventListener('visibilitychange', onVisibility); clearInterval(interval); unsub() }
