@@ -200,7 +200,8 @@ export default function InquilinoView({ session, onLogout }) {
 
   useEffect(() => {
     let cancelled = false
-    let inFlight = false   // B) evita cargas duplicadas concurrentes (mount + subscribe + visibility)
+    let inFlight = false   // B) evita cargas duplicadas concurrentes
+    let lastLoad = 0       // B) throttle: colapsa la ráfaga de arranque (mount + subscribe + visibility)
 
     // Lista de meses a mostrar (saltando los previos al contrato).
     const computeMonths = (loc) => {
@@ -243,8 +244,11 @@ export default function InquilinoView({ session, onLogout }) {
       }
     } catch {}
 
-    async function load() {
+    async function load(force) {
+      // Throttle: ignorar disparos seguidos (subscribe/visibility justo después del mount).
+      // force=true para la carga inicial. Cambios reales >3s después igual entran.
       if (inFlight) return
+      if (!force && Date.now() - lastLoad < 3000) return
       inFlight = true
       try {
         const { config: cfg, locales } = await loadCfg()
@@ -258,6 +262,7 @@ export default function InquilinoView({ session, onLogout }) {
         const datas = await Promise.all(monthsToLoad.map(({ y, m }) => loadMonth(y, m)))
         if (cancelled) return
         setMeses(toMeses(monthsToLoad, datas)); setLoading(false)
+        lastLoad = Date.now()
       } catch (e) {
         console.error('InquilinoView load error:', e)
         if (!cancelled) setLoading(false)   // salir del "Cargando…"; el guard de !local muestra reintentar
@@ -265,7 +270,7 @@ export default function InquilinoView({ session, onLogout }) {
         inFlight = false
       }
     }
-    load()
+    load(true)
     const onVisibility = () => { if (document.visibilityState === 'visible') load() }
     document.addEventListener('visibilitychange', onVisibility)
     const interval = setInterval(load, 60000)
