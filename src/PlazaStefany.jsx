@@ -458,11 +458,20 @@ export default function App({ supabase, onLogout }) {
         const cl = await loadCfg();
         const hoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' });
         if (cl.config?.tasaFechaActualizada !== hoy) {
-          const res = await fetch('/api/tasa-bac');
+          // dryRun: el browser no puede autenticar el write del cron. Traemos la tasa
+          // y la persistimos como admin (RLS permite admin write). Auto-cura la tasa
+          // cada vez que William abre el panel, aunque el cron esté caído.
+          const res = await fetch('/api/tasa-bac?dryRun=1');
           const data = await res.json();
           if (data?.ok && data.sell) {
-            setConfig((prev) => ({ ...prev, tasaCambio: data.sell, tasaFechaActualizada: data.fecha, tasaFuente: 'BAC' }));
-            setToast(`Tasa BAC: L ${Number(data.sell).toFixed(4)}/$`);
+            const fresh = await loadCfg();
+            const merged = {
+              ...fresh,
+              config: { ...(fresh.config || {}), tasaCambio: data.sell, tasaFechaActualizada: data.fecha, tasaFuente: data.source || 'auto' },
+            };
+            await window.storage.set('config-and-locales', JSON.stringify(merged));
+            setConfig(merged.config);
+            setToast(`Tasa ${data.source || ''}: L ${Number(data.sell).toFixed(4)}/$`);
             setTimeout(() => setToast(null), 2800);
           }
         }
@@ -1176,10 +1185,15 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         };
       });
 
+      // Aporte del dueño: la parte de la factura ENEE que NO se le asigna a ningún
+      // inquilino (cargos fijos de los locales sin rentar). Por diseño William la
+      // absorbe (opción B). Es exactamente montoENEE − luz cobrable a inquilinos.
+      const aporteDueno = (fact.montoTotal && tarifa) ? Math.max(0, Number(fact.montoTotal) - totalLuz) : 0;
+
       return {
         idx, mes: m, mesLargo: MESES_LARGO[idx],
         factura: fact, consumoPrincipal, consumoSubmedidores, areasComunes, tarifa,
-        totalRenta, totalLuz, cobradoRenta, cobradoLuz,
+        totalRenta, totalLuz, cobradoRenta, cobradoLuz, aporteDueno,
         total: cobradoRenta + cobradoLuz, esperado: totalRenta + totalLuz,
         localData,
         hasData: Object.keys(p).length > 0 || Object.keys(fact).length > 0,
@@ -1494,7 +1508,7 @@ function HistorialENEE({ monthsData, year }) {
   const yearTotals = useMemo(() => {
     let monto = 0, kwhPrincipal = 0, kwhSubmedidores = 0, areasComunes = 0;
     let mesesConData = 0;
-    let totalLuzEsperado = 0, totalLuzCobrado = 0;
+    let totalLuzEsperado = 0, totalLuzCobrado = 0, aporteDueno = 0;
     monthsData.forEach((m) => {
       if (m.factura.montoTotal) {
         monto += Number(m.factura.montoTotal);
@@ -1505,8 +1519,9 @@ function HistorialENEE({ monthsData, year }) {
       if (m.areasComunes) areasComunes += m.areasComunes;
       totalLuzEsperado += m.totalLuz || 0;
       totalLuzCobrado += m.cobradoLuz || 0;
+      aporteDueno += m.aporteDueno || 0;
     });
-    return { monto, kwhPrincipal, kwhSubmedidores, areasComunes, mesesConData, totalLuzEsperado, totalLuzCobrado };
+    return { monto, kwhPrincipal, kwhSubmedidores, areasComunes, mesesConData, totalLuzEsperado, totalLuzCobrado, aporteDueno };
   }, [monthsData]);
 
   // Tarifa efectiva chart

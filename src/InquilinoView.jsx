@@ -180,8 +180,18 @@ export default function InquilinoView({ session, onLogout }) {
   // celular, sin depender del cron) o solicita el recibo por WhatsApp.
   const esAppNativa = typeof window !== 'undefined' && (window.Capacitor?.isNativePlatform?.() || !!window.cordova)
   const hoyISO = today.toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' })
-  const tasaFreshHoy = config?.tasaFechaActualizada === hoyISO
-  const dentroVentanaWeb = esAppNativa || tasaFreshHoy
+  // La tasa casi no se mueve día a día. Aceptamos la última de los últimos 7 días
+  // en vez de exigir HOY exacto — antes bloqueaba cada madrugada (el cron corre 7am)
+  // y todo el día si el cron fallaba una vez. Solo bloquea si está MUY vieja (cron muerto).
+  const diasTasa = (() => {
+    const f = config?.tasaFechaActualizada
+    if (!f) return Infinity
+    const d = new Date(f + 'T00:00:00')
+    if (isNaN(d)) return Infinity
+    return Math.round((new Date(hoyISO + 'T00:00:00') - d) / 86400000)
+  })()
+  const tasaReciente = diasTasa <= 7
+  const dentroVentanaWeb = esAppNativa || tasaReciente
   const TEL_ADMIN_WSP = '50494628618'
   const wspText = (asunto) => encodeURIComponent(
     `Hola William, soy ${session?.nombre || local?.inquilino || 'inquilino'} del local ${local?.numero || ''}. Necesito mi ${asunto} de ${MESES[today.getMonth()]} ${today.getFullYear()}.`
