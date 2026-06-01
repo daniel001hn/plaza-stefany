@@ -1185,15 +1185,10 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         };
       });
 
-      // Aporte del dueño: la parte de la factura ENEE que NO se le asigna a ningún
-      // inquilino (cargos fijos de los locales sin rentar). Por diseño William la
-      // absorbe (opción B). Es exactamente montoENEE − luz cobrable a inquilinos.
-      const aporteDueno = (fact.montoTotal && tarifa) ? Math.max(0, Number(fact.montoTotal) - totalLuz) : 0;
-
       return {
         idx, mes: m, mesLargo: MESES_LARGO[idx],
         factura: fact, consumoPrincipal, consumoSubmedidores, areasComunes, tarifa,
-        totalRenta, totalLuz, cobradoRenta, cobradoLuz, aporteDueno,
+        totalRenta, totalLuz, cobradoRenta, cobradoLuz,
         total: cobradoRenta + cobradoLuz, esperado: totalRenta + totalLuz,
         localData,
         hasData: Object.keys(p).length > 0 || Object.keys(fact).length > 0,
@@ -1508,7 +1503,7 @@ function HistorialENEE({ monthsData, year }) {
   const yearTotals = useMemo(() => {
     let monto = 0, kwhPrincipal = 0, kwhSubmedidores = 0, areasComunes = 0;
     let mesesConData = 0;
-    let totalLuzEsperado = 0, totalLuzCobrado = 0, aporteDueno = 0;
+    let totalLuzEsperado = 0, totalLuzCobrado = 0;
     monthsData.forEach((m) => {
       if (m.factura.montoTotal) {
         monto += Number(m.factura.montoTotal);
@@ -1519,9 +1514,8 @@ function HistorialENEE({ monthsData, year }) {
       if (m.areasComunes) areasComunes += m.areasComunes;
       totalLuzEsperado += m.totalLuz || 0;
       totalLuzCobrado += m.cobradoLuz || 0;
-      aporteDueno += m.aporteDueno || 0;
     });
-    return { monto, kwhPrincipal, kwhSubmedidores, areasComunes, mesesConData, totalLuzEsperado, totalLuzCobrado, aporteDueno };
+    return { monto, kwhPrincipal, kwhSubmedidores, areasComunes, mesesConData, totalLuzEsperado, totalLuzCobrado };
   }, [monthsData]);
 
   // Tarifa efectiva chart
