@@ -33,6 +33,8 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     rentaPagada: !!data.rentaPagada,
     montoRentaPagado: data.montoRentaPagado ?? '',
     fechaRenta: data.fechaRenta || '',
+    adjuntoRenta: data.adjuntoRenta || '',
+    adjuntoRentaNombre: data.adjuntoRentaNombre || '',
     luzPagada: !!data.luzPagada,
     fechaLuz: data.fechaLuz || '',
     lecturaActual: data.lecturaActual ?? '',
@@ -52,6 +54,20 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
       alert('No se pudo procesar la foto. Probá con otra.')
     } finally {
       setFotoLoading(s => ({ ...s, [tipo]: false }))
+    }
+  };
+
+  const [adjuntoLoading, setAdjuntoLoading] = useState(false);
+  const handleAdjuntoRenta = async (file) => {
+    if (!file) return
+    setAdjuntoLoading(true)
+    try {
+      const b64 = await comprimirFotoMedidor(file)
+      setForm(f => ({ ...f, adjuntoRenta: b64, adjuntoRentaNombre: file.name }))
+    } catch (e) {
+      alert('No se pudo procesar el comprobante. Probá con otro.')
+    } finally {
+      setAdjuntoLoading(false)
     }
   };
   const tipoLuz = local.tipoLuz || 'incluido';
@@ -75,6 +91,8 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     const out = {
       rentaPagada: form.rentaPagada, fechaRenta: form.fechaRenta,
       montoRentaPagado: form.rentaPagada && form.montoRentaPagado !== '' ? Number(form.montoRentaPagado) : null,
+      adjuntoRenta: form.adjuntoRenta || null,
+      adjuntoRentaNombre: form.adjuntoRenta ? (form.adjuntoRentaNombre || 'comprobante') : null,
       notas: form.notas,
     };
     if (tipoLuz !== 'incluido') {
@@ -132,9 +150,29 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
                   Dejalo vacío si pagaron el calculado (L {fmt2(renta)}). Anotá el monto real solo si difiere.
                 </div>
               </div>
-              <div style={{ maxWidth: 220 }}>
+              <div style={{ maxWidth: 150, marginBottom: '.6rem' }}>
                 <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>
-                <input type="date" className="ps-input" value={form.fechaRenta || todayStr()} onChange={(e) => set('fechaRenta', e.target.value)} />
+                <input type="date" className="ps-input ps-mono" style={{ fontSize: '.8rem', padding: '.4rem .55rem' }}
+                  value={form.fechaRenta || todayStr()} onChange={(e) => set('fechaRenta', e.target.value)} />
+              </div>
+              <div>
+                <div className="ps-label" style={{ marginBottom: '.3rem' }}>Comprobante</div>
+                {form.adjuntoRenta ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', padding: '.45rem .7rem', background: 'rgba(52,199,89,0.08)', border: '1px solid rgba(52,199,89,0.3)', borderRadius: 8 }}>
+                    <span style={{ color: '#1A7F35', fontWeight: 700 }}>✓</span>
+                    <span style={{ fontSize: '.8rem', color: '#1C1C1E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {form.adjuntoRentaNombre || 'comprobante'}
+                    </span>
+                    <button onClick={(e) => { e.preventDefault(); setForm(f => ({ ...f, adjuntoRenta: '', adjuntoRentaNombre: '' })) }}
+                      style={{ background: 'none', border: 'none', color: '#8E8E96', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>×</button>
+                  </div>
+                ) : (
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer', padding: '.45rem .8rem', border: '1px dashed rgba(99,102,241,0.4)', borderRadius: 8, background: 'rgba(255,255,255,0.5)', color: '#6366F1', fontSize: '.8rem' }}>
+                    <input type="file" accept="image/*" style={{ display: 'none' }}
+                      onChange={(e) => handleAdjuntoRenta(e.target.files?.[0])} />
+                    {adjuntoLoading ? '⏳ Procesando...' : '📎 Subir comprobante'}
+                  </label>
+                )}
               </div>
             </div>
           )}
