@@ -158,6 +158,24 @@ function entregarPdf(doc, filename) {
 // Agrega página 2 al PDF con las 2 fotos del submedidor (si están presentes).
 // fotoAnterior/fotoActual son data URLs base64 (image/jpeg) generadas en
 // PaymentModal con compresión a 1200px. Si alguna falta, no se agrega la página.
+// Convierte una imagen a data URL para jsPDF. Si ya es base64 (data:) la deja;
+// si es una URL de Storage, la baja y la convierte (evita problemas de CORS en addImage).
+async function toDataUrl(src) {
+  if (!src) return null;
+  if (src.startsWith('data:')) return src;
+  try {
+    const res = await fetch(src);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = reject;
+      fr.readAsDataURL(blob);
+    });
+  } catch { return null; }
+}
+
 async function agregarPaginaFotos(doc, d) {
   if (!d.fotoMedidorAnterior && !d.fotoMedidorActual) return;
   doc.addPage();
@@ -213,8 +231,12 @@ async function agregarPaginaFotos(doc, d) {
     }
   };
 
-  dibujarFoto(d.fotoMedidorAnterior, 'LECTURA ANTERIOR', d.lecturaAnterior, y);
-  dibujarFoto(d.fotoMedidorActual, 'LECTURA ACTUAL', d.lecturaActual, y + fotoH + labelH + 4);
+  const [anteriorData, actualData] = await Promise.all([
+    toDataUrl(d.fotoMedidorAnterior),
+    toDataUrl(d.fotoMedidorActual),
+  ]);
+  dibujarFoto(anteriorData, 'LECTURA ANTERIOR', d.lecturaAnterior, y);
+  dibujarFoto(actualData, 'LECTURA ACTUAL', d.lecturaActual, y + fotoH + labelH + 4);
 
   drawFooter(doc);
 }

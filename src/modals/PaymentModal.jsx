@@ -3,6 +3,7 @@ import { Circle, X, Receipt, Zap, AlertCircle, Calculator, Save, Printer } from 
 import { fmt2, MESES_LARGO } from '../utils/format';
 import { useLightbox } from '../components/Lightbox';
 import { ModalPortal } from '../components/ModalPortal';
+import { uploadImage } from '../uploadImage';
 
 // Comprime imagen a base64 (max 1200px, calidad 0.7) para usar en recibos.
 function comprimirFotoMedidor(file) {
@@ -49,9 +50,10 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     setFotoLoading(s => ({ ...s, [tipo]: true }))
     try {
       const b64 = await comprimirFotoMedidor(file)
-      setForm(f => ({ ...f, [`fotoMedidor${tipo === 'anterior' ? 'Anterior' : 'Actual'}`]: b64 }))
+      const url = await uploadImage(b64, 'medidores')
+      setForm(f => ({ ...f, [`fotoMedidor${tipo === 'anterior' ? 'Anterior' : 'Actual'}`]: url }))
     } catch (e) {
-      alert('No se pudo procesar la foto. Probá con otra.')
+      alert('No se pudo subir la foto: ' + (e.message || 'error') + '. Probá de nuevo.')
     } finally {
       setFotoLoading(s => ({ ...s, [tipo]: false }))
     }
@@ -63,9 +65,10 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     setAdjuntoLoading(true)
     try {
       const b64 = await comprimirFotoMedidor(file)
-      setForm(f => ({ ...f, adjuntoRenta: b64, adjuntoRentaNombre: file.name }))
+      const url = await uploadImage(b64, 'renta')
+      setForm(f => ({ ...f, adjuntoRenta: url, adjuntoRentaNombre: file.name }))
     } catch (e) {
-      alert('No se pudo procesar el comprobante. Probá con otro.')
+      alert('No se pudo subir el comprobante: ' + (e.message || 'error') + '. Probá de nuevo.')
     } finally {
       setAdjuntoLoading(false)
     }

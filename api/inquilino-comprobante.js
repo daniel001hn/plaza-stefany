@@ -13,6 +13,8 @@ export const config = { runtime: 'edge' }
 const URL_BASE = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
+const BUCKET = process.env.STORAGE_BUCKET || 'uploads'
+const EXT = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
@@ -55,7 +57,7 @@ export default async function handler(req) {
     if (typeof comprobanteB64 !== 'string' || !comprobanteB64.startsWith('data:image/')) {
       return json({ error: 'invalid comprobante (expected data:image/...)' }, 400)
     }
-    if (comprobanteB64.length > 400000) return json({ error: 'image too large (max ~300KB)' }, 413)
+    if (comprobanteB64.length > 3_000_000) return json({ error: 'image too large (max ~2MB)' }, 413)
   }
 
   const sbAdmin = createClient(URL_BASE, SERVICE_KEY)
@@ -69,6 +71,28 @@ export default async function handler(req) {
   if (!u) return json({ error: 'usuario no mapeado a local' }, 403)
   const localId = u.localId
 
+  // Subir el comprobante a Storage (bucket público) y guardar SOLO la URL en
+  // kv_store — ya no se mete el base64 inline (inflaba la fila del mes).
+  let comprobanteUrl = null
+  if (action === 'upload') {
+    const match = comprobanteB64.match(/^data:([^;]+);base64,(.*)$/s)
+    if (!match) return json({ error: 'malformed data url' }, 400)
+    const ext = EXT[match[1]]
+    if (!ext) return json({ error: 'unsupported image type: ' + match[1] }, 415)
+    let bytes
+    try {
+      const bin = atob(match[2])
+      bytes = new Uint8Array(bin.length)
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+    } catch { return json({ error: 'invalid base64' }, 400) }
+    const path = `comprobantes/${crypto.randomUUID()}.${ext}`
+    const { error: upErr } = await sbAdmin.storage.from(BUCKET).upload(path, bytes, {
+      contentType: match[1], cacheControl: '31536000', upsert: false,
+    })
+    if (upErr) return json({ error: 'storage upload error: ' + upErr.message }, 500)
+    comprobanteUrl = sbAdmin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+  }
+
   const key = `pagos:${year}-${String(monthIdx + 1).padStart(2, '0')}`
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -81,7 +105,7 @@ export default async function handler(req) {
     const localPago = { ...(data.pagos[localId] || {}) }
 
     if (action === 'upload') {
-      localPago[`comprobante${tipo}`] = comprobanteB64
+      localPago[`comprobante${tipo}`] = comprobanteUrl
       localPago[`comprobante${tipo}Date`] = new Date().toISOString()
       localPago[`actividadNombre`] = u.nombre || usuarioStr
     } else if (action === 'delete') {
