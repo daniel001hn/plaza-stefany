@@ -31,6 +31,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
   const lb = useLightbox();
   const [form, setForm] = useState({
     rentaPagada: !!data.rentaPagada,
+    montoRentaPagado: data.montoRentaPagado ?? '',
     fechaRenta: data.fechaRenta || '',
     numFactura: data.numFactura || '',
     linkFactura: data.linkFactura || '',
@@ -40,7 +41,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     medidorReemplazado: !!data.medidorReemplazado,
     lecturaInicialReseteo: data.lecturaInicialReseteo ?? '',
     notas: data.notas || '',
-    fotoMedidorAnterior: data.fotoMedidorAnterior || '',
+    fotoMedidorAnterior: data.fotoMedidorAnterior || prevData?.fotoMedidorActual || '',
     fotoMedidorActual: data.fotoMedidorActual || '',
   });
   const [fotoLoading, setFotoLoading] = useState({ anterior: false, actual: false });
@@ -79,6 +80,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
   const handleSave = () => {
     const out = {
       rentaPagada: form.rentaPagada, fechaRenta: form.fechaRenta,
+      montoRentaPagado: form.rentaPagada && form.montoRentaPagado !== '' ? Number(form.montoRentaPagado) : null,
       numFactura: form.numFactura, linkFactura: form.linkFactura, notas: form.notas,
     };
     if (tipoLuz !== 'incluido') {
@@ -130,14 +132,24 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
           </label>
 
           {form.rentaPagada && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem', marginTop: '.6rem' }}>
-              <div>
-                <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>
-                <input type="date" className="ps-input" value={form.fechaRenta || todayStr()} onChange={(e) => set('fechaRenta', e.target.value)} />
+            <div style={{ marginTop: '.6rem' }}>
+              <div style={{ marginBottom: '.6rem' }}>
+                <div className="ps-label" style={{ marginBottom: '.3rem' }}>Monto pagado (L)</div>
+                <input type="number" inputMode="decimal" className="ps-input ps-mono" placeholder={fmt2(renta)}
+                  value={form.montoRentaPagado} onChange={(e) => set('montoRentaPagado', e.target.value)} />
+                <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.3rem' }}>
+                  Dejalo vacío si pagaron el calculado (L {fmt2(renta)}). Anotá el monto real solo si difiere.
+                </div>
               </div>
-              <div>
-                <div className="ps-label" style={{ marginBottom: '.3rem' }}>N° Factura</div>
-                <input className="ps-input" placeholder="000-000-..." value={form.numFactura} onChange={(e) => set('numFactura', e.target.value)} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem' }}>
+                <div>
+                  <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>
+                  <input type="date" className="ps-input" value={form.fechaRenta || todayStr()} onChange={(e) => set('fechaRenta', e.target.value)} />
+                </div>
+                <div>
+                  <div className="ps-label" style={{ marginBottom: '.3rem' }}>N° Factura</div>
+                  <input className="ps-input" placeholder="000-000-..." value={form.numFactura} onChange={(e) => set('numFactura', e.target.value)} />
+                </div>
               </div>
             </div>
           )}
@@ -252,7 +264,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
                             </div>
                           ) : (
                             <label style={{ display: 'block', cursor: 'pointer' }}>
-                              <input type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                              <input type="file" accept="image/*" style={{ display: 'none' }}
                                 onChange={(e) => handleFotoChange(tipo, e.target.files?.[0])} />
                               <div style={{ height: 90, display: 'grid', placeItems: 'center', border: '1px dashed rgba(99,102,241,0.4)', borderRadius: 6, background: 'rgba(255,255,255,0.5)', color: '#6366F1', fontSize: '.78rem', textAlign: 'center', padding: '.5rem' }}>
                                 {fotoLoading[tipo] ? '⏳ Procesando...' : '📷 Tomar / Subir'}

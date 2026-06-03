@@ -46,6 +46,12 @@ const DEFAULT_CONFIG = {
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
+// Renta efectivamente cobrada. Si el admin anotó un monto real al marcar pagada
+// (puede diferir del calculado por banco/tasa del depósito), se usa ese; si no,
+// el calculado por fórmula. Lo "esperado/facturado" siempre usa la fórmula.
+const rentaCobradaDe = (d, rentaCalc) =>
+  !d.rentaPagada ? 0 : (d.montoRentaPagado != null ? Number(d.montoRentaPagado) : rentaCalc);
+
 const fmt = (n) => new Intl.NumberFormat('es-HN', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0));
 const fmt2 = (n) => new Intl.NumberFormat('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
 
@@ -579,6 +585,7 @@ export default function App({ supabase, onLogout }) {
     if (updates.rentaPagada === false && prevPago.rentaPagada) {
       updates.tasaCambioCongelado = null;
       updates.fechaRentaPagada = null;
+      updates.montoRentaPagado = null;
     }
 
     // Concurrency: re-leer fresh antes de escribir. Si un inquilino subió un
@@ -1032,7 +1039,7 @@ function DashboardView({
         ? ((consumo != null && tarifaEfectiva) ? consumo * tarifaEfectiva : 0) + fijoLocalActual
         : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
       totalLuz += montoLuz;
-      if (d.rentaPagada) cobradoRenta += calcRenta(l.m2); else pendientesRenta++;
+      if (d.rentaPagada) cobradoRenta += rentaCobradaDe(d, calcRenta(l.m2)); else pendientesRenta++;
       if (l.tipoLuz !== 'incluido' && montoLuz > 0) {
         if (d.luzPagada) cobradoLuz += montoLuz; else pendientesLuz++;
       }
@@ -1053,8 +1060,9 @@ function DashboardView({
       const luz = l.tipoLuz === 'medidor'
         ? ((consumo != null && tarifaEfectiva) ? consumo * tarifaEfectiva : 0) + fijoLocalActual
         : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
-      const cobrado = (d.rentaPagada ? renta : 0) + (d.luzPagada ? luz : 0);
-      return { ...l, renta, luz, total: renta + luz, cobrado, consumo };
+      const cobradoRenta = rentaCobradaDe(d, renta);
+      const cobrado = cobradoRenta + (d.luzPagada ? luz : 0);
+      return { ...l, renta, luz, total: renta + luz, cobrado, cobradoRenta, montoRentaPagado: d.montoRentaPagado ?? null, consumo };
     });
   }, [locales, pagos, prevPagos, tarifaEfectiva, fijoLocalActual, config]);
 
@@ -1173,11 +1181,12 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
           ? consumo * tarifa + fijoLocal : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
         totalRenta += renta;
         totalLuz += luz;
-        if (d.rentaPagada) cobradoRenta += renta;
+        if (d.rentaPagada) cobradoRenta += rentaCobradaDe(d, renta);
         if (d.luzPagada) cobradoLuz += luz;
         localData[l.id] = {
           lecturaActual: d.lecturaActual,
           consumo, renta, luz,
+          montoRentaPagado: d.montoRentaPagado ?? null,
           rentaPagada: !!d.rentaPagada,
           luzPagada: !!d.luzPagada,
           fechaRenta: d.fechaRenta,
@@ -1228,23 +1237,22 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         </div>
       </div>
 
-      {/* Búsqueda / filtro */}
-      <input
-        type="text"
-        placeholder="🔍 Filtrar mes (ej: mayo, abril...)"
+      {/* Filtro de mes */}
+      <select
         value={filtro}
         onChange={(e) => setFiltro(e.target.value)}
-        className="ps-input"
-        style={{ fontSize: '.85rem', maxWidth: 360 }}
-      />
+        className="ps-input ps-mono"
+        style={{ fontSize: '.9rem', maxWidth: 360, padding: '.5rem .85rem', fontWeight: 500, cursor: 'pointer' }}
+      >
+        <option value="">Todos los meses</option>
+        {monthsData.map((m) => (
+          <option key={m.idx} value={m.idx}>{m.mesLargo}</option>
+        ))}
+      </select>
 
       {(() => {
-        const filtered = filtro
-          ? monthsData.filter(m => {
-              const f = filtro.toLowerCase();
-              return (m.mes || '').toLowerCase().includes(f)
-                || (m.mesLargo || '').toLowerCase().includes(f);
-            })
+        const filtered = filtro !== ''
+          ? monthsData.filter(m => String(m.idx) === filtro)
           : monthsData;
         return (
           <>
@@ -1389,7 +1397,7 @@ function HistorialLocales({ monthsData, locales, year }) {
         monthsData.forEach((m) => {
           const ld = m.localData[l.id];
           if (!ld) return;
-          if (ld.rentaPagada) { totalRenta += ld.renta; mesesPagosRenta++; }
+          if (ld.rentaPagada) { totalRenta += (ld.montoRentaPagado != null ? Number(ld.montoRentaPagado) : ld.renta); mesesPagosRenta++; }
           if (ld.luzPagada) { totalLuz += ld.luz; mesesPagosLuz++; }
           if (ld.consumo != null) { totalConsumo += ld.consumo; mesesConData++; }
         });
@@ -1877,7 +1885,7 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
       return { ...l, rentaPagada: !!d.rentaPagada, luzPagada: !!d.luzPagada, fechaRenta: d.fechaRenta, fechaLuz: d.fechaLuz };
     });
 
-  const sumCobrado = rows.reduce((s, r) => s + (tipo === 'renta' ? (r.rentaPagada ? r.renta : 0) : tipo === 'luz' ? (r.luzPagada ? r.luz : 0) : r.cobrado), 0);
+  const sumCobrado = rows.reduce((s, r) => s + (tipo === 'renta' ? (r.cobradoRenta || 0) : tipo === 'luz' ? (r.luzPagada ? r.luz : 0) : r.cobrado), 0);
   const sumTotal = rows.reduce((s, r) => s + (tipo === 'renta' ? r.renta : tipo === 'luz' ? r.luz : r.total), 0);
 
   return (
@@ -2639,7 +2647,7 @@ function ReporteMensualModal({ locales, pagos, factura, monthIdx, year, config, 
     return { l, d, renta, luzM, tasaMes };
   });
 
-  const totRenta    = rows.reduce((s,r)=>s+(r.d.rentaPagada?r.renta:0),0);
+  const totRenta    = rows.reduce((s,r)=>s+rentaCobradaDe(r.d, r.renta),0);
   const totLuz      = rows.reduce((s,r)=>s+(r.d.luzPagada?r.luzM:0),0);
   const totPend     = rows.reduce((s,r)=>s+(!r.d.rentaPagada?r.renta:0),0);
   const totalFact   = factura?.montoTotal||0;
