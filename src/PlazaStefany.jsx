@@ -1028,18 +1028,23 @@ function DashboardView({
   );
 
   const kpis = useMemo(() => {
-    const totalRenta = locales.reduce((s, l) => s + calcRenta(l.m2), 0);
-    let totalLuz = 0, cobradoRenta = 0, cobradoLuz = 0;
+    let totalRenta = 0, totalLuz = 0, cobradoRenta = 0, cobradoLuz = 0;
     let pendientesRenta = 0, pendientesLuz = 0;
     locales.forEach((l) => {
+      // Locales sin inquilino no le cobran renta/luz a nadie (William los absorbe).
+      // Se excluyen de los KPIs para que el conteo cuadre con el drill-down,
+      // que también filtra `!l.inquilino`.
+      if (!l.inquilino) return;
       const d = pagos[l.id] || {};
+      const renta = calcRenta(l.m2);
+      totalRenta += renta;
       const consumo = calcConsumoLocal(l, pagos, prevPagos);
       // luz = consumo × tarifa + parte del cargo fijo (Fenix consumo 0 sigue pagando fijo)
       const montoLuz = l.tipoLuz === 'medidor'
         ? ((consumo != null && tarifaEfectiva) ? consumo * tarifaEfectiva : 0) + fijoLocalActual
         : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
       totalLuz += montoLuz;
-      if (d.rentaPagada) cobradoRenta += rentaCobradaDe(d, calcRenta(l.m2)); else pendientesRenta++;
+      if (d.rentaPagada) cobradoRenta += rentaCobradaDe(d, renta); else pendientesRenta++;
       if (l.tipoLuz !== 'incluido' && montoLuz > 0) {
         if (d.luzPagada) cobradoLuz += montoLuz; else pendientesLuz++;
       }
