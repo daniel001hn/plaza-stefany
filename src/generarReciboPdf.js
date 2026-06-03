@@ -243,16 +243,13 @@ export async function generarReciboLuzPdf(d) {
 
   sectionHead(doc, 'CÁLCULO DEL MONTO', y);
   y += 4;
-  const tieneFijos = d.cargosFijos && d.cargosFijos !== '0.00' && d.cargosFijos !== '0';
-  const body = [['Factura ENEE total (plaza)', d.kWhPlaza + ' kWh', d.facturaEnee]];
+  const tieneFijos = d.fijoLocal && d.fijoLocal !== '0.00' && d.fijoLocal !== '0';
+  const body = [];
   if (tieneFijos) {
-    body.push(['Cargos fijos del mes (comerc. + reg. + alumbrado)', 'div. entre ' + d.nLocales, d.cargosFijos]);
+    body.push(['Cargos por servicios (comerc. + reg. + alumbrado)', '', d.fijoLocal]);
   }
-  body.push(['Tarifa efectiva de energía', 'L/kWh', d.tarifa]);
-  body.push(['Su consumo de energía', d.consumo + ' × ' + d.tarifa, d.montoEnergia]);
-  if (tieneFijos) {
-    body.push(['Su parte de cargos fijos', d.cargosFijos + ' ÷ ' + d.nLocales, d.fijoLocal]);
-  }
+  body.push(['Tarifa efectiva por kWh', 'L/kWh', d.tarifa]);
+  body.push(['Consumo del local', d.consumo + ' × ' + d.tarifa, d.montoEnergia]);
   autoTable(doc, {
     startY: y,
     margin: { left: MARGIN, right: MARGIN },
@@ -264,8 +261,8 @@ export async function generarReciboLuzPdf(d) {
   y = doc.lastAutoTable.finalY + 9;
 
   const nota = tieneFijos
-    ? 'Método de cálculo: la energía se prorratea según el consumo del submedidor (factura ENEE neta de cargos fijos ÷ kWh totales de la plaza). Los cargos fijos (comercialización, regulación y alumbrado público) se dividen en partes iguales entre todos los locales con submedidor. Este recibo no genera ISV.'
-    : 'Método de cálculo: El monto se obtiene prorrateando la factura ENEE de la plaza según el consumo real registrado en el submedidor de cada local. Este recibo no genera ISV.';
+    ? 'Los cargos por servicios incluyen comercialización, regulación y alumbrado público. La energía se cobra a la tarifa efectiva del mes según el consumo del submedidor del local. Este recibo no genera ISV.'
+    : 'El monto corresponde al consumo de energía registrado en el submedidor del local, a la tarifa efectiva del mes. Este recibo no genera ISV.';
   noteBox(doc, nota, y);
 
   drawFooter(doc);
