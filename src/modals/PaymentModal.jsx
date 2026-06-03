@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Circle, X, Receipt, ExternalLink, Zap, AlertCircle, Calculator, Save, Printer } from 'lucide-react';
+import { Circle, X, Receipt, Zap, AlertCircle, Calculator, Save, Printer } from 'lucide-react';
 import { fmt2, MESES_LARGO } from '../utils/format';
 import { useLightbox } from '../components/Lightbox';
 import { ModalPortal } from '../components/ModalPortal';
@@ -33,13 +33,9 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     rentaPagada: !!data.rentaPagada,
     montoRentaPagado: data.montoRentaPagado ?? '',
     fechaRenta: data.fechaRenta || '',
-    numFactura: data.numFactura || '',
-    linkFactura: data.linkFactura || '',
     luzPagada: !!data.luzPagada,
     fechaLuz: data.fechaLuz || '',
     lecturaActual: data.lecturaActual ?? '',
-    medidorReemplazado: !!data.medidorReemplazado,
-    lecturaInicialReseteo: data.lecturaInicialReseteo ?? '',
     notas: data.notas || '',
     fotoMedidorAnterior: data.fotoMedidorAnterior || prevData?.fotoMedidorActual || '',
     fotoMedidorActual: data.fotoMedidorActual || '',
@@ -62,10 +58,8 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
   const renta = calcRenta(local.m2);
   const lecturaAnterior = prevData.lecturaActual ?? local.lecturaInicial ?? null;
 
-  const consumo = tipoLuz === 'medidor' && form.lecturaActual !== ''
-    ? (form.medidorReemplazado && form.lecturaInicialReseteo !== ''
-        ? Number(form.lecturaActual) - Number(form.lecturaInicialReseteo)
-        : (lecturaAnterior != null ? Number(form.lecturaActual) - Number(lecturaAnterior) : null))
+  const consumo = tipoLuz === 'medidor' && form.lecturaActual !== '' && lecturaAnterior != null
+    ? Number(form.lecturaActual) - Number(lecturaAnterior)
     : null;
 
   const montoEnergiaCalc = tipoLuz === 'medidor' && consumo != null && tarifaEfectiva
@@ -81,16 +75,13 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     const out = {
       rentaPagada: form.rentaPagada, fechaRenta: form.fechaRenta,
       montoRentaPagado: form.rentaPagada && form.montoRentaPagado !== '' ? Number(form.montoRentaPagado) : null,
-      numFactura: form.numFactura, linkFactura: form.linkFactura, notas: form.notas,
+      notas: form.notas,
     };
     if (tipoLuz !== 'incluido') {
       out.luzPagada = form.luzPagada;
       out.fechaLuz = form.fechaLuz;
       if (tipoLuz === 'medidor') {
         out.lecturaActual = form.lecturaActual === '' ? null : Number(form.lecturaActual);
-        out.medidorReemplazado = !!form.medidorReemplazado;
-        out.lecturaInicialReseteo = form.medidorReemplazado && form.lecturaInicialReseteo !== ''
-          ? Number(form.lecturaInicialReseteo) : null;
         out.fotoMedidorAnterior = form.fotoMedidorAnterior || null;
         out.fotoMedidorActual = form.fotoMedidorActual || null;
       }
@@ -141,31 +132,12 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
                   Dejalo vacío si pagaron el calculado (L {fmt2(renta)}). Anotá el monto real solo si difiere.
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.6rem' }}>
-                <div>
-                  <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>
-                  <input type="date" className="ps-input" value={form.fechaRenta || todayStr()} onChange={(e) => set('fechaRenta', e.target.value)} />
-                </div>
-                <div>
-                  <div className="ps-label" style={{ marginBottom: '.3rem' }}>N° Factura</div>
-                  <input className="ps-input" placeholder="000-000-..." value={form.numFactura} onChange={(e) => set('numFactura', e.target.value)} />
-                </div>
+              <div style={{ maxWidth: 220 }}>
+                <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>
+                <input type="date" className="ps-input" value={form.fechaRenta || todayStr()} onChange={(e) => set('fechaRenta', e.target.value)} />
               </div>
             </div>
           )}
-
-          <div style={{ marginTop: '.75rem' }}>
-            <div className="ps-label" style={{ marginBottom: '.3rem' }}>Enlace de factura</div>
-            <input type="url" className="ps-input" placeholder="https://drive.google.com/..." value={form.linkFactura} onChange={(e) => set('linkFactura', e.target.value)} />
-            {form.linkFactura && (
-              <a href={form.linkFactura} target="_blank" rel="noreferrer" style={{
-                fontSize: '.75rem', color: '#6366F1', textDecoration: 'none', marginTop: '.4rem',
-                display: 'inline-flex', alignItems: 'center', gap: '.3rem',
-              }}>
-                <ExternalLink size={11} /> Abrir factura
-              </a>
-            )}
-          </div>
         </div>
 
         {tipoLuz !== 'incluido' && (
@@ -226,21 +198,6 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
                   </div>
                 </div>
 
-                <div style={{ marginBottom: '.85rem', padding: '.6rem .85rem', background: 'rgba(251, 146, 60, 0.06)', border: '1px solid rgba(251, 146, 60, 0.25)', borderRadius: 8 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer', fontSize: '.8rem' }}>
-                    <input type="checkbox" className="ps-checkbox" checked={form.medidorReemplazado} onChange={(e) => set('medidorReemplazado', e.target.checked)} />
-                    <span>🔧 Submedidor reemplazado este mes</span>
-                  </label>
-                  {form.medidorReemplazado && (
-                    <div style={{ marginTop: '.5rem' }}>
-                      <div className="ps-label" style={{ marginBottom: '.3rem', fontSize: '.7rem' }}>Lectura inicial del nuevo medidor</div>
-                      <input type="number" className="ps-input ps-mono" value={form.lecturaInicialReseteo} onChange={(e) => set('lecturaInicialReseteo', e.target.value)} placeholder="0" style={{ fontSize: '.85rem' }} />
-                      <div style={{ fontSize: '.7rem', color: '#8E8E96', marginTop: '.3rem' }}>
-                        El consumo de este mes se calcula desde esta lectura, no desde el mes anterior.
-                      </div>
-                    </div>
-                  )}
-                </div>
 
                 <div style={{ marginBottom: '.85rem', padding: '.7rem .85rem', background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: 8 }}>
                   <div className="ps-label" style={{ marginBottom: '.5rem', fontSize: '.72rem', color: '#6366F1' }}>

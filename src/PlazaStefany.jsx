@@ -1,7 +1,7 @@
 // Plaza Stefany - Version con Supabase (conexion a BD en la nube)
 // Generado automaticamente - no editar manualmente
 
-import React, { useState, useEffect, useMemo, memo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, memo } from 'react';
 import {
   Settings, Plus, Check, X, Zap, Building2,
   ChevronLeft, ChevronRight, Trash2, Edit3, ExternalLink,
@@ -51,6 +51,18 @@ const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Jul
 // el calculado por fórmula. Lo "esperado/facturado" siempre usa la fórmula.
 const rentaCobradaDe = (d, rentaCalc) =>
   !d.rentaPagada ? 0 : (d.montoRentaPagado != null ? Number(d.montoRentaPagado) : rentaCalc);
+
+// El dropdown de mes en el historial NO filtra (colapsaría los gráficos de
+// tendencia a una sola barra): solo resalta y scrollea a la fila del mes.
+function useScrollToMonth(highlightIdx) {
+  const refs = useRef({});
+  useEffect(() => {
+    const el = highlightIdx != null ? refs.current[highlightIdx] : null;
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightIdx]);
+  return refs;
+}
+const mesRowHL = (on) => on ? { background: 'rgba(99,102,241,0.14)', boxShadow: 'inset 3px 0 0 #6366F1' } : null;
 
 const fmt = (n) => new Intl.NumberFormat('es-HN', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(n || 0));
 const fmt2 = (n) => new Intl.NumberFormat('es-HN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
@@ -1249,21 +1261,19 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         className="ps-input ps-mono"
         style={{ fontSize: '.9rem', maxWidth: 360, padding: '.5rem .85rem', fontWeight: 500, cursor: 'pointer' }}
       >
-        <option value="">Todos los meses</option>
+        <option value="">Ir a un mes…</option>
         {monthsData.map((m) => (
           <option key={m.idx} value={m.idx}>{m.mesLargo}</option>
         ))}
       </select>
 
       {(() => {
-        const filtered = filtro !== ''
-          ? monthsData.filter(m => String(m.idx) === filtro)
-          : monthsData;
+        const highlightIdx = filtro !== '' ? Number(filtro) : null;
         return (
           <>
-            {subView === 'plaza' && <HistorialPlaza monthsData={filtered} year={year} />}
-            {subView === 'locales' && <HistorialLocales monthsData={filtered} locales={locales} year={year} />}
-            {subView === 'enee' && <HistorialENEE monthsData={filtered} year={year} />}
+            {subView === 'plaza' && <HistorialPlaza monthsData={monthsData} year={year} highlightIdx={highlightIdx} />}
+            {subView === 'locales' && <HistorialLocales monthsData={monthsData} locales={locales} year={year} highlightIdx={highlightIdx} />}
+            {subView === 'enee' && <HistorialENEE monthsData={monthsData} year={year} highlightIdx={highlightIdx} />}
           </>
         );
       })()}
@@ -1271,7 +1281,8 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
   );
 }
 
-function HistorialPlaza({ monthsData, year }) {
+function HistorialPlaza({ monthsData, year, highlightIdx }) {
+  const rowRefs = useScrollToMonth(highlightIdx);
   const totals = useMemo(() => {
     let renta = 0, luz = 0, cobrado = 0, esperado = 0;
     monthsData.forEach((m) => {
@@ -1352,7 +1363,7 @@ function HistorialPlaza({ monthsData, year }) {
             {monthsData.map((m) => {
               const pct = m.esperado > 0 ? (m.total / m.esperado) * 100 : 0;
               return (
-                <tr key={m.idx} className="ps-table-row" style={{ opacity: m.hasData ? 1 : 0.4 }}>
+                <tr key={m.idx} ref={(el) => { rowRefs.current[m.idx] = el; }} className="ps-table-row" style={{ opacity: m.hasData ? 1 : 0.4, ...mesRowHL(m.idx === highlightIdx) }}>
                   <td style={{ fontWeight: 600 }}>{m.mesLargo}</td>
                   <td className="num">L {fmt(m.cobradoRenta)}</td>
                   <td className="num" style={{ color: '#6366F1' }}>L {fmt(m.cobradoLuz)}</td>
@@ -1381,7 +1392,7 @@ function HistorialPlaza({ monthsData, year }) {
   );
 }
 
-function HistorialLocales({ monthsData, locales, year }) {
+function HistorialLocales({ monthsData, locales, year, highlightIdx }) {
   const [expandedLocal, setExpandedLocal] = useState(null);
 
   if (locales.length === 0) {
@@ -1465,7 +1476,7 @@ function HistorialLocales({ monthsData, locales, year }) {
                       {monthsData.map((m) => {
                         const ld = m.localData[l.id] || {};
                         return (
-                          <tr key={m.idx} className="ps-table-row" style={{ opacity: m.hasData ? 1 : 0.35 }}>
+                          <tr key={m.idx} className="ps-table-row" style={{ opacity: m.hasData ? 1 : 0.35, ...mesRowHL(m.idx === highlightIdx) }}>
                             <td style={{ fontWeight: 600 }}>{m.mes}</td>
                             <td className="num" style={{ color: '#8E8E96' }}>
                               {ld.lecturaActual != null ? ld.lecturaActual : '—'}
@@ -1512,7 +1523,8 @@ function HistorialLocales({ monthsData, locales, year }) {
   );
 }
 
-function HistorialENEE({ monthsData, year }) {
+function HistorialENEE({ monthsData, year, highlightIdx }) {
+  const rowRefs = useScrollToMonth(highlightIdx);
   const yearTotals = useMemo(() => {
     let monto = 0, kwhPrincipal = 0, kwhSubmedidores = 0, areasComunes = 0;
     let mesesConData = 0;
@@ -1658,7 +1670,7 @@ function HistorialENEE({ monthsData, year }) {
           </thead>
           <tbody>
             {monthsData.map((m) => (
-              <tr key={m.idx} className="ps-table-row" style={{ opacity: m.factura.montoTotal ? 1 : 0.35 }}>
+              <tr key={m.idx} ref={(el) => { rowRefs.current[m.idx] = el; }} className="ps-table-row" style={{ opacity: m.factura.montoTotal ? 1 : 0.35, ...mesRowHL(m.idx === highlightIdx) }}>
                 <td style={{ fontWeight: 600 }}>{m.mes}</td>
                 <td style={{ fontSize: '.72rem', color: '#6E6E78', whiteSpace: 'nowrap' }}>
                   {m.factura.periodoDesde && m.factura.periodoHasta
