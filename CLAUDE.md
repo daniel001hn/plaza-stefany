@@ -2,7 +2,35 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> Business context, billing rules, and deployment ops are documented in `C:/Users/ALIENWARE/CLAUDE.md` (loaded automatically by Claude Code). This file focuses on **architecture and developer workflow** for this specific repo.
+> **Este es el CLAUDE.md ÚNICO y principal de Plaza Stefany** (negocio + arquitectura + contexto histórico). El que está en `C:/Users/ALIENWARE/CLAUDE.md` es solo un puntero a este archivo.
+
+---
+
+## Contexto de negocio
+
+- **Propietario legal:** D & L Soluciones S de R.L.
+- **Director Comercial:** William (dueño del repo)
+- **Ubicación:** Colonia América, frente a Torre Xcala, Tegucigalpa, Honduras
+- **Brand correcto:** "Stefany Plaza" (no "Plaza Stefany"). El dominio `plazastefany.com` queda como está hasta renovación 2027.
+- **Locales:** 5 unidades comerciales con submedidores eléctricos individuales (L1=84m² Tatys, L2=84m² libre, L3=54m² DSD, L4=54m² Fenix, L5=54m² libre)
+- **Restricción de tenants:** NO se aceptan salones de belleza ni restaurantes
+- **Moneda:** Lempiras (L) · **Idioma de la app:** Español (Honduras)
+- **Naturaleza de la data:** app de **control interno sin información sensible** (capturas de transferencias + montos por fórmula pública). Esto justifica decisiones como bucket público y no aislar RLS por inquilino.
+
+### Lógica de cobro
+
+**Renta:** `m² × L29 × tasaUSD/HNL × (1 + 15% ISV)`.
+
+**Electricidad (prorrateo de factura ENEE):**
+1. Cada local tiene submedidor → se lee el consumo en kWh.
+2. **Cargos fijos** (comercialización 60 + regulación 30 + alumbrado 130) se dividen en partes iguales entre locales con submedidor (Fenix consumo 0 igual paga su fijo).
+3. Solo la **energía neta** (factura ENEE − cargos fijos) se prorratea: `tarifa efectiva = (monto − cargosFijos) / kWh total`.
+4. Cada local paga: `(kWh propio + común asignado) × tarifa efectiva + su cargo fijo`.
+5. **El ISV NO se re-aplica** sobre la luz — la factura ENEE ya viene con impuestos.
+
+### Convenciones de negocio
+- Moneda: `L 1,234.56` · Fechas al usuario: `DD/MM/YYYY` o `'Mayo 2026'`.
+- WhatsApp de contacto D&L: +504 9462-8618.
 
 ---
 
@@ -86,6 +114,52 @@ The complex parts of the luz cálculo live in pure functions at the top of [Plaz
 - Avoid emojis in jsPDF output — the embedded Helvetica/Arial only supports Latin-1. Use text badges ("AVISO", "TIP") or drawn shapes (circles, triangles) instead. Existing code in `generar-manual-inquilino.cjs` shows the pattern.
 - The admin password is `Ottoniel20012005` (stored in Supabase Auth, not the bundle). Inquilino passwords: `tatys2026.`, `DSD2026.`, `fenixhn2026.`
 - When manually testing as a tenant or admin, prefer Playwright scripts in `scripts/` over manual browser clicking — they're faster to re-run and self-document.
+
+---
+
+## Contexto guardado — 2026-05-21 (histórico, fusionado del CLAUDE.md de la home)
+
+> Nota: snapshot temprano. Mucho de esto fue superado por contextos posteriores (la migración a Auth/RLS ya se hizo, el bloqueo de recibos se relajó, etc.). Se conserva por completitud.
+
+### Decisiones técnicas
+- **Stack real:** Vite + React 18, Supabase con **una sola tabla `kv_store`** (claves: `config-and-locales`, `pagos:YYYY-MM`, `audit-log`, `historial-tasas`).
+- **Recibos PDF:** jsPDF + jspdf-autotable. Generador unificado en `src/generarReciboPdf.js`. Membrete = PNG `public/membrete-header.png` 3600×600px, compresión `SLOW` → PDF ~27KB.
+- **Tasa USD/HNL:** Edge Function `api/tasa-bac.js` cadena Ficohsa → BAC → forex. Cron diario 13:00 UTC (7am Tegus). Ficohsa publica la tasa BAC sin Akamai (BAC bloquea IPs de Vercel).
+- **Cargos fijos ENEE:** `cargoComercializacion=60`, `cargoRegulacion=30`, `alumbradoPublico=130`. Partes iguales entre locales con submedidor. Solo energía neta se prorratea.
+- **Snapshot de cargos en factura:** al guardar `pagos:YYYY-MM.factura` se copian los valores de config; recibos históricos usan el snapshot.
+- **Sistema de colores:** Apple HIG. paid `#34C759`, pending `#FF9F0A`, danger `#FF3B30`, info `#5AC8FA`, energía `#0EA5E9`, brand `#6366F1`, texto secundario `#6E6E78` (NO `#888`/`#999`/`#ccc`).
+
+### Restricciones críticas (vigentes)
+- **NO commitear anon key real al `.env.example`** — solo placeholders.
+- **NO PowerShell 7-isms** — PS 5.1 only. Sin `&&`/`||`/`??`/`?.`/ternary. Sin `2>&1` en native exes.
+- **NO actualizar `config.tasaCambio` desde cliente** sin la edge function (pisa valores frescos con stale).
+- **`/api/tasa-bac` sin dryRun** requiere `CRON_SECRET`.
+- **Cálculo de luz admin DEBE sumar `fijoLocal`** (bug histórico que sub-reportaba luz, ya corregido).
+
+### Errores resueltos (referencia)
+- PDFs de 6.2MB → `addImage` con `'SLOW'` → 27KB.
+- DNS en sandbox no resuelve → `dangerouslyDisableSandbox: true` para fetch externos.
+- Akamai bloquea Vercel desde BAC → cambio a Ficohsa.
+
+---
+
+## Contexto guardado — 2026-05-22 (histórico, fusionado del CLAUDE.md de la home)
+
+### Decisiones técnicas
+- **Migración a Supabase Auth EJECUTADA:** RLS activo en `kv_store`, 4 usuarios en `auth.users` (admin + 3 tenants con dominio ficticio `@plaza-stefany.local`), policy `authenticated_only FOR ALL TO authenticated`. Las policies viejas (`pr`/`pi`/`pu`/`pd`) que daban acceso total a anon fueron dropeadas.
+- **Admin password:** `Ottoniel20012005` contra Supabase Auth como `admin@plaza-stefany.local`.
+- **storageKey de supabase-js: DEFAULT** (no custom — el custom rompió sesiones cross-deploy).
+- **Login flow en App.jsx:** `supabase.auth.getSession()` como source of truth; `onAuthStateChange` para SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED; sessionStorage es cache derivado.
+
+### Restricciones críticas
+- **NO usar `storageKey` custom en supabase-js** — rompe sesiones cross-deploy.
+- **NUNCA hacer DELETE de prueba sobre filas reales** (`config-and-locales`, etc.) para "verificar RLS" — usar siempre keys dummy `__TEST_DELETE_ME`.
+- **Secret key vieja `sb_secret_EKaW7…` quedó expuesta en un chat anterior** — debía rotarse en Supabase → Settings → API → Reset. (NO escribir la key completa acá; GitHub push protection la bloquea.)
+- **Free Plan de Supabase NO tiene backups** — si algo se borra, no hay recovery point. Hacer `pg_dump`/backup manual cuando la data sea crítica.
+
+### Errores resueltos
+- **Anon con acceso total a kv_store** → policies viejas PUBLIC → dropeadas, reemplazadas por `authenticated_only`.
+- **400 en `/auth/v1/token`** → supabase-js refrescando JWT stale con storageKey custom → revertido a default + Clear site data.
 
 ---
 
