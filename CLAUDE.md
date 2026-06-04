@@ -171,3 +171,108 @@ The complex parts of the luz cálculo live in pure functions at the top of [Plaz
 5. **Hashear passwords plaintext de tenants en config.usuarios**: ya removidos del config (solo metadata), pero si los volvés a agregar usar Supabase Auth Admin API, no plaintext
 6. **Refactor restante de PlazaStefany.jsx**: aún 2700 líneas. Si crece más, extraer DashboardView, HistorialView, ConfigView (compartir state via React Context)
 7. **Backup automático**: Free plan Supabase no incluye. Upgrade Pro ($25/mes) o pg_dump manual mensual cuando la data se vuelva crítica
+
+---
+
+## Contexto guardado — 2026-06-01 (sesión modales + tasa + perf)
+
+### Decisiones técnicas
+- **Modales: scrollea el OVERLAY, no el modal.** `.ps-modal-backdrop` = `display:flex; justify-content:center; overflow-y:auto` y `.ps-modal` usa `margin:auto` (truco flexbox: centrado si cabe, alineado arriba + scrollable si es más alto que la pantalla). Reemplazó `max-height:90vh + overflow-y:scroll` que con `align-items:center` dejaba el tope del modal inalcanzable. ReporteMensualModal (no usa `.ps-modal`) lleva el mismo `margin:auto` inline.
+- **Factura ENEE — medidor principal = kWh directos.** Ya NO se guarda lectura anterior→actual del edificio. Campo único `consumoEdificio` (kWh del período 11→11). `calcConsumoPrincipal` prefiere `factura.consumoEdificio`, fallback a `lecturaPrincipal` para meses viejos. **Los submedidores de cada local SIGUEN con inicio→final** (no se tocaron).
+- **Locales vacíos / cargos fijos = OPCIÓN B.** William ABSORBE los cargos fijos de los locales sin rentar (no se reparten entre inquilinos). `aporteDueno = montoENEE − totalLuz` por mes (= parte fija de los vacíos). **Edits 1 y 2 hechos (cómputo en monthsData + yearTotals) pero NO se muestra aún** — falta edit 3 (mostrarlo en tarjeta Cuadratura). Dormido a propósito.
+- **storageAdapter resiliente:** retry backoff (3 intentos, timeout 6s c/u) + cache localStorage. `get()` network-first; si todo falla sirve la última copia cacheada (no `null`). Expone `getCached(key)` sincrónico.
+- **Dedup de lecturas en storageAdapter:** coalescing (comparte request en vuelo por clave) + micro-cache 1.5s. Colapsó la ráfaga de login donde `config-and-locales` se pedía 3× (App.handleSubmit + App.deriveSession + InquilinoView.load) → 1×. `set`/`delete`/realtime invalidan la micro-cache.
+- **InquilinoView cache-first:** pinta al instante desde `getCached` y refresca en background. Reabrir: ~3.3s → **~0.27s**. Guard `inFlight` + throttle 3s. Intervalo refresco 30s→60s.
+- **ErrorBoundary global** (`src/ErrorBoundary.jsx`) envuelve `<App>` — cualquier crash muestra "Recargar" en vez de blanco.
+- **Gate de recibos relajado a 7 días:** antes exigía tasa de HOY exacto → bloqueaba cada madrugada (cron 7am) y todo el día si el cron fallaba. Ahora `diasTasa <= 7`.
+- **Admin auto-cura la tasa:** al abrir el panel, si está vieja hace `fetch('/api/tasa-bac?dryRun=1')` y persiste como admin (RLS permite) con merge. Redundancia si el cron falla.
+
+### Estado actual
+- ✅ `CRON_SECRET` AHORA SÍ está en Vercel (verificado: `GET /api/tasa-bac` da 401, no 503). Cron actualiza tasa diario otra vez.
+- ✅ Tasa fresca, recibos desbloqueados.
+- ✅ RLS write-tightening CONFIRMADO aplicado (inquilino no puede escribir kv_store). Read sigue abierto a todos (limitación del blob único).
+- ✅ Recibo luz exige lectura cargada; recibo renta siempre descargable.
+- ✅ Modales caben/scrollean en iPhone (vertical + horizontal). Stress test 105 OK / 0 fallos.
+- ✅ Reabrir app ~0.27s (cache-first). Cold load (1ª vez sin cache) ~2.8s (auth + distancia a Oregon, inherente).
+- ⏳ Cuadratura "aporte dueño": cómputo listo, display pendiente (1 edit).
+
+### Restricciones críticas
+- **`CRON_SECRET` DEBE existir en Vercel** o tasa-bac da 503 → cron no persiste → recibos bloqueados. Verificar: `GET /api/tasa-bac` (401=ok, 503=falta).
+- **NO `display:grid` sin `grid-template-columns`** para listas con texto `nowrap` (la columna auto desborda). Usar flex column + `minWidth:0`.
+- **Modales: overlay scrollea con `margin:auto`, NO `align-items:center`+`max-height`.**
+- **Aislamiento de lectura por inquilino NO posible con el esquema actual** (`pagos:YYYY-MM` = un blob con todos). Requiere partir en `pagos:YYYY-MM:localId` (migración grande). Decisión A (migrar) vs B (dejar) pendiente.
+- **Organizar el código en carpetas NO mejora la velocidad** — el browser baja el mismo bundle. La lentitud es latencia a Supabase (Oregon).
+- **Feature de email/recordatorios ELIMINADA** (hacía fetch a `gmailmcp.googleapis.com` inexistente y mentía con alert de éxito). No reintroducir sin backend de email real.
+- **micro-cache storageAdapter = 1.5s** (set/delete/realtime la invalidan).
+
+### Archivos clave (modificados esta sesión)
+- `src/storageAdapter.js` — retry+cache+coalescing+micro-cache, `getCached()`
+- `src/InquilinoView.jsx` — cache-first, throttle/inFlight, gate tasa 7 días, luz exige `consumo!=null`, renta siempre, guard `!local`
+- `src/PlazaStefany.jsx` — modales overlay-scroll, DetalleCobro flex column, admin auto-cura tasa, aporteDueno (dormido), ReporteMensual margin:auto
+- `src/modals/FacturaModal.jsx` — campo `consumoEdificio` (kWh 11→11)
+- `src/calculos.js` — `calcConsumoPrincipal` usa consumoEdificio; `calcConsumoLocal` guard `!locale`
+- `src/ErrorBoundary.jsx` — NEW; `src/main.jsx` — envuelve App
+- `vercel.json` — CSP permite fonts.googleapis.com + fonts.gstatic.com
+- `scripts/_stress-test.cjs` / `_rls-probe.cjs` / `_check-tasa.cjs` / `_perf-probe.cjs` — helpers diagnóstico
+
+### Errores resueltos
+- **Modal ENEE cortado en iPhone** → `align-items:center`+`max-height` dejaba el tope fuera → overlay scrollea con `margin:auto`
+- **Filas DetalleCobro desbordaban a la derecha** → grid sin template, columna auto al nombre nowrap → flex column + minWidth:0
+- **Inquilino crasheaba en blanco al refrescar** → `calcConsumoLocal(undefined)` con storage.get timeout → guard `!locale` + try/catch + ErrorBoundary + guard `!local`
+- **CSP bloqueaba fonts Google** → faltaban dominios → agregados
+- **Recibos bloqueados** → CRON_SECRET faltaba → cron 503 desde 28-may → tasa congelada → seteado + gate 7 días + admin auto-cura
+- **Luz se descargaba sin lectura** → `tieneLuz` no exigía consumo → `&& consumo != null`
+- **Renta no se descargaba (mes actual impago)** → `rentaPagada || !esActual` → `= true`
+- **config-and-locales 3× en login** → 3 callers → coalescing + micro-cache → 1×
+
+### Próximos pasos
+1. **Terminar cuadratura "aporte dueño" (edit 3)** — mostrar `aporteDueno` en tarjeta Cuadratura + redefinir `cuadra` (✅ cuando lo cobrable está cobrado; el aporte del dueño no es faltante). Cómputo ya en monthsData/yearTotals.
+2. **Opción C (perf):** cargar solo mes actual + 2 al abrir admin, resto al scroll (baja la cold load).
+3. **Cache-first en el admin** (PlazaStefany) como InquilinoView.
+4. **Decisión RLS A vs B** (partir blob pagos por local).
+5. **Tabla tipo Excel** para lecturas (columnas=meses, inicio/final) — pedido de William, no empezado.
+6. Pendientes viejos: datos abril/mayo, Storage para comprobantes, refactor, backups.
+
+---
+
+## Contexto guardado — 2026-06-03 (imágenes a Storage + decisión "no Fase B")
+
+### Decisiones técnicas
+- **Imágenes a Supabase Storage (Fase A, HECHA).** Las fotos de medidor, comprobantes del inquilino y el adjunto de renta ya NO se guardan como base64 inline en `kv_store` (inflaban la fila del mes: `pagos:2026-05` pesaba 1 MB). Ahora van a un **bucket público `uploads`** con nombre UUID (`uploads/{comprobantes|medidores|renta}/<uuid>.jpg`) y en `kv_store` queda solo la **URL pública**. Resultado: `pagos:2026-05` 1011 KB → 2.7 KB; junio 413→0.8 KB; abril 110→1.5 KB. **0 base64 restantes** en la DB.
+- **Bucket público + nombres UUID** (no privado/signed URLs). Elegido por simplicidad: las URLs andan directo en `<img>` y en el PDF. Riesgo aceptado: quien tenga la URL la abre siempre. Justificación: la data no es sensible (capturas de transferencias, montos de renta por fórmula pública).
+- **Toda subida pasa por un endpoint** (`api/upload-image.js` para admin, `api/inquilino-comprobante.js` para inquilino) que valida JWT y sube con `service_role`. Así NO hubo que abrir Storage RLS a los clientes.
+- **`storageAdapter` NO se tocó** — sigue con el modelo blob. El cambio fue solo dónde viven las imágenes, no la estructura de `kv_store`.
+- **Fase B (normalizar schema) DESCARTADA a propósito.** Partir `kv_store` en tablas reales (`config`/`locales`/`pagos`/`facturas`) resolvía dos cosas: (1) aislamiento RLS por inquilino, (2) hot-row de escritura. **Ninguna aplica hoy:** la app es de **control sin data sensible** (William confirmó), así que la privacidad por-inquilino no protege nada que importe; y la contención de escritura no existe a 3 inquilinos. B sería reescribir la capa de datos de una app en producción que funciona = riesgo sin payoff. **Premature optimization.** El dolor real (blobs de 1 MB) ya se pagó en A.
+
+### Estado actual
+- ✅ Fase A deployada y verificada: bucket `uploads` público, 7 imágenes migradas (script `_migrate-images-to-storage.cjs --apply`), URL pública responde HTTP 200. App backward-compatible (lee base64 viejo y URL nuevo, aunque ya no quedan base64).
+- ✅ Backup completo pre-migración en `scripts/_backups/kvstore-2026-06-03T22-55-57/` (7 filas, 1.5 MB, full-dump + 1 archivo por clave). Generado con `_backup-kvstore.cjs` (login admin → JWT, NO usa service key).
+- ⚠️ Existe un bucket viejo `medidores` (público) sin usar — se quedó de antes, no estorba.
+
+### Restricciones críticas
+- **La `SUPABASE_SERVICE_ROLE_KEY` en Vercel DEBE ser la key actual** o las subidas nuevas (admin y inquilino) dan 500. El formato nuevo es `sb_secret_...`.
+- **La service key (formato `sb_secret_p7ug…`) quedó en el chat de esta sesión** — William debe rotarla en Supabase → Settings → API. (No se escribe completa acá a propósito; GitHub push protection la bloquea.)
+- **Borrar una foto/comprobante deja el archivo huérfano en Storage** (no se borra el objeto, solo la URL en `kv_store`). Leak menor, aceptable a este volumen.
+- **NO reabrir Fase B** sin un driver real: más edificios / muchos más locales (ahí duele el blob + contención), data realmente sensible, o necesidad de reportes SQL sobre pagos. Mientras sea 1 edificio / 3-5 inquilinos / control sin data sensible, el `kv_store` blob es pragmático y correcto.
+
+### Otros cambios de UI en esta sesión (admin)
+- **Recibo de luz:** tabla "Cálculo del monto" sin detalle de plaza — solo Cargos por servicios (= fijoLocal), Tarifa efectiva por kWh, Consumo del local. Quitada la palabra "Su".
+- **Historial:** el dropdown de mes **resalta + scrollea** la fila del mes (ya no filtra — filtrar colapsaba los gráficos de tendencia a un bloque). Gráficos/tablas siempre muestran el año completo.
+- **KPIs:** el conteo de Pendientes/totales **excluye locales vacíos** (sin inquilino) para cuadrar con el drill-down.
+- **PaymentModal:** campo "Monto pagado" en renta (override de lo cobrado, no del esperado/recibo); fecha más compacta; subir comprobante de renta (solo nombre + ✓, sin preview, key `adjuntoRenta`). **Quitados:** N° factura, enlace de factura, "submedidor reemplazado".
+- **Dead code:** removido `aporteDueno` (se calculaba y nunca se mostraba).
+
+### Archivos clave (nuevos/modificados)
+- `api/upload-image.js` — NEW. Endpoint subida admin → Storage, valida JWT, service_role.
+- `src/uploadImage.js` — NEW. Helper cliente (getSession → POST /api/upload-image → URL).
+- `api/inquilino-comprobante.js` — el `action:upload` sube a Storage y guarda URL (antes base64 inline).
+- `src/generarReciboPdf.js` — `toDataUrl()` baja la URL→bytes para `addImage` (maneja base64 y URL).
+- `src/modals/PaymentModal.jsx` — fotos/adjunto suben a Storage; campos renta; limpieza.
+- `src/PlazaStefany.jsx` — dropdown resalta (`useScrollToMonth`/`mesRowHL`), KPIs sin vacíos, `rentaCobradaDe`.
+- `scripts/_backup-kvstore.cjs` / `_migrate-images-to-storage.cjs` / `_ensure-bucket.cjs` — NEW (gitignored). Backup, migración idempotente (dry-run default), crear bucket.
+
+### Próximos pasos
+1. **William rota la service key** `sb_secret_p7ug…` y confirma que la de Vercel quede igual a la nueva.
+2. Verificación visual en la app: comprobantes/fotos se ven, recibo de luz con fotos genera la pág. 2.
+3. (Si algún día) limpieza de objetos huérfanos en Storage al borrar foto/comprobante.
+4. Pendientes viejos siguen: datos abril/mayo, tabla tipo Excel de lecturas, perf opción C, cache-first admin.
