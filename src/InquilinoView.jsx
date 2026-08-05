@@ -207,6 +207,8 @@ export default function InquilinoView({ session, onLogout }) {
     const computeMonths = (loc) => {
       const desdeStr = loc?.contratoDesde
       const desde = desdeStr ? new Date(desdeStr + 'T00:00:00') : null
+      const cobroDesde = loc?.cobroDesde || null   // "YYYY-MM"
+      const cobroHasta = loc?.cobroHasta || null   // "YYYY-MM"
       const now = new Date()
       const list = []
       for (let i = 0; i < 12; i++) {
@@ -214,6 +216,9 @@ export default function InquilinoView({ session, onLogout }) {
         const y = d.getFullYear(); const m = d.getMonth()
         const finDeMes = new Date(y, m + 1, 0)
         if (desde && desde > finDeMes) continue
+        const ym = `${y}-${String(m + 1).padStart(2, '0')}`
+        if (cobroDesde && ym < cobroDesde) continue
+        if (cobroHasta && ym > cobroHasta) continue
         list.push({ y, m })
       }
       return list

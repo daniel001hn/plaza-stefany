@@ -18,7 +18,7 @@ import { monthKey } from './keys';
 import {
   getPrecioForMonth, calcConsumoLocal, calcTotalKwhSubmedidores,
   calcCargosFijosTotal, calcLocalesConMedidor, calcPerLocalFijo,
-  calcTarifaEfectiva, calcConsumoPrincipal,
+  calcTarifaEfectiva, calcConsumoPrincipal, enRangoCobro,
 } from './calculos';
 import { LocalEditModal } from './modals/LocalEditModal';
 import { FacturaModal } from './modals/FacturaModal';
@@ -1044,9 +1044,10 @@ function DashboardView({
     let pendientesRenta = 0, pendientesLuz = 0;
     locales.forEach((l) => {
       // Locales sin inquilino no le cobran renta/luz a nadie (William los absorbe).
-      // Se excluyen de los KPIs para que el conteo cuadre con el drill-down,
-      // que también filtra `!l.inquilino`.
-      if (!l.inquilino) return;
+      // Se excluyen de los KPIs para que el conteo cuadre con el drill-down.
+      // También se excluye a un inquilino fuera de su rango de cobro (ya se fue
+      // o aún no arranca) para no contarlo como pendiente.
+      if (!l.inquilino || !enRangoCobro(l, year, monthIdx)) return;
       const d = pagos[l.id] || {};
       const renta = calcRenta(l.m2);
       totalRenta += renta;
@@ -1067,7 +1068,7 @@ function DashboardView({
       totalCobrado: cobradoRenta + cobradoLuz,
       totalEsperado: totalRenta + totalLuz,
     };
-  }, [locales, pagos, prevPagos, tarifaEfectiva, fijoLocalActual, config]);
+  }, [locales, pagos, prevPagos, tarifaEfectiva, fijoLocalActual, config, year, monthIdx]);
 
   const perLocal = useMemo(() => {
     return locales.map((l) => {
@@ -1151,7 +1152,7 @@ function DashboardView({
         </div>
 
         <div style={{ display: 'grid', gap: '.5rem' }}>
-          {perLocal.map((l, i) => (
+          {perLocal.filter((l) => !l.inquilino || enRangoCobro(l, year, monthIdx)).map((l, i) => (
             <LocalRow key={l.id} l={l} data={pagos[l.id] || {}} tarifaEfectiva={tarifaEfectiva}
               prevData={prevPagos[l.id] || {}} mesAnterior={MESES_LARGO[(monthIdx + 11) % 12]}
               onClick={() => onOpenPayment(l)} i={i}
@@ -1196,8 +1197,11 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         const consumo = calcConsumoLocal(l, p, prevP);
         const luz = (l.tipoLuz === 'medidor' && consumo != null && tarifa)
           ? consumo * tarifa + fijoLocal : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
-        totalRenta += renta;
-        totalLuz += luz;
+        // Esperado: solo si hay inquilino activo ese mes (dentro del rango de cobro).
+        // Cobrado: siempre que haya pago real, aunque el local ya esté libre
+        // (así el historial de un ex-inquilino sigue sumando lo que pagó).
+        const activo = !!l.inquilino && enRangoCobro(l, year, idx);
+        if (activo) { totalRenta += renta; totalLuz += luz; }
         if (d.rentaPagada) cobradoRenta += rentaCobradaDe(d, renta);
         if (d.luzPagada) cobradoLuz += luz;
         localData[l.id] = {
@@ -1208,6 +1212,7 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
           luzPagada: !!d.luzPagada,
           fechaRenta: d.fechaRenta,
           fechaLuz: d.fechaLuz,
+          nombre: d.actividadNombre || '',
         };
       });
 
@@ -1220,7 +1225,7 @@ function HistorialView({ locales, yearData, year, setYear, config, calcRenta }) 
         hasData: Object.keys(p).length > 0 || Object.keys(fact).length > 0,
       };
     });
-  }, [yearData, locales, config]);
+  }, [yearData, locales, config, year]);
 
   return (
     <div className="ps-fade-in" style={{ display: 'grid', gap: '1rem' }}>
@@ -1410,13 +1415,17 @@ function HistorialLocales({ monthsData, locales, year, highlightIdx }) {
         let totalRenta = 0, totalLuz = 0, totalConsumo = 0;
         let mesesPagosRenta = 0, mesesPagosLuz = 0, mesesConData = 0;
 
+        let nombreHist = '';
         monthsData.forEach((m) => {
           const ld = m.localData[l.id];
           if (!ld) return;
+          if (ld.nombre) nombreHist = ld.nombre;   // último nombre visto en los pagos del año
           if (ld.rentaPagada) { totalRenta += (ld.montoRentaPagado != null ? Number(ld.montoRentaPagado) : ld.renta); mesesPagosRenta++; }
           if (ld.luzPagada) { totalLuz += ld.luz; mesesPagosLuz++; }
           if (ld.consumo != null) { totalConsumo += ld.consumo; mesesConData++; }
         });
+        // Nombre a mostrar: inquilino actual, o el guardado en pagos (ex-inquilino), o "Sin asignar".
+        const nombreMostrar = l.inquilino || nombreHist;
 
         return (
           <div key={l.id} className="ps-card" style={{ overflow: 'hidden' }}>
@@ -1434,7 +1443,10 @@ function HistorialLocales({ monthsData, locales, year, highlightIdx }) {
               }}>{l.numero || '?'}</span>
               <div>
                 <div style={{ fontSize: '.95rem', fontWeight: 500 }}>
-                  {l.inquilino || <span style={{ color: '#5A5A64' }}>Sin asignar</span>}
+                  {nombreMostrar || <span style={{ color: '#5A5A64' }}>Sin asignar</span>}
+                  {!l.inquilino && nombreHist && (
+                    <span style={{ fontSize: '.62rem', fontWeight: 600, color: '#6E6E78', background: 'rgba(0,0,0,0.05)', padding: '.1rem .4rem', borderRadius: 5, marginLeft: '.4rem' }}>EX-INQUILINO</span>
+                  )}
                 </div>
                 <div style={{ fontSize: '.72rem', color: '#6E6E78', marginTop: '.1rem' }}>
                   {l.m2} m² · {l.nombre || '—'}

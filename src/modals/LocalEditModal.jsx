@@ -15,6 +15,8 @@ export function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarCon
     lecturaInicial: locale.lecturaInicial ?? '',
     luzFija: locale.luzFija ?? '',
     contratoDesde: locale.contratoDesde || '',
+    cobroDesde: locale.cobroDesde || '',
+    cobroHasta: locale.cobroHasta || '',
   });
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
@@ -25,6 +27,8 @@ export function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarCon
       lecturaInicial: f.lecturaInicial === '' ? null : Number(f.lecturaInicial),
       luzFija: f.luzFija === '' ? null : Number(f.luzFija),
       contratoDesde: f.contratoDesde || null,
+      cobroDesde: f.cobroDesde || null,
+      cobroHasta: f.cobroHasta || null,
     });
   };
 
@@ -77,6 +81,21 @@ export function LocalEditModal({ locale, onClose, onSave, calcRenta, onCerrarCon
             </div>
           </div>
         )}
+
+        <div style={{ marginBottom: '.85rem' }}>
+          <div className="ps-label" style={{ marginBottom: '.4rem' }}>Período de cobro</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.65rem' }}>
+            <Field label="Cobrar desde (mes)">
+              <input type="month" className="ps-input" value={f.cobroDesde} onChange={(e) => set('cobroDesde', e.target.value)} />
+            </Field>
+            <Field label="Cobrar hasta (mes)">
+              <input type="month" className="ps-input" value={f.cobroHasta} onChange={(e) => set('cobroHasta', e.target.value)} />
+            </Field>
+          </div>
+          <div style={{ fontSize: '.72rem', color: '#6E6E78', marginTop: '.35rem' }}>
+            Meses en que se le cobra renta y luz a este inquilino. <b>Desde</b> vacío = usa el inicio del contrato. <b>Hasta</b> vacío = en curso (sin fin). Cuando un inquilino se va, poné su último mes en “Hasta” y se corta solo, conservando el historial.
+          </div>
+        </div>
 
         <div style={{ marginBottom: '.85rem' }}>
           <div className="ps-label" style={{ marginBottom: '.4rem' }}>Tipo de cobro de luz</div>

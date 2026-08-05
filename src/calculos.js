@@ -118,3 +118,25 @@ export function calcRenta(m2, config, year, monthIdx) {
   const isv = config.isv ?? 0.15;
   return (m2 || 0) * precio * tasa * (1 + isv);
 }
+
+// ──────────────────────────────────────────────────────────────
+// Rango de cobro por inquilino
+// ──────────────────────────────────────────────────────────────
+// Clave "YYYY-MM" para un año + índice de mes (0 = enero).
+export function mesKey(year, monthIdx) {
+  return `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+}
+
+// ¿Se le cobra renta/luz a este local en (year, monthIdx)?
+// Rango [cobroDesde, cobroHasta] inclusive, ambos "YYYY-MM".
+// Fallbacks retrocompatibles: si falta cobroDesde, usa el mes de contratoDesde;
+// si falta cobroHasta, se cobra indefinidamente (en curso).
+export function enRangoCobro(locale, year, monthIdx) {
+  if (!locale) return false;
+  const ym = mesKey(year, monthIdx);
+  const desde = locale.cobroDesde || (locale.contratoDesde ? locale.contratoDesde.slice(0, 7) : null);
+  const hasta = locale.cobroHasta || null;
+  if (desde && ym < desde) return false;
+  if (hasta && ym > hasta) return false;
+  return true;
+}
