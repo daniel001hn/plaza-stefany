@@ -554,6 +554,7 @@ export default function InquilinoView({ session, onLogout }) {
           const idx = meses.findIndex(m => m.year === mes.year && m.monthIdx === mes.monthIdx)
           const { data } = mes
           const rentaPagada = !!data.rentaPagada
+          const rentaCondonada = !!data.rentaCondonada
           const tipoLuz     = local?.tipoLuz || 'incluido'
           const luzAplica   = tipoLuz !== 'incluido'
           const esActual    = mes.year === today.getFullYear() && mes.monthIdx === today.getMonth()
@@ -562,6 +563,7 @@ export default function InquilinoView({ session, onLogout }) {
           const luzMes      = meses[idx + 1] || null
           const luzData     = luzMes?.data || {}
           const luzPagada   = !!luzData.luzPagada
+          const luzCondonada = !!luzData.luzCondonada
           const luzPagosAll = luzMes?.pagosAll || {}
           const luzPrevPagosAll = meses[idx + 2]?.pagosAll || {}
           const tarifaEf    = luzMes ? (calcTarifaEfectiva(luzMes.factura, locales, luzPagosAll, luzPrevPagosAll, config) || 0) : 0
@@ -607,10 +609,11 @@ export default function InquilinoView({ session, onLogout }) {
 
               <div style={{display:'flex',gap:'.4rem',flexWrap:'wrap',marginBottom:'.65rem',alignItems:'center'}}>
                 <span style={{fontSize:'.67rem',color:'#6E6E78'}}>Renta {MESES[mes.monthIdx]}</span>
-                {rentaPagada ? <span className="pill-g"><span className="dg"/>Pagada</span> : <span className="pill-o"><span className="do"/>Pendiente</span>}
+                {rentaPagada ? <span className="pill-g"><span className="dg"/>Pagada</span> : rentaCondonada ? <span className="pill-x"><span className="dx"/>Condonada</span> : <span className="pill-o"><span className="do"/>Pendiente</span>}
                 {luzAplica && <><span style={{fontSize:'.67rem',color:'#6E6E78',marginLeft:'.2rem'}}>Luz {luzLabel || ''}</span>
                   {!tieneLuz ? <span className="pill-x"><span className="dx"/>No disponible</span>
                     : luzPagada ? <span className="pill-g"><span className="dg"/>Pagada</span>
+                    : luzCondonada ? <span className="pill-x"><span className="dx"/>Condonada</span>
                     : <span className="pill-o"><span className="do"/>Pendiente</span>}</>}
                 {!luzAplica && <><span style={{fontSize:'.67rem',color:'#6E6E78',marginLeft:'.2rem'}}>Luz</span><span className="pill-x"><span className="dx"/>Incluida</span></>}
               </div>

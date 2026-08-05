@@ -32,11 +32,13 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
   const lb = useLightbox();
   const [form, setForm] = useState({
     rentaPagada: !!data.rentaPagada,
+    rentaCondonada: !!data.rentaCondonada,
     montoRentaPagado: data.montoRentaPagado ?? '',
     fechaRenta: data.fechaRenta || '',
     adjuntoRenta: data.adjuntoRenta || '',
     adjuntoRentaNombre: data.adjuntoRentaNombre || '',
     luzPagada: !!data.luzPagada,
+    luzCondonada: !!data.luzCondonada,
     fechaLuz: data.fechaLuz || '',
     lecturaActual: data.lecturaActual ?? '',
     notas: data.notas || '',
@@ -93,6 +95,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
   const handleSave = () => {
     const out = {
       rentaPagada: form.rentaPagada, fechaRenta: form.fechaRenta,
+      rentaCondonada: form.rentaCondonada,
       montoRentaPagado: form.rentaPagada && form.montoRentaPagado !== '' ? Number(form.montoRentaPagado) : null,
       adjuntoRenta: form.adjuntoRenta || null,
       adjuntoRentaNombre: form.adjuntoRenta ? (form.adjuntoRentaNombre || 'comprobante') : null,
@@ -100,6 +103,7 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
     };
     if (tipoLuz !== 'incluido') {
       out.luzPagada = form.luzPagada;
+      out.luzCondonada = form.luzCondonada;
       out.fechaLuz = form.fechaLuz;
       if (tipoLuz === 'medidor') {
         out.lecturaActual = form.lecturaActual === '' ? null : Number(form.lecturaActual);
@@ -139,9 +143,18 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
           </div>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.4rem 0' }}>
-            <input type="checkbox" className="ps-checkbox" checked={form.rentaPagada} onChange={(e) => set('rentaPagada', e.target.checked)} />
+            <input type="checkbox" className="ps-checkbox" checked={form.rentaPagada}
+              onChange={(e) => setForm((f) => ({ ...f, rentaPagada: e.target.checked, rentaCondonada: e.target.checked ? false : f.rentaCondonada }))} />
             <span style={{ fontSize: '.92rem', fontWeight: 500 }}>Renta pagada</span>
           </label>
+
+          {!form.rentaPagada && (
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.2rem 0' }}>
+              <input type="checkbox" className="ps-checkbox" checked={form.rentaCondonada}
+                onChange={(e) => setForm((f) => ({ ...f, rentaCondonada: e.target.checked, rentaPagada: e.target.checked ? false : f.rentaPagada }))} />
+              <span style={{ fontSize: '.82rem', fontWeight: 500, color: '#8E8E96' }}>Condonar renta <span style={{ fontSize: '.72rem' }}>(no se le cobra este mes)</span></span>
+            </label>
+          )}
 
           {form.rentaPagada && (
             <div style={{ marginTop: '.6rem' }}>
@@ -291,9 +304,17 @@ export function PaymentModal({ local, monthIdx, year, data, prevData, factura, t
             {montoLuzCalc > 0 && (
               <>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.4rem 0' }}>
-                  <input type="checkbox" className="ps-checkbox" checked={form.luzPagada} onChange={(e) => set('luzPagada', e.target.checked)} />
+                  <input type="checkbox" className="ps-checkbox" checked={form.luzPagada}
+                    onChange={(e) => setForm((f) => ({ ...f, luzPagada: e.target.checked, luzCondonada: e.target.checked ? false : f.luzCondonada }))} />
                   <span style={{ fontSize: '.92rem', fontWeight: 500 }}>Luz pagada</span>
                 </label>
+                {!form.luzPagada && (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '.6rem', cursor: 'pointer', padding: '.2rem 0' }}>
+                    <input type="checkbox" className="ps-checkbox" checked={form.luzCondonada}
+                      onChange={(e) => setForm((f) => ({ ...f, luzCondonada: e.target.checked, luzPagada: e.target.checked ? false : f.luzPagada }))} />
+                    <span style={{ fontSize: '.82rem', fontWeight: 500, color: '#8E8E96' }}>Condonar luz <span style={{ fontSize: '.72rem' }}>(no se le cobra este mes)</span></span>
+                  </label>
+                )}
                 {form.luzPagada && (
                   <div style={{ marginTop: '.5rem', maxWidth: 220 }}>
                     <div className="ps-label" style={{ marginBottom: '.3rem' }}>Fecha</div>

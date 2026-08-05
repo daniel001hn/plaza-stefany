@@ -1057,9 +1057,9 @@ function DashboardView({
         ? ((consumo != null && tarifaEfectiva) ? consumo * tarifaEfectiva : 0) + fijoLocalActual
         : (l.tipoLuz === 'fijo' ? (l.luzFija || 0) : 0);
       totalLuz += montoLuz;
-      if (d.rentaPagada) cobradoRenta += rentaCobradaDe(d, renta); else pendientesRenta++;
+      if (d.rentaPagada) cobradoRenta += rentaCobradaDe(d, renta); else if (!d.rentaCondonada) pendientesRenta++;
       if (l.tipoLuz !== 'incluido' && montoLuz > 0) {
-        if (d.luzPagada) cobradoLuz += montoLuz; else pendientesLuz++;
+        if (d.luzPagada) cobradoLuz += montoLuz; else if (!d.luzCondonada) pendientesLuz++;
       }
     });
     return {
@@ -1903,15 +1903,15 @@ function DetalleCobroModal({ tipo, perLocal, pagos, mesLargo, year, onClose, onO
       if (!l.inquilino) return false;
       if (tipo === 'pendientes') {
         const d = pagos[l.id] || {};
-        const debeRenta = !d.rentaPagada && l.renta > 0;
-        const debeLuz = !d.luzPagada && l.luz > 0;
+        const debeRenta = !d.rentaPagada && !d.rentaCondonada && l.renta > 0;
+        const debeLuz = !d.luzPagada && !d.luzCondonada && l.luz > 0;
         return debeRenta || debeLuz;
       }
       return true;
     })
     .map(l => {
       const d = pagos[l.id] || {};
-      return { ...l, rentaPagada: !!d.rentaPagada, luzPagada: !!d.luzPagada, fechaRenta: d.fechaRenta, fechaLuz: d.fechaLuz };
+      return { ...l, rentaPagada: !!d.rentaPagada, luzPagada: !!d.luzPagada, rentaCondonada: !!d.rentaCondonada, luzCondonada: !!d.luzCondonada, fechaRenta: d.fechaRenta, fechaLuz: d.fechaLuz };
     });
 
   const sumCobrado = rows.reduce((s, r) => s + (tipo === 'renta' ? (r.cobradoRenta || 0) : tipo === 'luz' ? (r.luzPagada ? r.luz : 0) : r.cobrado), 0);
@@ -2113,6 +2113,7 @@ const LocalRow = memo(function LocalRow({ l, data, tarifaEfectiva, prevData = {}
   const btnPaid = { ...btnBase, background: '#D1FAE5', color: '#065F46' };
   const btnPending = { ...btnBase, background: '#FEE2E2', color: '#991B1B' };
   const btnNA = { ...btnBase, background: '#F3F4F6', color: '#9CA3AF', cursor: 'default' };
+  const btnCondonada = { ...btnBase, background: '#EDE9FE', color: '#6D28D9', cursor: 'default' };
 
   return (
     <div className="ps-local-row" onClick={onClick} style={{ animationDelay: `${i * 60}ms` }}>
@@ -2134,10 +2135,12 @@ const LocalRow = memo(function LocalRow({ l, data, tarifaEfectiva, prevData = {}
         <div className="ps-label" style={{ marginBottom: '.25rem' }}>RENTA</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
           <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 600 }}>L {fmt(l.renta)}</div>
-          <button style={data.rentaPagada ? btnPaid : btnPending}
-            onClick={(e) => { e.stopPropagation(); onToggleRenta && onToggleRenta(); }}>
-            {data.rentaPagada ? '✓ Pagada' : '○ Pendiente'}
-          </button>
+          {data.rentaCondonada && !data.rentaPagada
+            ? <span style={btnCondonada}>⊘ Condonada</span>
+            : <button style={data.rentaPagada ? btnPaid : btnPending}
+                onClick={(e) => { e.stopPropagation(); onToggleRenta && onToggleRenta(); }}>
+                {data.rentaPagada ? '✓ Pagada' : '○ Pendiente'}
+              </button>}
         </div>
       </div>
 
@@ -2148,10 +2151,12 @@ const LocalRow = memo(function LocalRow({ l, data, tarifaEfectiva, prevData = {}
             <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', flexWrap: 'wrap' }}>
               <div className="ps-mono" style={{ fontSize: '.95rem', fontWeight: 600 }}>L {fmt(l.luz)}</div>
               {l.luz > 0
-                ? <button style={data.luzPagada ? btnPaid : btnPending}
-                    onClick={(e) => { e.stopPropagation(); onToggleLuz && onToggleLuz(); }}>
-                    {data.luzPagada ? '✓ Pagada' : '○ Pendiente'}
-                  </button>
+                ? (data.luzCondonada && !data.luzPagada
+                    ? <span style={btnCondonada}>⊘ Condonada</span>
+                    : <button style={data.luzPagada ? btnPaid : btnPending}
+                        onClick={(e) => { e.stopPropagation(); onToggleLuz && onToggleLuz(); }}>
+                        {data.luzPagada ? '✓ Pagada' : '○ Pendiente'}
+                      </button>)
                 : <span style={btnNA}>—</span>}
               {l.consumo != null && (
                 <span className="ps-mono" style={{ fontSize: '.7rem', color: '#6366F1' }}>{l.consumo} kWh</span>
