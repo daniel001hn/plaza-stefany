@@ -197,14 +197,30 @@ async function agregarPaginaFotos(doc, d) {
   doc.text(`Local ${d.local} · ${d.periodo}`, pw / 2, y, { align: 'center' });
   y += 8;
 
-  // Cada foto ocupa ~ mitad disponible del ancho útil, max altura tal que entren las 2 + footer
+  // Caja máxima por foto: tamaño coherente (NO toda la página). Se respeta el aspect
+  // ratio real de la foto y se centra dentro de la caja, así no sale estirada.
   const usable = pw - 2 * MARGIN;
-  const fotoW = usable;
   const labelH = 7;
   const footerSpace = 22; // espacio para footer + nota
   const availH = ph - y - footerSpace;
-  const fotoH = Math.min((availH - 2 * labelH - 6) / 2, 95);
+  const gap = 10;         // separación vertical entre las 2 fotos
+  const boxW = Math.min(usable, 95);                              // ancho máx ~95mm
+  const boxH = Math.min((availH - 2 * labelH - gap) / 2, 78);     // alto máx por foto
 
+  // Devuelve {w,h} de la foto ajustada dentro de (boxW,boxH) sin deformar.
+  const fitDims = (dataUrl) => {
+    try {
+      const p = doc.getImageProperties(dataUrl);
+      const r = p.width / p.height;
+      let w = boxW, h = w / r;
+      if (h > boxH) { h = boxH; w = h * r; }
+      return { w, h };
+    } catch (e) {
+      return { w: boxW * 0.75, h: boxH * 0.75 };
+    }
+  };
+
+  // Dibuja el label + la foto centrada. Devuelve la altura real dibujada.
   const dibujarFoto = (dataUrl, label, lectura, top) => {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
@@ -217,17 +233,24 @@ async function agregarPaginaFotos(doc, d) {
       doc.text('Lectura: ' + lectura + ' kWh', pw - MARGIN, top, { align: 'right' });
     }
     if (dataUrl) {
+      const { w, h } = fitDims(dataUrl);
+      const x = MARGIN + (usable - w) / 2; // centrada horizontalmente
       try {
-        doc.addImage(dataUrl, 'JPEG', MARGIN, top + 2, fotoW, fotoH, undefined, 'SLOW');
+        doc.addImage(dataUrl, 'JPEG', x, top + 3, w, h, undefined, 'SLOW');
+        return h;
       } catch (e) {
         doc.setTextColor(...C.light);
-        doc.text('(foto no disponible)', pw / 2, top + fotoH / 2, { align: 'center' });
+        doc.text('(foto no disponible)', pw / 2, top + 20, { align: 'center' });
+        return 40;
       }
     } else {
+      const w = boxW * 0.6, h = boxH * 0.6;
+      const x = MARGIN + (usable - w) / 2;
       doc.setFillColor(245, 245, 247);
-      doc.rect(MARGIN, top + 2, fotoW, fotoH, 'F');
+      doc.rect(x, top + 3, w, h, 'F');
       doc.setTextColor(...C.light);
-      doc.text('(sin foto)', pw / 2, top + fotoH / 2 + 2, { align: 'center' });
+      doc.text('(sin foto)', pw / 2, top + 3 + h / 2, { align: 'center' });
+      return h;
     }
   };
 
@@ -235,8 +258,8 @@ async function agregarPaginaFotos(doc, d) {
     toDataUrl(d.fotoMedidorAnterior),
     toDataUrl(d.fotoMedidorActual),
   ]);
-  dibujarFoto(anteriorData, 'LECTURA ANTERIOR', d.lecturaAnterior, y);
-  dibujarFoto(actualData, 'LECTURA ACTUAL', d.lecturaActual, y + fotoH + labelH + 4);
+  const h1 = dibujarFoto(anteriorData, 'LECTURA ANTERIOR', d.lecturaAnterior, y);
+  dibujarFoto(actualData, 'LECTURA ACTUAL', d.lecturaActual, y + 3 + h1 + gap + labelH);
 
   drawFooter(doc);
 }
